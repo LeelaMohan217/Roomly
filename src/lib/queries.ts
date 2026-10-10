@@ -1058,7 +1058,11 @@ export type PairwiseLedger = {
 
 export function usePairwiseLedger(memberId: string | undefined) {
   return useQuery({
-    queryKey: ['pairwise', memberId],
+    // 'v2' since the result changed from PairNet[] to PairwiseLedger. The query
+    // cache is persisted for a week, so without a new key the first launch on
+    // an updated bundle restores the OLD array under this key, and
+    // `data.pairs.find` throws on the pair screen before the refetch lands.
+    queryKey: ['pairwise', 'v2', memberId],
     enabled: !!memberId,
     queryFn: async (): Promise<PairwiseLedger> => {
       const [expenses, settlements] = await Promise.all([
