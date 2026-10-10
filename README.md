@@ -1,56 +1,145 @@
-# Welcome to your Expo app 👋
+# Roomly
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Shared expenses for people who live together. Roomly tracks who paid what in a
+household, works out who owes whom, and records settlements, with each month
+closed off once it is done.
 
-## Get started
+Built with [Expo](https://expo.dev) (SDK 57, Expo Router) and
+[Supabase](https://supabase.com) (Postgres, Auth, Realtime). Runs on Android,
+iOS and web.
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+- **Households**: create one, invite housemates with a code, approve join
+  requests, hand over ownership, and mark members as away
+- **Expenses**: equal or custom splits, categories, search, and an edit
+  history for every change
+- **Recurring expenses**: rent, bills and subscriptions are posted
+  automatically each month, and missed months are backfilled
+- **Balances and settling up**: pairwise balances, suggested payments, and
+  payments the person being paid has to confirm
+- **Monthly statements**: closed months can't be changed, and reports and
+  charts show spending by category and by member
+- **Offline first**: writes are queued in an outbox and replayed safely
+  (idempotent on the server), and the query cache persists across launches
+- **Live updates and push**: an in-app notification feed over Supabase
+  Realtime, with push notifications via Expo and FCM/APNs
+- **Export**: CSV export and backups
 
-2. Start the app
+Amounts are stored as integer paise, and balances are always computed in the
+database, never stored.
 
-   ```bash
-   npx expo start
-   ```
+## Tech stack
 
-In the output, you'll find options to open the app in a
+| Area | Library |
+|---|---|
+| App | Expo 57, React Native 0.86, React 19, Expo Router (typed routes) |
+| Data | `@supabase/supabase-js`, TanStack Query (persisted) |
+| State / forms | Zustand, React Hook Form, Zod |
+| Local storage | `expo-sqlite`, AsyncStorage |
+| Backend | Supabase Postgres with RLS, SQL functions, triggers, views |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Getting started
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Prerequisites
 
-## Get a fresh project
+- Node.js 20+
+- A Supabase project
+- For device builds: Android Studio or Xcode, or an [EAS](https://expo.dev/eas)
+  account
 
-When you're ready, run:
+### 1. Install
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Set up the database
 
-### Other setup steps
+Run every file in [`supabase/migrations/`](supabase/migrations) in the
+Supabase SQL Editor, **in numeric order**. See
+[`supabase/README.md`](supabase/README.md) for the full checklist, including
+the auth redirect URL (`roomly://`) and how to check the ledger.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+### 3. Configure environment
 
-## Learn more
+```bash
+cp .env.example .env
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Fill in your Supabase project URL and **publishable** (anon) key. Never put
+the `service_role` / secret key in `.env` or in the app, because it bypasses
+row level security.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 4. Run
 
-## Join the community
+```bash
+npm start
+```
 
-Join our community of developers creating universal apps.
+Then press `a` for Android, `i` for iOS, or `w` for web. The app uses native
+modules, so use a [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+rather than Expo Go.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm start` | Start the Expo dev server |
+| `npm run android` / `npm run ios` | Build and run a native dev build |
+| `npm run web` | Run in the browser |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm test` | Domain tests (money, splits, settlement) and structure tests (routes, migrations) |
+| `npm run test:security` | Checks RLS from outside with only the publishable key (needs `.env`) |
+| `node scripts/stamp-build.mjs` | Bump the build number and time in `app.json` |
+| `node scripts/rebuild-native.mjs --build` | Re-run prebuild and keep the hand-tuned Gradle settings |
+| `node scripts/enable-push.mjs` | Turn on push once credentials exist |
+
+## Building
+
+`android/` and `ios/` are generated by `expo prebuild` and are not committed.
+
+- **Local APK**: `node scripts/rebuild-native.mjs --build`. Use this script
+  instead of running `expo prebuild` directly, because it restores the Gradle
+  settings that keep the APK around 37 MB.
+- **EAS**: profiles are in [`eas.json`](eas.json). `preview` builds an
+  internal APK and `production` builds an app bundle.
+- **OTA updates**: `expo-updates` on the `production` channel.
+
+Push notifications need an Expo project ID and FCM/APNs credentials. See
+[`PUSH-SETUP.md`](PUSH-SETUP.md).
+
+## Project structure
+
+```
+src/
+  app/                  Expo Router routes
+    (app)/              Signed-in area
+      (tabs)/           Home, history, calculator, reports, more
+      ...               Expense, settle, recurring, household, settings screens
+    sign-in.tsx, register.tsx, onboarding.tsx, ...   Auth and household setup
+  components/           UI kit (ui/), charts, brand, expense form
+  lib/                  Supabase client, queries, money/split/settle logic,
+                        offline outbox, realtime, push, CSV, backup
+  constants/            Theme
+supabase/
+  migrations/           Schema, RLS, functions, views (run in order)
+  maintenance/          Reset and backup-check scripts
+  seed/                 Demo data
+  tests/                SQL smoke tests
+tests/                  Node tests and manual test plan
+scripts/                Build and release helpers
+```
+
+## Testing
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+```
+
+[`tests/MANUAL-TESTS.md`](tests/MANUAL-TESTS.md) covers the flows that need a
+real device and more than one account. On the database side,
+`select * from ledger_imbalance();` must always return zero rows.

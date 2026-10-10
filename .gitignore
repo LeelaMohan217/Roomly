@@ -9,41 +9,62 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# generated native folders (expo prebuild)
+/ios
+/android
+
+# build outputs
+*.apk
+*.aab
+*.ipa
+*.app
+build/
+
+# Native signing
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
+!debug.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
 *.pem
+
+# Firebase service account key for FCM push. google-services.json is public
+# identifiers and may be committed; these must never be.
+*service-account*.json
+*firebase-adminsdk*.json
 
 # local env files
 .env
 .env*.local
 !.env.example
 
+# Metro
+.metro-health-check*
+
+# debug / logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
 # typescript
 *.tsbuildinfo
 
-example
+# test coverage
+coverage/
 
-# generated native folders
-/ios
-/android
+# Claude Code: personal settings stay local, shared ones are committed
+.claude/settings.local.json
 
-# Firebase service account key for FCM push. google-services.json is public
-# identifiers and may be committed; this one must never be.
-*service-account*.json
+# editors
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
