@@ -19,6 +19,17 @@ the SQL Editor can roll back silently.
 | 0025 | Closed months | Period checks on the three functions that bypassed RLS |
 | 0026 | Payee confirms | The person paid confirms the payment, not the owner |
 | 0027 | Rejoin + Realtime | One *active* membership per account; Realtime publication |
+| 0028–0033 | Fixes | Joined-on dates, payment guards, household timezone, member autonomy, settlement period trigger |
+| 0034 | Lock function grants | Every function closed to clients except an explicit allowlist; new functions start closed |
+
+## Adding a function
+
+Since `0034`, new functions in `public` get **no** EXECUTE for `anon` or
+`authenticated`. End every migration that adds a function the app calls (or
+drops and re-creates one, which also resets its grants; `create or replace`
+keeps them) with `grant execute on function … to authenticated;`. Forget it and the
+RPC fails with "permission denied", which is the safe way to fail. Functions
+that only triggers or other SECURITY DEFINER functions call need no grant.
 
 ## After running them
 

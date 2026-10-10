@@ -164,6 +164,33 @@ check(
   `status ${canary.status} body ${canary.body.slice(0, 80)}`
 );
 
+// Internal helpers a client must not be able to reach at all. Before 0034 all
+// three were open: functions created after 0004's one-time revoke kept the
+// default EXECUTE-to-PUBLIC grant. notify_household had no caller check, so a
+// stranger could push arbitrary text to every phone in a household.
+const INTERNAL = [
+  [
+    'notify_household',
+    {
+      p_household: '00000000-0000-0000-0000-000000000000',
+      p_kind: 'expense_added',
+      p_entity: null,
+      p_amount: null,
+      p_subject: 'intruder',
+    },
+  ],
+  ['send_push_for_notification', { p_notification: '00000000-0000-0000-0000-000000000000' }],
+  ['ensure_period', { p_household: '00000000-0000-0000-0000-000000000000', p_date: '2026-01-01' }],
+];
+for (const [fn, args] of INTERNAL) {
+  const res = await post(`rpc/${fn}`, args);
+  // Must be refused for lack of EXECUTE (42501). Any other error means the
+  // function body ran and only tripped over the fake ids -- a 23503 foreign key
+  // failure here is the hole, not a pass.
+  const denied = res.status === 401 || res.status === 403 || /"42501"/.test(res.body);
+  check(`anon cannot call ${fn} at all`, denied, `status ${res.status} body ${res.body.slice(0, 80)}`);
+}
+
 // An invite code must not expose the ledger to someone who has not joined.
 const preview = await post('rpc/preview_invite', { p_code: 'AAA-AAA' });
 check(
