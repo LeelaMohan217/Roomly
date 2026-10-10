@@ -13,7 +13,7 @@ import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { exportPairStatement } from '@/lib/backup';
-import { formatRange } from '@/lib/dates';
+import { dayOf, formatRange } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { pairRouting, pairSummary } from '@/lib/pairwise';
 import { useMembers, usePairwiseLedger } from '@/lib/queries';
@@ -43,9 +43,14 @@ export default function PairHistoryScreen() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pair = pairwise.data?.find((p) => p.memberId === id);
+  const pair = pairwise.data?.pairs.find((p) => p.memberId === id);
   const them = members.data?.find((m) => m.id === id)?.displayName ?? 'They';
   const owesMe = (pair?.netPaise ?? 0) > 0;
+
+  // The list starts at the last settle-up, so the header must not claim
+  // "everything".
+  const squaredAt = pairwise.data?.squaredAt;
+  const squaredOn = squaredAt ? formatRange(dayOf(squaredAt), dayOf(squaredAt)) : null;
 
   // Signed, so the three figures on screen subtract to the number above them.
   // pairSummary() is in pairwise.ts and asserted there — the alternative is a
@@ -71,7 +76,10 @@ export default function PairHistoryScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title={them} subtitle="Everything between you" />
+      <ScreenHeader
+        title={them}
+        subtitle={squaredOn ? `Since everyone squared up on ${squaredOn}` : 'Everything between you'}
+      />
 
       {state ? (
         <View style={styles.content}>{state}</View>
@@ -81,7 +89,9 @@ export default function PairHistoryScreen() {
             <Ionicons name="checkmark-done" size={22} color={theme.primary} />
             <ThemedText style={Type.headline}>Nothing between you</ThemedText>
             <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-              You have not shared an expense with {them} yet.
+              {squaredOn
+                ? `Nothing new with ${them} since everyone squared up on ${squaredOn}.`
+                : `You have not shared an expense with ${them} yet.`}
             </ThemedText>
           </Card>
         </View>

@@ -47,7 +47,9 @@ export default function SettlementsScreen() {
   const pairwise = usePairwiseLedger(member?.id);
 
   const routedById = new Map<string, { directPaise: number; routedPaise: number }>();
-  for (const pair of pairwise.data ?? []) {
+  // All-time, not since the last settle-up: a payment that went through
+  // somebody else still did, whatever has been squared since.
+  for (const pair of pairwise.data?.allTime ?? []) {
     for (const line of pair.lines) {
       if (line.kind !== 'settlement' || !line.routedPaise) continue;
       routedById.set(line.id, {

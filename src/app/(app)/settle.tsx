@@ -17,7 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
 import { committed, rejected } from '@/lib/haptics';
 import { exportPairStatement } from '@/lib/backup';
-import { formatRange, todayIso } from '@/lib/dates';
+import { dayOf, formatRange, todayIso } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import {
   useBalances,
@@ -92,7 +92,7 @@ export default function SettleScreen() {
    * against the balance rather than trusted.
    */
   const pairs = useMemo(() => {
-    const rows = pairwise.data ?? [];
+    const rows = pairwise.data?.pairs ?? [];
     const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise;
     if (rows.length === 0 || myBalance === undefined) return { rows, drift: null as string | null };
     try {
@@ -102,6 +102,11 @@ export default function SettleScreen() {
     }
     return { rows, drift: null as string | null };
   }, [pairwise.data, balances.data, member?.id]);
+
+  // Shown on the two pairwise tabs, because "48 things between you" turning
+  // into "3 things" after a settle-up needs saying, not discovering.
+  const squaredAt = pairwise.data?.squaredAt;
+  const squaredOn = squaredAt ? formatRange(dayOf(squaredAt), dayOf(squaredAt)) : null;
 
   const owedToMe = pairs.rows.filter((p: PairNet) => p.netPaise > 0);
   const iOwe = pairs.rows.filter((p: PairNet) => p.netPaise < 0);
@@ -572,6 +577,11 @@ export default function SettleScreen() {
         <ThemedText themeColor="textTertiary" style={Type.label}>
           {title}
         </ThemedText>
+        {squaredOn ? (
+          <ThemedText themeColor="textTertiary" style={Type.micro}>
+            {`Counting from ${squaredOn}, when everyone was last square.`}
+          </ThemedText>
+        ) : null}
 
         {rows.map((pair) => {
           const key = `pair-${pair.memberId}`;

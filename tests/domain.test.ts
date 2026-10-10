@@ -8,7 +8,9 @@ import {
   pairRouting,
   pairStatementRows,
   pairSummary,
+  lastSquaredAt,
   pairwiseNets,
+  sinceLastSquare,
   splitPayment,
   PAIR_STATEMENT_HEADERS,
   type ExpenseLike,
@@ -688,6 +690,147 @@ suite('pairwise / who owes whom before simplification');
     }
   }
   check('3000 random ledgers: pairwise always sums to the balance', fail === '', fail);
+}
+
+suite('pairwise / starting again after everyone is square');
+
+// The report this was built for. Lee is owed by Madhav and owes Vinod and Mani;
+// the plan settles it by Madhav paying all three, so every BALANCE is zero --
+// but all-time, Lee still "owes" Vinod and Mani and Madhav still "owes" Lee.
+// After the settle-up, Lee should see only what was added since.
+{
+  const at = (h: number) => `2026-10-10T${String(h).padStart(2, '0')}:00:00.000+00:00`;
+  const expenses: ExpenseLike[] = [
+    {
+      id: 'e1', date: '2026-10-01', categoryName: 'Rent', description: null, at: at(1),
+      paidBy: 'lee', totalPaise: 40000,
+      splits: [{ memberId: 'lee', amountPaise: 10000 }, { memberId: 'madhav', amountPaise: 30000 }],
+    },
+    {
+      id: 'e2', date: '2026-10-01', categoryName: 'Food', description: null, at: at(2),
+      paidBy: 'vinod', totalPaise: 20000,
+      splits: [{ memberId: 'vinod', amountPaise: 10000 }, { memberId: 'lee', amountPaise: 10000 }],
+    },
+    {
+      id: 'e3', date: '2026-10-01', categoryName: 'Food', description: null, at: at(3),
+      paidBy: 'mani', totalPaise: 24000,
+      splits: [{ memberId: 'mani', amountPaise: 12000 }, { memberId: 'lee', amountPaise: 12000 }],
+    },
+  ];
+  // Lee +30000 -10000 -12000 = +8000; Madhav -30000; Vinod +10000; Mani +12000.
+  const settled: SettlementLike[] = [
+    { id: 's1', date: '2026-10-10', at: at(5), fromMember: 'madhav', toMember: 'lee', amountPaise: 8000 },
+    { id: 's2', date: '2026-10-10', at: at(5), fromMember: 'madhav', toMember: 'vinod', amountPaise: 10000 },
+    { id: 's3', date: '2026-10-10', at: at(6), fromMember: 'madhav', toMember: 'mani', amountPaise: 12000 },
+  ];
+
+  const allTime = pairwiseNets('lee', expenses, settled);
+  check(
+    'all-time, the settled household still shows Lee owing Vinod',
+    allTime.some((p) => p.memberId === 'vinod' && p.netPaise === -10000),
+    JSON.stringify(allTime.map((p) => [p.memberId, p.netPaise]))
+  );
+
+  eq('the last zero is after the final payment', lastSquaredAt(expenses, settled), at(6));
+  eq('half a settle-up is not square', lastSquaredAt(expenses, settled.slice(0, 2)), null);
+
+  const recent = sinceLastSquare(expenses, settled);
+  eq('right after settling there is nothing between anybody', pairwiseNets('lee', recent.expenses, recent.settlements).length, 0);
+
+  // Then Vinod adds two splits and Lee adds one, as in the report.
+  const later: ExpenseLike[] = [
+    ...expenses,
+    {
+      id: 'e4', date: '2026-10-10', categoryName: 'Milk', description: null, at: at(8),
+      paidBy: 'vinod', totalPaise: 6000,
+      splits: ['vinod', 'lee', 'mani'].map((m) => ({ memberId: m, amountPaise: 2000 })),
+    },
+    {
+      // Backdated: spent before the settle-up, recorded after. Still new.
+      id: 'e5', date: '2026-10-05', categoryName: 'Gas', description: null, at: at(9),
+      paidBy: 'vinod', totalPaise: 3000,
+      splits: ['vinod', 'lee', 'mani'].map((m) => ({ memberId: m, amountPaise: 1000 })),
+    },
+    {
+      id: 'e6', date: '2026-10-10', categoryName: 'Snacks', description: null, at: at(10),
+      paidBy: 'lee', totalPaise: 900,
+      splits: ['lee', 'madhav', 'mani'].map((m) => ({ memberId: m, amountPaise: 300 })),
+    },
+  ];
+  const after = sinceLastSquare(later, settled);
+  const nets = pairwiseNets('lee', after.expenses, after.settlements);
+  const net = (id: string) => nets.find((p) => p.memberId === id)?.netPaise ?? 0;
+  eq('Lee owes Vinod only for his two new splits', net('vinod'), -3000);
+  eq('Mani owes Lee for the snacks, not the old routing', net('mani'), 300);
+  eq('Madhav owes Lee for the snacks', net('madhav'), 300);
+  noThrow('and it still sums to the balance', () => assertPairwiseReconciles(nets, -3000 + 600));
+}
+
+// Rows without timestamps (older callers, these tests) keep the all-time view.
+{
+  const expenses: ExpenseLike[] = [
+    {
+      id: 'e1', date: '2026-09-01', categoryName: 'X', description: null,
+      paidBy: 'me', totalPaise: 100, splits: [{ memberId: 'me', amountPaise: 100 }],
+    },
+  ];
+  eq('no timestamps, no cutoff', lastSquaredAt(expenses, []), null);
+}
+
+// Starting from the last zero must never break the reconciliation, whatever
+// the ledger -- including squares that happen mid-history and are then left.
+{
+  let fail = '';
+  for (let i = 0; i < 2000 && !fail; i++) {
+    const n = 2 + Math.floor(Math.random() * 3);
+    const ids = Array.from({ length: n }, (_, j) => 'm' + j);
+    const expenses: ExpenseLike[] = [];
+    const settlements: SettlementLike[] = [];
+    const bal = new Map(ids.map((id) => [id, 0]));
+    let clock = 0;
+    const stamp = () => new Date(Date.UTC(2026, 9, 1) + (clock += 1 + Math.floor(Math.random() * 2)) * 1000).toISOString();
+
+    for (let step = 0; step < 12; step++) {
+      if (Math.random() < 0.25) {
+        // Settle everybody up with the plan, all at one moment or spread out.
+        const plan = simplifyDebts(ids.map((id) => ({ memberId: id, balancePaise: bal.get(id)! })));
+        const t = stamp();
+        for (const tr of plan) {
+          settlements.push({
+            id: 't' + settlements.length, date: '2026-10-01', at: Math.random() < 0.5 ? t : stamp(),
+            fromMember: tr.from, toMember: tr.to, amountPaise: tr.amountPaise,
+          });
+          bal.set(tr.from, bal.get(tr.from)! + tr.amountPaise);
+          bal.set(tr.to, bal.get(tr.to)! - tr.amountPaise);
+        }
+        continue;
+      }
+      const present = ids.filter(() => Math.random() > 0.3);
+      if (present.length === 0) present.push(ids[0]);
+      const payer = ids[Math.floor(Math.random() * n)];
+      const share = 1 + Math.floor(Math.random() * 5000);
+      expenses.push({
+        id: 'e' + step, date: '2026-10-01', categoryName: 'X', description: null, at: stamp(),
+        paidBy: payer, totalPaise: share * present.length,
+        splits: present.map((id) => ({ memberId: id, amountPaise: share })),
+      });
+      bal.set(payer, bal.get(payer)! + share * present.length);
+      for (const id of present) bal.set(id, bal.get(id)! - share);
+    }
+
+    const recent = sinceLastSquare(expenses, settlements);
+    for (const me of ids) {
+      try {
+        const nets = pairwiseNets(me, recent.expenses, recent.settlements);
+        assertPairwiseReconciles(nets, bal.get(me)!);
+        for (const pair of nets) assertLinesExplainNet(pair);
+      } catch (err) {
+        fail = (err as Error).message;
+        break;
+      }
+    }
+  }
+  check('2000 random ledgers: counting from the last square still sums to the balance', fail === '', fail);
 }
 
 // A ledger that does not reconcile must be caught, not shrugged at.

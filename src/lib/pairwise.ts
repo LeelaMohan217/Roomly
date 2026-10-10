@@ -24,6 +24,12 @@ export type ExpenseLike = {
   paidBy: string;
   totalPaise: Paise;
   splits: { memberId: string; amountPaise: Paise }[];
+  /**
+   * When it entered the ledger (created_at). Only lastSquaredAt() reads it --
+   * `date` is the day the money was spent, which can be backdated, so it says
+   * nothing about whether this came before or after a settle-up.
+   */
+  at?: string;
 };
 
 export type SettlementLike = {
@@ -32,6 +38,8 @@ export type SettlementLike = {
   fromMember: string;
   toMember: string;
   amountPaise: Paise;
+  /** When it started counting (confirmed_at). See ExpenseLike.at. */
+  at?: string;
 };
 
 /** One row of the "why" list: a single expense, seen from my side. */
@@ -178,6 +186,98 @@ export function pairwiseNets(
   return [...byMember.values()].sort(
     (a, b) => b.netPaise - a.netPaise || a.memberId.localeCompare(b.memberId)
   );
+}
+
+/**
+ * The last moment every balance in the household was exactly zero, or null if
+ * there never was one (or the rows carry no timestamps).
+ *
+ * Why this exists: pairwise nets are all-time, and settling up through the
+ * plan clears BALANCES without clearing pairs. When Madhav pays Vinod what he
+ * owed Lee, everybody lands on zero -- but pairwise Madhav still "owes" Lee
+ * and Lee still "owes" Vinod, the same amount, forever. After a full settle-up
+ * that showed people a "You owe Vinod Rs 375" for money nobody owed, and it
+ * never went away.
+ *
+ * Once everyone is square there is nothing left to explain about the past, so
+ * the pairwise view starts again from that point (sinceLastSquare below).
+ *
+ * The reconciliation in assertPairwiseReconciles survives this exactly: my
+ * balance at that moment was zero, so the events after it sum to my whole
+ * balance -- the same algebra as before, starting from a zero.
+ *
+ * Replayed from the ledger AS IT IS NOW, not as it was: an expense voided
+ * after the settle-up is simply absent, and if that means the household was
+ * never really at zero then, an earlier zero is found (or none). That can only
+ * show more history than necessary, never a wrong total.
+ *
+ * Rows sharing a timestamp are applied together before checking, so a
+ * settle-up recorded in one statement is never half-counted.
+ */
+export function lastSquaredAt(
+  expenses: ExpenseLike[],
+  settlements: SettlementLike[]
+): string | null {
+  type Event = { t: number; at: string; deltas: [string, Paise][] };
+  const events: Event[] = [];
+
+  for (const e of expenses) {
+    if (!e.at) return null;
+    const deltas: [string, Paise][] = [[e.paidBy, e.totalPaise]];
+    for (const s of e.splits) deltas.push([s.memberId, -s.amountPaise]);
+    events.push({ t: Date.parse(e.at), at: e.at, deltas });
+  }
+  for (const s of settlements) {
+    if (!s.at) return null;
+    // Same signs as member_balance(): paying in raises your balance.
+    events.push({
+      t: Date.parse(s.at),
+      at: s.at,
+      deltas: [[s.fromMember, s.amountPaise], [s.toMember, -s.amountPaise]],
+    });
+  }
+  if (events.some((e) => Number.isNaN(e.t))) return null;
+
+  events.sort((a, b) => a.t - b.t);
+
+  const balance = new Map<string, Paise>();
+  let nonZero = 0;
+  let squared: string | null = null;
+
+  for (let i = 0; i < events.length; i++) {
+    for (const [memberId, delta] of events[i].deltas) {
+      const before = balance.get(memberId) ?? 0;
+      const after = before + delta;
+      balance.set(memberId, after);
+      if (before === 0 && after !== 0) nonZero += 1;
+      if (before !== 0 && after === 0) nonZero -= 1;
+    }
+    const lastOfGroup = i === events.length - 1 || events[i + 1].t !== events[i].t;
+    if (lastOfGroup && nonZero === 0) squared = events[i].at;
+  }
+
+  return squared;
+}
+
+/**
+ * Only what entered the ledger after everyone was last square. Passing the
+ * result to pairwiseNets() is what the Settle screen shows.
+ */
+export function sinceLastSquare(
+  expenses: ExpenseLike[],
+  settlements: SettlementLike[]
+): { expenses: ExpenseLike[]; settlements: SettlementLike[]; squaredAt: string | null } {
+  const squaredAt = lastSquaredAt(expenses, settlements);
+  if (squaredAt === null) return { expenses, settlements, squaredAt };
+
+  const cutoff = Date.parse(squaredAt);
+  const after = (at: string | undefined) => !!at && Date.parse(at) > cutoff;
+
+  return {
+    expenses: expenses.filter((e) => after(e.at)),
+    settlements: settlements.filter((s) => after(s.at)),
+    squaredAt,
+  };
 }
 
 export type Routing = {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { addDays, daysInMonth, isoOf, todayIso } from '@/lib/dates';
 import {
   pairwiseNets,
+  sinceLastSquare,
   type ExpenseLike,
   type PairNet,
   type SettlementLike,
@@ -1041,17 +1042,30 @@ export function useRecurring() {
  * Confirmed settlements only, matching member_balances (migration 0019). An
  * unconfirmed payment is in nobody's balance, so counting it here would make
  * the pairwise view disagree with every other number in the app.
+ *
+ * `pairs` starts from the last time everyone was square (sinceLastSquare in
+ * pairwise.ts), which is what the screens show. `allTime` is the full replay,
+ * kept for the payment history: whether a past payment was routed is a fact
+ * about the ledger at the time it was made, and a settle-up since does not
+ * change it.
  */
+export type PairwiseLedger = {
+  pairs: PairNet[];
+  allTime: PairNet[];
+  /** When everyone was last square, or null if never. */
+  squaredAt: string | null;
+};
+
 export function usePairwiseLedger(memberId: string | undefined) {
   return useQuery({
     queryKey: ['pairwise', memberId],
     enabled: !!memberId,
-    queryFn: async (): Promise<PairNet[]> => {
+    queryFn: async (): Promise<PairwiseLedger> => {
       const [expenses, settlements] = await Promise.all([
         supabase
           .from('expenses')
           .select(
-            `id, expense_date, total_paise, description, paid_by,
+            `id, expense_date, total_paise, description, paid_by, created_at,
              categories ( name ),
              expense_splits ( member_id, amount_paise )`
           )
@@ -1059,7 +1073,7 @@ export function usePairwiseLedger(memberId: string | undefined) {
           .order('expense_date', { ascending: false }),
         supabase
           .from('settlements')
-          .select('id, settled_on, from_member, to_member, amount_paise')
+          .select('id, settled_on, from_member, to_member, amount_paise, confirmed_at')
           .is('voided_at', null)
           .not('confirmed_at', 'is', null),
       ]);
@@ -1073,6 +1087,7 @@ export function usePairwiseLedger(memberId: string | undefined) {
         total_paise: number;
         description: string | null;
         paid_by: string;
+        created_at: string;
         categories: { name: string } | null;
         expense_splits: { member_id: string; amount_paise: number }[];
       };
@@ -1084,6 +1099,7 @@ export function usePairwiseLedger(memberId: string | undefined) {
         description: e.description,
         paidBy: e.paid_by,
         totalPaise: Number(e.total_paise),
+        at: e.created_at,
         splits: e.expense_splits.map((s) => ({
           memberId: s.member_id,
           amountPaise: Number(s.amount_paise),
@@ -1096,9 +1112,16 @@ export function usePairwiseLedger(memberId: string | undefined) {
         fromMember: t.from_member as string,
         toMember: t.to_member as string,
         amountPaise: Number(t.amount_paise),
+        at: t.confirmed_at as string,
       }));
 
-      return pairwiseNets(memberId!, mapped, paid);
+      const recent = sinceLastSquare(mapped, paid);
+
+      return {
+        pairs: pairwiseNets(memberId!, recent.expenses, recent.settlements),
+        allTime: pairwiseNets(memberId!, mapped, paid),
+        squaredAt: recent.squaredAt,
+      };
     },
   });
 }

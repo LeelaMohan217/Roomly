@@ -16,6 +16,12 @@ export function todayIso(): string {
   return isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
+/** The device-local calendar day a timestamp falls on. */
+export function dayOf(timestamp: string): string {
+  const d = new Date(timestamp);
+  return isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
 export function addDays(iso: string, delta: number): string {
   const d = new Date(`${iso}T00:00:00`);
   d.setDate(d.getDate() + delta);
