@@ -31,7 +31,9 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +43,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase service account key for FCM push. google-services.json is public
+# identifiers and may be committed; this one must never be.
+*service-account*.json

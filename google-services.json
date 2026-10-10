@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "924474383340",
+    "project_id": "roomly-338dc",
+    "storage_bucket": "roomly-338dc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:924474383340:android:fe1b3d6273461fbcc7bec9",
+        "android_client_info": {
+          "package_name": "com.roomly.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEc3VIikbxeE4WMHkYkgVUqmMJxSW1KxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
