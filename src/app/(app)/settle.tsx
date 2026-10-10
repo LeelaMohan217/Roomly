@@ -65,6 +65,9 @@ export default function SettleScreen() {
   const pending = usePendingSettlements();
 
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Fewest-payments cards whose routing breakdown is open. Separate from
+  // `expanded` so opening one does not close a pair list on the other tabs.
+  const [planOpen, setPlanOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [picked, setPicked] = useState<SettleView | null>(null);
@@ -868,7 +871,29 @@ export default function SettleScreen() {
                     </ThemedText>
                   </View>
 
+                  {/* Collapsed by default: the amount and the button are what
+                      most people need, and three cards each carrying a
+                      paragraph pushed the buttons off the screen. */}
                   {routed ? (
+                    <Pressable
+                      onPress={() => setPlanOpen(planOpen === key ? null : key)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: planOpen === key }}>
+                      <View style={styles.whyToggle}>
+                        <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
+                          {planOpen === key ? 'Hide details' : 'Show details'}
+                        </ThemedText>
+                        <Ionicons
+                          name={planOpen === key ? 'chevron-up' : 'chevron-down'}
+                          size={13}
+                          color={theme.primary}
+                        />
+                      </View>
+                    </Pressable>
+                  ) : null}
+
+                  {routed && planOpen === key ? (
                     <View style={[styles.why, { backgroundColor: theme.backgroundSunken }]}>
                       <View style={styles.whyRow}>
                         <ThemedText
