@@ -101,6 +101,13 @@ export type SpendSummary = {
   roomPrevWeekPaise: number;
   myPrevMonthPaise: number;
   myPrevWeekPaise: number;
+  /**
+   * The whole previous month, both scopes. Home shows these under a plain
+   * "Spent in September" label: a total that is named as the full month
+   * can't be misread, which a same-span figure needed a date range for.
+   */
+  roomPrevMonthFullPaise: number;
+  myPrevMonthFullPaise: number;
 };
 
 /**
@@ -119,7 +126,9 @@ export type SpendSummary = {
 export function useSpendSummary(memberId: string | undefined) {
   return useQuery({
     // Keyed on the date so every figure re-derives when the day rolls over.
-    queryKey: ['spend-summary', todayIso(), memberId],
+    // Versioned: the result gained the full-month fields, and a cache
+    // persisted by an older build must not be read as the new shape.
+    queryKey: ['spend-summary', 2, todayIso(), memberId],
     enabled: !!memberId,
     queryFn: async (): Promise<SpendSummary> => {
       const today = todayIso();
@@ -169,6 +178,8 @@ export function useSpendSummary(memberId: string | undefined) {
         roomPrevWeekPaise: 0,
         myPrevMonthPaise: 0,
         myPrevWeekPaise: 0,
+        roomPrevMonthFullPaise: 0,
+        myPrevMonthFullPaise: 0,
       };
 
       for (const e of data as unknown as Row[]) {
@@ -192,6 +203,10 @@ export function useSpendSummary(memberId: string | undefined) {
         if (date >= prevMonthStart && date <= prevMonthEnd) {
           totals.roomPrevMonthPaise += total;
           totals.myPrevMonthPaise += mine;
+        }
+        if (date >= prevMonthStart && date < monthStart) {
+          totals.roomPrevMonthFullPaise += total;
+          totals.myPrevMonthFullPaise += mine;
         }
         if (date >= prevWeekStart && date <= prevWeekEnd) {
           totals.roomPrevWeekPaise += total;

@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
 
@@ -66,6 +66,15 @@ export default function MoreScreen() {
       icon: 'calendar',
       label: 'Bills',
       hint: 'Rent, wifi and other bills that post themselves each month',
+      tint: 'plain',
+    },
+    {
+      // Out of the tab bar to make room for Add in the middle, but still one
+      // tap from here -- "Use in an expense" carries its total into Add.
+      href: '/calculator',
+      icon: 'calculator',
+      label: 'Calculator',
+      hint: 'Work out an amount, then use it in an expense',
       tint: 'plain',
     },
     {
@@ -135,7 +144,7 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: 130, gap: Spacing.four },
+  content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

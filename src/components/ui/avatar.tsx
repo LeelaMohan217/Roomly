@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { avatarPairFor } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useMembers } from '@/lib/queries';
 
 /** "Mohan Nethala" -> "MN", "Ravi" -> "RA". Never more than two glyphs. */
@@ -25,6 +26,10 @@ type Props = {
   icon?: boolean;
   /** Overrides the stored colour — for previewing a pick before it is saved. */
   color?: string | null;
+  /** Pale brand green with green initials, in place of the member's own
+   *  colour -- for lists drawn in the one brand colour, like Home's
+   *  Balances. Everywhere else keeps the colour each member picked. */
+  brand?: boolean;
   style?: ViewStyle;
 };
 
@@ -36,8 +41,10 @@ export function Avatar({
   ringColor,
   icon = false,
   color,
+  brand = false,
   style,
 }: Props) {
+  const theme = useTheme();
   // Resolved here rather than threaded through eighteen call sites: useMembers
   // is one shared cache entry, so every avatar in the app honours a colour the
   // moment its owner picks one, and anyone who has left falls back to the
@@ -47,6 +54,25 @@ export function Avatar({
 
   const [from, to] = avatarPairFor(color ?? stored, seed ?? name);
   const fontSize = Math.round(size * 0.38);
+
+  if (brand) {
+    return (
+      <View
+        style={[
+          styles.circle,
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primarySoft },
+          style,
+        ]}>
+        {icon ? (
+          <Ionicons name="person" size={Math.round(size * 0.52)} color={theme.brandInk} />
+        ) : (
+          <Text style={[styles.text, { fontSize, color: theme.brandInk }]} allowFontScaling={false}>
+            {initials(name)}
+          </Text>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View

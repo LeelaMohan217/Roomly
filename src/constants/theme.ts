@@ -61,26 +61,31 @@ export const Colors = {
     heroRule: 'rgba(6,48,31,0.12)',
     heroAccent: '#096647',
     heroUp: '#7A4E00',
-    // "You owe" on the green card. The page's danger red is 3.9:1 on the
-    // darker end of the gradient; this is 5.3:1.
-    heroDanger: '#B42318',
 
-    // Home's two tiles, sampled from the design mockup: near-white mint,
-    // with an S-shaped wave of deeper mint down the right edge. The wave
-    // fades from top to bottom, so the top-right corner is the greenest.
-    tileFrom: '#F0FDF8',
-    tileTo: '#E2FAEF',
-    tileWaveTop: 'rgba(16,185,129,0.16)',
-    tileWaveBottom: 'rgba(16,185,129,0.05)',
+    // One brand colour, used on almost everything that matters, the way the
+    // big payment apps do: green means Roomly or "do something", red means
+    // only "you owe", and everything else stays neutral -- so the green
+    // always has full contrast against what's around it.
 
-    // Home's quick actions, one hue each so they can be told apart at a
-    // glance. Deep enough to pass 4.5:1 as label text on the page (4.6+).
-    // Blue leans cyan and orange leans amber on purpose: #2563EB read as
-    // violet beside the purple, and #C2410C as red.
-    actionGreen: '#087A55',
-    actionBlue: '#0B6BCB',
-    actionPurple: '#7C3AED',
-    actionOrange: '#B45309',
+    // Brand green as ink: icons and small text on white or the page (4.8:1).
+    brandInk: '#087A55',
+
+    // Home's big balance card, in brand green. Deeper than primary on
+    // purpose: on #087F5B the pale label measured 4.41:1, under the 4.5 a
+    // small label needs; here white is 6.5:1 and the label 5.8:1. On a green
+    // card the amount can't be green, so "owed to you" is white and "you
+    // owe" a pale red (4.9:1).
+    balanceCard: '#066B4C',
+    balanceEdge: '#066B4C',
+    onBalance: '#FFFFFF',
+    onBalanceMuted: '#D1FAE5',
+    balanceRing: 'rgba(255,255,255,0.12)',
+    balanceRule: 'rgba(255,255,255,0.2)',
+    balancePositive: '#FFFFFF',
+    balanceNegative: '#FFD5D5',
+
+    // The floating tab bar's drawn shadow, two layers of this.
+    barShadow: 'rgba(16,24,40,0.06)',
 
     chart1: '#0E9A6C',
     chart2: '#3B82F6',
@@ -134,21 +139,22 @@ export const Colors = {
     heroRule: 'rgba(255,255,255,0.18)',
     heroAccent: '#6EE7B7',
     heroUp: '#FCD34D',
-    // The page's danger red is 3.1:1 on the lighter end of the gradient.
-    heroDanger: '#FCA5A5',
 
-    // Dark at the bottom left rising to emerald at the top right, as in the
-    // mockup, with the wave as a SHADOW: it darkens the brightest corner, so
-    // the light band just left of the curve is what reads as the glow.
-    tileFrom: '#012824',
-    tileTo: '#01805E',
-    tileWaveTop: 'rgba(0,30,22,0.45)',
-    tileWaveBottom: 'rgba(0,30,22,0.22)',
+    brandInk: '#3ECF8E',
 
-    actionGreen: '#3ECF8E',
-    actionBlue: '#60A5FA',
-    actionPurple: '#A78BFA',
-    actionOrange: '#FB923C',
+    // A dark green in dark mode: bright green on a near-black page would
+    // glare. The amount is the bright green again (6.1:1), and "you owe" a
+    // light red, since #F87171 was 4.4:1 on this green.
+    balanceCard: '#0F3D2E',
+    balanceEdge: '#1B5A44',
+    onBalance: '#FFFFFF',
+    onBalanceMuted: '#A7F3D0',
+    balanceRing: 'rgba(255,255,255,0.08)',
+    balanceRule: 'rgba(255,255,255,0.16)',
+    balancePositive: '#3ECF8E',
+    balanceNegative: '#FCA5A5',
+
+    barShadow: 'rgba(0,0,0,0.45)',
 
     chart1: '#3ECF8E',
     chart2: '#60A5FA',
@@ -234,7 +240,24 @@ export const Elevation = {
   }),
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/** The floating tab bar's measurements, shared by the bar and the screens under it. */
+export const TabBar = {
+  /** The rounded body the tabs sit in. */
+  body: 68,
+  /** How far the hump over the Add button rises above the body. */
+  hump: 8,
+  /** Gap between the bar and the screen's sides and bottom inset. */
+  margin: 12,
+} as const;
+
+/**
+ * Bottom padding for a tab screen's scroll content, so its last row stops just
+ * above the floating bar instead of under it. The screens' SafeAreaView already
+ * pads for the system inset, so this only clears the bar, plus a little air.
+ * (It was a flat 130, sized for the old floating + button, and left a band of
+ * empty page above the bar.)
+ */
+export const TabBarClearance = TabBar.margin + TabBar.body + TabBar.hump + 12;
 export const MaxContentWidth = 800;
 
 /** Deterministic avatar colour from a member id, so the same person is the

@@ -1,9 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AppState,
   Pressable,
@@ -13,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { HomeHeader } from '@/components/ui/app-bar';
@@ -24,18 +23,17 @@ import { Card } from '@/components/ui/card';
 import { Appear } from '@/components/ui/appear';
 import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
-import { iconFor, lineIconFor } from '@/lib/icons';
+import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import {
   useAwayPeriods,
   useBalances,
   useExpenses,
   useMembers,
-  useMonthlyTotals,
   usePendingChanges,
   useRecurring,
   useSpendSummary,
@@ -54,213 +52,165 @@ type JoinRequest = {
 
 
 /**
- * Household name and head-count, one quiet line above the two cards. Half a
- * screen is too narrow to carry it inside a card as well as a figure.
+ * The big card: the household, then where you stand with it. A panel in the
+ * brand green -- deep green in light mode, dark green in dark -- with faint
+ * rings in the bottom right corner, after the design reference.
+ *
+ * The top row names the household and its head-count, a rule splits it from
+ * the balance below. The amount's colour comes from the balance tokens (on a
+ * green card, "owed to you" can't itself be green), and the words always say
+ * the direction, so colour is never the only signal. Anything still loading
+ * shows a skeleton -- a ₹0.00 before the data arrives would be a claim.
  */
-function HouseholdLine({ name, people }: { name?: string; people?: number }) {
+function BalanceCard({
+  householdName,
+  people,
+  balancePaise,
+}: {
+  householdName?: string;
+  people?: number;
+  balancePaise?: number;
+}) {
+  const theme = useTheme();
+  const owed = balancePaise !== undefined && balancePaise > 0;
+  const owing = balancePaise !== undefined && balancePaise < 0;
+  const ink = owed ? theme.balancePositive : owing ? theme.balanceNegative : theme.onBalance;
+
   return (
-    <View style={styles.householdLine}>
-      {name ? (
-        <ThemedText themeColor="textSecondary" style={[Type.caption, styles.flex]} numberOfLines={1}>
-          {name}
+    <View style={[styles.balanceCard, { backgroundColor: theme.balanceCard, borderColor: theme.balanceEdge }]}>
+      {/* Three rings centred off the corner, so only their arcs show. */}
+      <Svg style={styles.balanceRings} width={170} height={170} pointerEvents="none">
+        {[28, 52, 76].map((r) => (
+          <Circle key={r} cx={120} cy={120} r={r} fill="none" stroke={theme.balanceRing} strokeWidth={2} />
+        ))}
+      </Svg>
+
+      <View style={styles.householdRow}>
+        {householdName ? (
+          <ThemedText
+            style={[Type.headline, styles.flex, { color: theme.onBalance }]}
+            numberOfLines={1}>
+            {householdName}
+          </ThemedText>
+        ) : (
+          <View style={styles.flex}>
+            <Skeleton width={150} height={14} tint={theme.balanceRing} />
+          </View>
+        )}
+        {people ? (
+          <View
+            style={styles.peopleCount}
+            accessible
+            accessibilityLabel={people === 1 ? '1 person' : `${people} people`}>
+            <Ionicons name="people" size={16} color={theme.onBalanceMuted} />
+            <ThemedText style={[Type.caption, styles.semi, { color: theme.onBalanceMuted }]}>
+              {people}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={[styles.balanceRule, { backgroundColor: theme.balanceRule }]} />
+
+      <ThemedText style={[Type.caption, { color: theme.onBalanceMuted }]} numberOfLines={1}>
+        {balancePaise === undefined
+          ? 'Your balance'
+          : owed
+            ? 'The house owes you'
+            : owing
+              ? 'You owe the house'
+              : 'You’re all square'}
+      </ThemedText>
+
+      {/* No Settle up link here: the Settle quick action just below goes to
+          the same screen. */}
+      {balancePaise !== undefined ? (
+        <ThemedText
+          style={[styles.balanceValue, { color: ink }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}>
+          {formatPaise(Math.abs(balancePaise))}
         </ThemedText>
       ) : (
-        <Skeleton width={140} height={12} />
+        <View style={styles.balanceSkeleton}>
+          <Skeleton width="55%" height={28} radius={Radius.sm} tint={theme.balanceRing} />
+        </View>
       )}
-      {people ? (
-        <ThemedText themeColor="textSecondary" style={Type.caption}>
-          {people === 1 ? '1 person' : `${people} people`}
-        </ThemedText>
-      ) : null}
     </View>
   );
 }
 
 /**
- * The tiles' background, after the design mockup: a diagonal gradient rising
- * from the bottom left to the top right, and two nested S-shaped waves down
- * the right edge -- each bulging in at mid-height and back out at the top and
- * bottom. Drawn behind the content and ignoring touches, so it is purely
- * surface.
+ * One of the two small cards under the balance: what this month's figure is,
+ * the figure, a rule, then the same figure for the whole of last month under
+ * a plain label ("Spent in September"). Real amounts, not a percentage.
  */
-function TileBackdrop() {
-  const theme = useTheme();
-  // Gradient ids are document-global on web; useId keeps this one from
-  // clashing with any other on the page. Its colons are not valid inside
-  // url(#...).
-  const id = useId().replace(/:/g, '');
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient
-        colors={[theme.tileFrom, theme.tileTo]}
-        start={{ x: 0, y: 1 }}
-        end={{ x: 1, y: 0 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* A 100x100 box stretched to the tile, so the waves keep their place
-          whatever height the row settles on. */}
-      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
-        <Defs>
-          <SvgGradient id={`wave${id}`} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={theme.tileWaveTop} />
-            <Stop offset="1" stopColor={theme.tileWaveBottom} />
-          </SvgGradient>
-        </Defs>
-        {/* The outer wave, then a narrower one inside it: where they overlap
-            the colour doubles, which is the deeper band in the corner. */}
-        <Path
-          d="M86 0 C 76 16, 56 30, 58 50 C 60 70, 72 84, 76 100 L 100 100 L 100 0 Z"
-          fill={`url(#wave${id})`}
-        />
-        <Path
-          d="M100 4 C 90 20, 74 34, 76 52 C 78 70, 90 82, 100 92 Z"
-          fill={`url(#wave${id})`}
-        />
-      </Svg>
-    </View>
-  );
-}
-
-/**
- * One of Home's two summary tiles: a round icon, a label, the figure, and a
- * smaller figure underneath. An undefined value shows a skeleton -- a ₹0.00
- * before the data arrives would be a claim.
- *
- * `featured` puts the tile on the green wave backdrop -- the balance only, so
- * the screen has one obvious place to start. A featured tile takes every
- * colour from the hero tokens: the page's own green and red measured under
- * 4.5:1 on it. A plain tile keeps the page's colours.
- */
-function StatTile({
+function SmallCard({
   icon,
-  tone,
   label,
+  period,
   value,
-  footLabel,
-  footValue,
-  featured = false,
+  compareLabel,
+  compareValue,
 }: {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  tone: 'success' | 'danger' | 'neutral';
+  /** Whose money: "Household spent", "Your share". */
   label: string;
+  /** Which month, on its own line: "in October". */
+  period: string;
   value?: string;
-  /** Short -- it shares one line with footValue: "Your share ₹9,652.78". */
-  footLabel: string;
-  footValue?: string;
-  featured?: boolean;
+  /** Last month's figure, named: "Spent in September". */
+  compareLabel: string;
+  compareValue?: string;
 }) {
   const theme = useTheme();
-  const ink = featured
-    ? tone === 'success'
-      ? theme.heroAccent
-      : tone === 'danger'
-        ? theme.heroDanger
-        : theme.onHero
-    : tone === 'success'
-      ? theme.success
-      : tone === 'danger'
-        ? theme.danger
-        : theme.textSecondary;
-  const muted = featured ? theme.onHeroMuted : theme.textSecondary;
-  const strong = featured ? theme.onHero : theme.text;
-  const rule = featured ? theme.heroRule : theme.border;
-  // On the plain tile, the icon's own colour as a wash behind it (hex alpha).
-  const chip = featured ? theme.heroChip : `${ink}24`;
-  const skeletonTint = featured ? theme.heroChip : undefined;
 
   return (
-    <View
-      style={[
-        styles.statTile,
-        { borderColor: rule },
-        !featured && { backgroundColor: theme.backgroundElement },
-      ]}>
-      {featured ? <TileBackdrop /> : null}
+    <View style={[styles.smallCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+      {/* The brand green in a pale tile: the card itself stays neutral. */}
+      <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+        <MaterialCommunityIcons name={icon} size={17} color={theme.brandInk} />
+      </View>
+      {/* Who, then when, each on a line of its own: a single sentence
+          wrapped on one card and not the other, which left the two
+          figures at different heights. */}
       <View>
-        <View style={[styles.tileIcon, { backgroundColor: chip }]}>
-          <MaterialCommunityIcons name={icon} size={17} color={ink} />
-        </View>
-        <ThemedText style={[Type.micro, styles.tileLabel, { color: muted }]} numberOfLines={1}>
+        <ThemedText style={styles.smallLabel} numberOfLines={1}>
           {label}
         </ThemedText>
-        {value ? (
-          <ThemedText
-            style={[styles.tileValue, { color: tone === 'neutral' ? strong : ink }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}>
-            {value}
-          </ThemedText>
-        ) : (
-          <View style={styles.tileValueSkeleton}>
-            <Skeleton width="80%" height={20} radius={Radius.sm} tint={skeletonTint} />
-          </View>
-        )}
+        <ThemedText themeColor="textSecondary" style={styles.smallPeriod} numberOfLines={1}>
+          {period}
+        </ThemedText>
       </View>
-
-      <View style={[styles.tileFootRow, { borderTopColor: rule }]}>
-        {footValue ? (
-          <ThemedText style={[styles.tileFoot, { color: muted }]} numberOfLines={1}>
-            {footLabel}{' '}
-            <ThemedText style={[styles.tileFootValue, { color: strong }]}>{footValue}</ThemedText>
-          </ThemedText>
-        ) : (
-          <View style={styles.tileFootLoading}>
-            <ThemedText style={[styles.tileFoot, { color: muted }]}>{footLabel}</ThemedText>
-            <Skeleton width={64} height={12} tint={skeletonTint} />
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
-/**
- * One category in "Where it went": a tinted line icon, the name and amount,
- * and a thin bar for its share of the month.
- */
-function CategoryRow({
-  icon,
-  name,
-  amount,
-  share,
-  color,
-}: {
-  icon: string;
-  name: string;
-  amount: string;
-  /** 0 to 1, of the month's total. */
-  share: number;
-  color: string;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={styles.categoryRow}>
-      <View style={[styles.tileIcon, { backgroundColor: `${color}2E` }]}>
-        <MaterialCommunityIcons
-          name={icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
-          size={16}
-          color={color}
-        />
-      </View>
-      <View style={[styles.flex, styles.categoryText]}>
-        <View style={styles.categoryHead}>
-          <ThemedText style={[Type.caption, styles.flex]} numberOfLines={1}>
-            {name}
-          </ThemedText>
-          <ThemedText style={Type.caption}>{amount}</ThemedText>
+      {value ? (
+        <ThemedText
+          style={styles.smallValue}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}>
+          {value}
+        </ThemedText>
+      ) : (
+        <View style={styles.smallValueSkeleton}>
+          <Skeleton width="80%" height={20} radius={Radius.sm} />
         </View>
-        <View style={[styles.categoryTrack, { backgroundColor: theme.backgroundSelected }]}>
-          <View
-            style={[
-              styles.categoryFill,
-              // A sliver stays visible for a tiny category rather than vanishing.
-              { width: `${Math.max(share * 100, 2)}%`, backgroundColor: color },
-            ]}
-          />
+      )}
+
+      <View style={[styles.smallRule, { backgroundColor: theme.border }]} />
+
+      <ThemedText themeColor="textSecondary" style={styles.smallCompareLabel} numberOfLines={1}>
+        {compareLabel}
+      </ThemedText>
+      {compareValue ? (
+        <ThemedText style={styles.smallCompareValue} numberOfLines={1}>
+          {compareValue}
+        </ThemedText>
+      ) : (
+        <View style={styles.smallCompareSkeleton}>
+          <Skeleton width="60%" height={12} />
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -312,7 +262,6 @@ export default function HomeScreen() {
   const expenses = useExpenses(4);
   const away = useAwayPeriods();
   const changes = usePendingChanges();
-  const totals = useMonthlyTotals();
   const recurring = useRecurring();
   const spend = useSpendSummary(member?.id);
 
@@ -423,33 +372,20 @@ export default function HomeScreen() {
   const now = new Date();
 
   // The header greets you instead of showing the logo — you know which app you
-  // opened; what you don't know is what day it is and where you stand.
+  // opened; what you want to know is where you stand.
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = (member?.display_name ?? '').trim().split(/\s+/)[0] || 'there';
-  const dateLabel = now.toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
   const monthName = now.toLocaleDateString('en-IN', { month: 'long' });
   const prevMonthName = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(
     'en-IN',
     { month: 'long' }
   );
 
-  const monthRows = (totals.data ?? []).filter(
-    (t) => t.year === now.getFullYear() && t.month === now.getMonth() + 1
-  );
-  const monthTotal = monthRows.reduce((sum, r) => sum + r.totalPaise, 0);
-
-  const palette = [theme.chart1, theme.chart2, theme.chart3, theme.chart4];
   // Not hand-memoized: React Compiler is enabled (app.json), and it could not
   // preserve a useMemo whose deps are rebuilt every render -- it reported
   // "Compilation Skipped", meaning the whole file went un-optimised to keep a
   // memo that was not helping. Plain derivation lets the compiler do it.
-  const topCategories = [...monthRows].sort((a, b) => b.totalPaise - a.totalPaise).slice(0, 4);
-
   const others = (balances.data ?? []).filter((b) => b.memberId !== member?.id);
   const openBalances = others
     .filter((b) => b.balancePaise !== 0)
@@ -459,8 +395,8 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <HomeHeader
-        overline={dateLabel}
-        title={`${greeting}, ${firstName}`}
+        greeting={greeting}
+        name={firstName}
         badge={isOwner ? approvalCount : 0}
       />
 
@@ -486,65 +422,50 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Two plain tiles side by side, both visible without a swipe. They
-            used to be pages of a horizontal pager, which had to share one
-            height and so left the shorter card half empty.
-
-            Only the balance sits on the green wave backdrop: two identical
-            green cards gave the eye nowhere to start. Meaning stays in the
-            amount and the words -- green when the house owes you, red when
-            you owe it, plain when you're square. */}
+        {/* One big card for where you stand, two small ones under it for
+            this month's spending -- the household's and yours. All visible
+            without a swipe: they used to be pages of a horizontal pager,
+            which had to share one height and so left the shorter card half
+            empty. Each small card's second line is the whole of last
+            month, labelled as such. */}
         <Appear style={styles.cards}>
-          <HouseholdLine name={household.data?.name} people={members.data?.length} />
+          <BalanceCard
+            householdName={household.data?.name}
+            people={members.data?.length}
+            balancePaise={balances.data ? myBalance : undefined}
+          />
 
-          <View style={styles.tiles}>
-            <StatTile
-              icon={
-                !balances.data
-                  ? 'wallet-outline'
-                  : myBalance > 0
-                    ? 'arrow-bottom-left'
-                    : myBalance < 0
-                      ? 'arrow-top-right'
-                      : 'check'
-              }
-              tone={!balances.data || myBalance === 0 ? 'neutral' : myBalance > 0 ? 'success' : 'danger'}
-              label={
-                !balances.data
-                  ? 'Your balance'
-                  : myBalance > 0
-                    ? 'The house owes you'
-                    : myBalance < 0
-                      ? 'You owe the house'
-                      : 'You’re all square'
-              }
-              value={balances.data ? formatPaise(Math.abs(myBalance)) : undefined}
-              footLabel="Your share"
-              footValue={spend.data ? formatPaise(spend.data.myMonthPaise) : undefined}
-              featured
-            />
-            <StatTile
-              icon="receipt-text-outline"
-              tone="neutral"
-              label={`Spent in ${monthName}`}
+          <View style={styles.smallCards}>
+            <SmallCard
+              icon="home-outline"
+              label="Household spent"
+              period={`in ${monthName}`}
               value={spend.data ? formatPaise(spend.data.roomMonthPaise) : undefined}
-              footLabel={prevMonthName}
-              footValue={spend.data ? formatPaise(spend.data.roomPrevMonthPaise) : undefined}
+              compareLabel={`Spent in ${prevMonthName}`}
+              compareValue={spend.data ? formatPaise(spend.data.roomPrevMonthFullPaise) : undefined}
+            />
+            <SmallCard
+              icon="account-outline"
+              label="Your share"
+              period={`in ${monthName}`}
+              value={spend.data ? formatPaise(spend.data.myMonthPaise) : undefined}
+              // Not "Your share in September": too long for half a screen.
+              compareLabel={`Share in ${prevMonthName}`}
+              compareValue={spend.data ? formatPaise(spend.data.myPrevMonthFullPaise) : undefined}
             />
           </View>
         </Appear>
 
         <Appear delay={60}>
         <QuickActions
-          // No Add here: the floating + button already adds an expense, and
-          // two Add buttons on one screen left recurring bills with no way in
-          // from Home.
+          // No Add here: the Add button in the tab bar already adds an
+          // expense, and two Add buttons on one screen left recurring bills
+          // with no way in from Home.
           actions={[
             {
               key: 'settle',
               icon: 'swap-horizontal',
               label: 'Settle',
-              color: theme.actionGreen,
               onPress: () => router.push('/settle'),
             },
             {
@@ -552,7 +473,6 @@ export default function HomeScreen() {
               // A calendar, not the repeat arrows: those sat beside Settle's
               // swap arrows and the two read as the same button.
               icon: 'calendar-outline',
-              color: theme.actionBlue,
               label: 'Bills',
               onPress: () => router.push('/recurring'),
             },
@@ -560,14 +480,12 @@ export default function HomeScreen() {
               key: 'away',
               icon: 'airplane',
               label: 'Away',
-              color: theme.actionPurple,
               onPress: () => router.push('/away'),
             },
             {
               key: 'people',
               icon: 'people',
               label: 'People',
-              color: theme.actionOrange,
               onPress: () => router.push('/household'),
             },
           ]}
@@ -670,45 +588,8 @@ export default function HomeScreen() {
           </Section>
         ) : null}
 
-        {/* Still loading: the card's shape, so the page does not jump when it
-            arrives. Loaded and empty: no card at all, as before. */}
-        {!totals.data ? (
-          <Section title="Where it went">
-            <Card style={styles.spendCard}>
-              {[0, 1, 2, 3].map((i) => (
-                <View key={i} style={styles.categoryRow}>
-                  <Skeleton width={30} height={30} radius={15} />
-                  <View style={[styles.flex, styles.categoryText]}>
-                    <Skeleton width={i % 2 ? '45%' : '60%'} height={12} />
-                    <Skeleton height={4} radius={2} />
-                  </View>
-                </View>
-              ))}
-            </Card>
-          </Section>
-        ) : monthTotal > 0 ? (
-          <Section
-            title="Where it went"
-            action={<SectionLink label="Reports" onPress={() => router.push('/reports')} />}>
-            {/* Categories only. The month's total is in the spend tile at the
-                top of Home; repeating it here put the same figure on screen
-                twice. Rows rather than a ring: an amount you can read beats a
-                percentage you have to turn back into rupees, and the line
-                icons match the tiles above. */}
-            <Card style={styles.spendCard}>
-              {topCategories.map((r, i) => (
-                <CategoryRow
-                  key={r.categoryId}
-                  icon={lineIconFor(r.icon)}
-                  name={r.categoryName}
-                  amount={formatPaise(r.totalPaise)}
-                  share={r.totalPaise / monthTotal}
-                  color={palette[i % palette.length]}
-                />
-              ))}
-            </Card>
-          </Section>
-        ) : null}
+        {/* No category breakdown on Home: the Reports tab has it, and Home
+            stays on where you stand and what just happened. */}
 
         <Section
           // No "Manage" link: the People quick action above goes to the same
@@ -742,7 +623,7 @@ export default function HomeScreen() {
                     borderBottomColor: theme.border,
                   },
                 ]}>
-                <Avatar name={b.displayName} seed={b.memberId} size={36} />
+                <Avatar name={b.displayName} seed={b.memberId} size={36} brand />
                 <View style={styles.flex}>
                   <ThemedText style={Type.body} numberOfLines={1}>
                     {b.displayName}
@@ -788,23 +669,23 @@ export default function HomeScreen() {
           }>
           {/* Loading is not empty: "Nothing logged yet" used to show for the
               moment before the list arrived, in a household full of expenses. */}
+          {/* One card per expense, with a gap between, rather than rows
+              ruled off inside a single card: each expense is a thing you can
+              tap, and a card of its own reads as one. */}
           {!expenses.data && pending.length === 0 ? (
-            <Card padded={false}>
+            <View style={styles.cardList}>
               {[0, 1, 2].map((i) => (
-                <RowSkeleton key={i} last={i === 2} />
+                <Card key={i} padded={false}>
+                  <RowSkeleton last />
+                </Card>
               ))}
-            </Card>
+            </View>
           ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
-            <Card padded={false}>
+            <View style={styles.cardList}>
               {/* Queued entries sit at the top marked as sending, so what you
                   just typed is visibly there rather than seeming lost. */}
               {pending.map((p) => (
-                <View
-                  key={p.id}
-                  style={[
-                    styles.row,
-                    { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
-                  ]}>
+                <Card key={p.id} padded={false} style={styles.row}>
                   <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
                     <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
                   </View>
@@ -828,37 +709,32 @@ export default function HomeScreen() {
                   <ThemedText themeColor="textTertiary" style={Type.amount}>
                     {formatPaise(p.totalPaise)}
                   </ThemedText>
-                </View>
+                </Card>
               ))}
 
-              {expenses.data?.map((e, i) => (
+              {expenses.data?.map((e) => (
                 <Pressable
                   key={e.id}
                   onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
-                  style={({ pressed }) => [
-                    styles.row,
-                    i < (expenses.data?.length ?? 0) - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: theme.border,
-                    },
-                    { opacity: pressed ? 0.6 : 1 },
-                  ]}>
-                  <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                    <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
-                  </View>
-                  <View style={styles.flex}>
-                    <ThemedText style={Type.body} numberOfLines={1}>
-                      {e.description || e.categoryName}
-                    </ThemedText>
-                    <ThemedText themeColor="textTertiary" style={Type.micro}>
-                      {e.paidByName} · {e.participantCount} way
-                      {e.participantCount === 1 ? '' : 's'}
-                    </ThemedText>
-                  </View>
-                  <ThemedText style={Type.amount}>{formatPaise(e.totalPaise)}</ThemedText>
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                  <Card padded={false} style={styles.row}>
+                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
+                    </View>
+                    <View style={styles.flex}>
+                      <ThemedText style={Type.body} numberOfLines={1}>
+                        {e.description || e.categoryName}
+                      </ThemedText>
+                      <ThemedText themeColor="textTertiary" style={Type.micro}>
+                        {e.paidByName} · {e.participantCount} way
+                        {e.participantCount === 1 ? '' : 's'}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={Type.amount}>{formatPaise(e.totalPaise)}</ThemedText>
+                  </Card>
                 </Pressable>
               ))}
-            </Card>
+            </View>
           ) : (
             <Card style={styles.empty}>
               <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
@@ -913,7 +789,7 @@ function Section({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: 130, gap: Spacing.four },
+  content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
   recurringError: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -926,42 +802,50 @@ const styles = StyleSheet.create({
   centered: { textAlign: 'center' },
   semi: { fontWeight: '700' },
 
-  cards: { gap: Spacing.two },
-  householdLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.half,
-  },
-  // Two equal halves. The row stretches both to the taller one's height, and
-  // space-between pins each footer to the bottom, so the two rules line up.
-  tiles: { flexDirection: 'row', gap: Spacing.two + Spacing.one },
-  statTile: {
-    flex: 1,
+  cards: { gap: Spacing.two + Spacing.one },
+  householdRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  peopleCount: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  balanceRule: { height: StyleSheet.hairlineWidth, marginTop: Spacing.three, marginBottom: Spacing.two + Spacing.one },
+  balanceCard: {
     borderRadius: Radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.three,
-    gap: Spacing.three,
-    justifyContent: 'space-between',
-    // Clips the gradient and the curves to the rounded corners.
+    paddingHorizontal: Spacing.four - Spacing.one,
+    paddingTop: Spacing.three + Spacing.one,
+    paddingBottom: Spacing.four - Spacing.one,
+    gap: Spacing.one,
+    // Clips the rings to the rounded corner.
     overflow: 'hidden',
   },
-  tileIcon: {
+  balanceRings: { position: 'absolute', right: -30, bottom: -50 },
+  balanceValue: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
+  // The same line height as the figure it stands in for, so nothing moves.
+  balanceSkeleton: { height: 40, justifyContent: 'center' },
+
+  // Two equal halves; the row stretches both to the taller one's height.
+  smallCards: { flexDirection: 'row', gap: Spacing.two + Spacing.one },
+  smallCard: {
+    flex: 1,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three,
+    gap: Spacing.one,
+  },
+  smallIcon: {
     width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: Spacing.one,
   },
-  tileLabel: { marginTop: Spacing.two + Spacing.one },
-  tileValue: { fontSize: 21, lineHeight: 27, fontWeight: '700', letterSpacing: -0.4, marginTop: 2 },
-  // A rule over the footer, as on the mockup, splitting the figure from its aside.
-  tileFootRow: { paddingTop: Spacing.two + Spacing.one, borderTopWidth: StyleSheet.hairlineWidth },
-  // The same 26px line as the figure it stands in for, so nothing moves.
-  tileValueSkeleton: { height: 27, marginTop: 2, justifyContent: 'center' },
-  tileFoot: { fontSize: 12, lineHeight: 17 },
-  tileFootValue: { fontSize: 12, lineHeight: 17, fontWeight: '500' },
-  tileFootLoading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  smallLabel: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  smallPeriod: { fontSize: 12, lineHeight: 16 },
+  smallValue: { fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.4 },
+  smallValueSkeleton: { height: 26, justifyContent: 'center' },
+  smallRule: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.two },
+  smallCompareLabel: { fontSize: 12, lineHeight: 16 },
+  smallCompareValue: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  smallCompareSkeleton: { height: 19, justifyContent: 'center' },
   rowSkeletonText: { gap: 6 },
 
   banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },
@@ -984,12 +868,6 @@ const styles = StyleSheet.create({
   },
   countText: { color: '#fff', fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
 
-  spendCard: { gap: Spacing.three + Spacing.one },
-  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  categoryText: { gap: 6 },
-  categoryHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  categoryTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  categoryFill: { height: 4, borderRadius: 2 },
 
   row: {
     flexDirection: 'row',
@@ -998,6 +876,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 13,
   },
+  // Recent's separate cards, a small gap apart.
+  cardList: { gap: Spacing.two },
   tile: {
     width: 38,
     height: 38,

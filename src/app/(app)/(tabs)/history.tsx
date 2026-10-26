@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
@@ -147,7 +147,7 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: 130 },
+  content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance },
   iconButton: {
     width: 36,
     height: 36,

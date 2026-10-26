@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
@@ -313,7 +313,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: 130, gap: Spacing.four },
+  content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
 

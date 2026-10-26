@@ -91,10 +91,13 @@ export default function CalculatorScreen() {
   }
 
   return (
-    // edges: the tab bar already sits in the bottom inset, so letting
-    // SafeAreaView pad for it again would float the keypad off the bar.
-    <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Calculator" showBack={false} />
+    // A pushed screen now, opened from More, with no tab bar under it -- so
+    // it pads for the bottom inset itself, keeping the keypad off the
+    // system navigation bar.
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      style={[styles.safe, { backgroundColor: theme.background }]}>
+      <ScreenHeader title="Calculator" />
 
       <View style={styles.body}>
         {/* The answer is the big number, always -- even mid-expression. The

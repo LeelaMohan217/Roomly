@@ -79,19 +79,21 @@ export function AppBar({
 }
 
 /**
- * Home's header: you on the left, activity on the right.
+ * Home's header: the greeting on the left; activity and you on the right.
  *
- * The avatar means "you" here rather than identifying one of four people, so
- * it carries a person glyph instead of initials, and the greeting sits at
- * body weight — a header is orientation, not the headline of the screen.
+ * The greeting is plain text, not a button -- the profile lives in the avatar
+ * at the far right, where every app puts it. The name is the bold part, the
+ * way you'd say it.
  */
 export function HomeHeader({
-  overline,
-  title,
+  greeting,
+  name,
   badge = 0,
 }: {
-  overline: string;
-  title: string;
+  /** "Good evening" -- the comma and name are added here. */
+  greeting: string;
+  name: string;
+  /** Things waiting for an owner's approval, shown on the avatar. */
   badge?: number;
 }) {
   const theme = useTheme();
@@ -102,14 +104,59 @@ export function HomeHeader({
 
   return (
     <View style={styles.bar}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Your account and settings"
-        onPress={() => router.push('/settings')}
-        hitSlop={8}
-        style={({ pressed }) => [styles.homeLeft, { opacity: pressed ? 0.7 : 1 }]}>
-        <View>
-          <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={38} icon />
+      <View style={styles.homeText}>
+        <ThemedText style={styles.homeGreeting} numberOfLines={1}>
+          {greeting}, <ThemedText style={styles.homeName}>{name}</ThemedText>
+        </ThemedText>
+      </View>
+
+      <View style={styles.homeRight}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={unread > 0 ? `Activity, ${unread} unread` : 'Activity'}
+          onPress={() => router.push('/notifications')}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.iconButton,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}>
+          {/* Brand green whether or not anything is unread: the red badge is
+              what says "new", so the bell itself never goes grey. */}
+          <Ionicons
+            name={unread > 0 ? 'notifications' : 'notifications-outline'}
+            size={19}
+            color={theme.brandInk}
+          />
+          {unread > 0 ? (
+            <View
+              style={[
+                styles.badge,
+                { backgroundColor: theme.danger, borderColor: theme.background },
+              ]}>
+              <ThemedText style={styles.badgeText} allowFontScaling={false}>
+                {unread > 9 ? '9+' : unread}
+              </ThemedText>
+            </View>
+          ) : null}
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            badge > 0
+              ? `Your account and settings, ${badge} waiting for you`
+              : 'Your account and settings'
+          }
+          onPress={() => router.push('/settings')}
+          hitSlop={8}
+          style={({ pressed }) => [styles.avatarWrap, { opacity: pressed ? 0.7 : 1 }]}>
+          {/* A person glyph, not initials: this button means "you", not one
+              housemate among several. */}
+          <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={40} icon />
           {badge > 0 ? (
             <View
               style={[
@@ -121,50 +168,8 @@ export function HomeHeader({
               </ThemedText>
             </View>
           ) : null}
-        </View>
-
-        <View style={styles.homeText}>
-          <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
-            {overline}
-          </ThemedText>
-          <ThemedText style={styles.homeTitle} numberOfLines={1}>
-            {title}
-          </ThemedText>
-        </View>
-      </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          unread > 0 ? `Activity, ${unread} unread` : 'Activity'
-        }
-        onPress={() => router.push('/notifications')}
-        hitSlop={8}
-        style={({ pressed }) => [
-          styles.iconButton,
-          {
-            backgroundColor: theme.backgroundElement,
-            borderColor: theme.border,
-            opacity: pressed ? 0.7 : 1,
-          },
-        ]}>
-        <Ionicons
-          name={unread > 0 ? 'notifications' : 'notifications-outline'}
-          size={19}
-          color={unread > 0 ? theme.primary : theme.textSecondary}
-        />
-        {unread > 0 ? (
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: theme.danger, borderColor: theme.background },
-            ]}>
-            <ThemedText style={styles.badgeText} allowFontScaling={false}>
-              {unread > 9 ? '9+' : unread}
-            </ThemedText>
-          </View>
-        ) : null}
-      </Pressable>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -181,9 +186,7 @@ export function ScreenHeader({
   action?: React.ReactNode;
   /**
    * Off at a tab root, where the stack has nothing to pop and the chevron is
-   * a control that visibly does nothing. The Calculator tab used this header
-   * while every other tab used AppBar, so it was the only tab in the app with
-   * a dead back button.
+   * a control that visibly does nothing.
    */
   showBack?: boolean;
 }) {
@@ -264,10 +267,11 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
   titleBlock: { flex: 1, gap: 1 },
-  homeLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flex: 1 },
-  homeText: { flex: 1, gap: 1 },
-  homeTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  // A circle, matching the round avatar opposite it in the header.
+  homeText: { flex: 1, gap: 2 },
+  homeGreeting: { fontSize: 19, fontWeight: '500', letterSpacing: -0.3, lineHeight: 25 },
+  homeName: { fontSize: 19, fontWeight: '700', letterSpacing: -0.3, lineHeight: 25 },
+  homeRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + Spacing.one },
+  // A circle, matching the round avatar beside it in the header.
   iconButton: {
     width: 40,
     height: 40,
