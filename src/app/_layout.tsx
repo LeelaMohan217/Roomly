@@ -6,6 +6,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 
+import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
 // One source of truth for the colour scheme. The navigator theme and the
 // design tokens reading different hooks is how you get light cards on a dark
@@ -73,7 +74,13 @@ function RootNavigator() {
     if (status !== 'loading') void SplashScreen.hideAsync();
   }, [status]);
 
-  if (status === 'loading') return null;
+  // While the session is still being worked out, the brand screen -- the
+  // same green and wordmark as the native splash -- rather than nothing. The
+  // native splash is hidden the moment this has drawn underneath it, so the
+  // wait looks like one screen, then sign in or home.
+  if (status === 'loading') {
+    return <BrandSplash onLayout={() => void SplashScreen.hideAsync()} />;
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
