@@ -57,6 +57,9 @@ yarn-error.*
 # test coverage
 coverage/
 
+# local planning sheets, kept out of git
+docs/roomly-scaling-plan.xlsx
+
 # Claude Code: personal settings stay local, shared ones are committed
 .claude/settings.local.json
 

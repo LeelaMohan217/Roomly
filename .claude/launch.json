@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "roomly-web",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "npx.cmd",
       "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
       "port": 8081
     }
