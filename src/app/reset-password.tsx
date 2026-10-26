@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -8,17 +7,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthButton, AuthField, AuthHeader, AuthResult, authStyles } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
-import { Button } from '@/components/ui/button';
-import { TextField } from '@/components/ui/text-field';
-import { Spacing, Type } from '@/constants/theme';
+import { Notice } from '@/components/ui/notice';
+import { Spacing } from '@/constants/theme';
 import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
 type Phase = 'idle' | 'verifying' | 'ready' | 'invalid' | 'saved';
+
+const MIN_PASSWORD = 8;
 
 /**
  * Landing for the password-reset deep link, and NOTHING else.
@@ -52,6 +53,9 @@ export default function ResetPasswordScreen() {
     params.code || params.token_hash ? 'verifying' : 'idle'
   );
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +87,7 @@ export default function ResetPasswordScreen() {
   }, [phase, params.code, params.token_hash]);
 
   async function save() {
+    if (password.length < MIN_PASSWORD || confirm !== password || busy) return;
     setError(null);
     setBusy(true);
 
@@ -126,10 +131,10 @@ export default function ResetPasswordScreen() {
 
   if (phase === 'verifying') {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
         <View style={styles.centered}>
           <ActivityIndicator color={theme.primary} />
-          <ThemedText themeColor="textSecondary" style={Type.body}>
+          <ThemedText themeColor="textSecondary" style={styles.waiting}>
             Checking your link…
           </ThemedText>
         </View>
@@ -139,95 +144,117 @@ export default function ResetPasswordScreen() {
 
   if (phase === 'invalid') {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <View style={styles.centered}>
-          <View style={[styles.icon, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="link-outline" size={26} color={theme.danger} />
-          </View>
-          <ThemedText style={Type.title}>Link didn&apos;t work</ThemedText>
-          <ThemedText themeColor="textSecondary" style={[Type.body, styles.centeredText]}>
-            {error ?? 'This reset link is invalid or has expired.'} Reset links last an hour and
-            can only be used once.
-          </ThemedText>
-          <Button
-            title={status === 'signedOut' ? 'Request a new link' : 'Back to the app'}
-            onPress={() => router.replace(status === 'signedOut' ? '/forgot-password' : home)}
-            style={styles.fullWidth}
-          />
-        </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+        <AuthResult
+          tone="danger"
+          icon="link"
+          title="This link didn’t work"
+          // The underlying error stays off screen: every reason this fails
+          // ends the same way, with a fresh link, and a code like
+          // pkce_code_verifier_not_found only adds worry.
+          actions={
+            // Grey, not green: on a red "this failed" screen a green button
+            // reads as a second, contradicting signal. The red says what
+            // happened; the button is just the way out.
+            <AuthButton
+              variant="secondary"
+              title={status === 'signedOut' ? 'Send me a new link' : 'Back to the app'}
+              onPress={() => router.replace(status === 'signedOut' ? '/forgot-password' : home)}
+            />
+          }>
+          Reset links work once, for one hour. Ask for a new one and use it straight away.
+        </AuthResult>
       </SafeAreaView>
     );
   }
 
   if (phase === 'saved') {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <View style={styles.centered}>
-          <View style={[styles.icon, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="checkmark-circle-outline" size={28} color={theme.primary} />
-          </View>
-          <ThemedText style={Type.title}>Password changed</ThemedText>
-          <ThemedText themeColor="textSecondary" style={[Type.body, styles.centeredText]}>
-            You&apos;re signed in on this phone. Any other device will need the new password.
-          </ThemedText>
-          <Button
-            title="Continue"
-            onPress={() => router.replace(home)}
-            style={styles.fullWidth}
-          />
-        </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+        <AuthResult
+          icon="checkmark"
+          title="Password changed"
+          actions={<AuthButton title="Continue" onPress={() => router.replace(home)} />}>
+          You’re signed in on this phone. Other devices will need the new password.
+        </AuthResult>
       </SafeAreaView>
     );
   }
 
-  const tooShort = password.length > 0 && password.length < 8;
+  const passwordOk = password.length >= MIN_PASSWORD;
+  const passwordShort = passwordTouched && password.length > 0 && !passwordOk;
+  const matches = confirm.length > 0 && confirm === password;
+  const mismatch = confirmTouched && confirm.length > 0 && confirm !== password;
+  const canSave = passwordOk && matches && !busy;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ThemedText style={Type.title}>Choose a new password</ThemedText>
-            <ThemedText themeColor="textSecondary" style={Type.body}>
-              {session?.user.email
-                ? `For ${session.user.email}`
-                : 'Pick something you can remember.'}
-            </ThemedText>
-          </View>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      <KeyboardAwareScrollView contentContainerStyle={authStyles.content}>
+        <AuthHeader
+          icon="key"
+          title="Choose a new password"
+          subtitle={
+            session?.user.email
+              ? `For ${session.user.email}`
+              : 'Pick something you can remember.'
+          }
+        />
 
-          <TextField
+        <View style={authStyles.form}>
+          <AuthField
             label="New password"
+            icon="lock-closed-outline"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(v) => {
+              setPassword(v);
+              setError(null);
+            }}
+            onBlur={() => setPasswordTouched(true)}
             secure
             autoCapitalize="none"
             autoComplete="new-password"
-            placeholder="••••••••"
+            placeholder="Create a password"
             editable={!busy}
-            hint="At least 8 characters"
-            error={tooShort ? 'Use at least 8 characters' : (error ?? undefined)}
-            onSubmitEditing={save}
-            returnKeyType="go"
+            returnKeyType="next"
+            hint={`At least ${MIN_PASSWORD} characters`}
+            hintTone={passwordOk ? 'success' : passwordShort ? 'danger' : 'neutral'}
           />
 
-          <Button
-            title="Save new password"
-            onPress={save}
-            loading={busy}
-            disabled={password.length < 8}
+          {/* Typed twice because there is no "show what I typed" moment after
+              saving: a typo here locks you out until the next reset email. */}
+          <AuthField
+            label="Confirm new password"
+            icon="lock-closed-outline"
+            value={confirm}
+            onChangeText={(v) => {
+              setConfirm(v);
+              setError(null);
+            }}
+            onBlur={() => setConfirmTouched(true)}
+            secure
+            autoCapitalize="none"
+            autoComplete="new-password"
+            placeholder="Enter it again"
+            editable={!busy}
+            onSubmitEditing={save}
+            returnKeyType="go"
+            hint={mismatch ? 'Passwords don’t match.' : matches ? 'Passwords match.' : undefined}
+            hintTone={mismatch ? 'danger' : matches ? 'success' : 'neutral'}
           />
-        </KeyboardAwareScrollView>
+
+          {error ? <Notice tone="danger" message={error} /> : null}
+
+          <View style={styles.submit}>
+            <AuthButton title="Save new password" onPress={save} busy={busy} disabled={!canSave} />
+          </View>
+        </View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.four,
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -235,15 +262,6 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     gap: Spacing.three,
   },
-  centeredText: { textAlign: 'center' },
-  fullWidth: { alignSelf: 'stretch' },
-  icon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.two,
-  },
-  header: { gap: Spacing.one },
+  waiting: { fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  submit: { marginTop: Spacing.one },
 });

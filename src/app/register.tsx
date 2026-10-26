@@ -1,44 +1,132 @@
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
+import {
+  AuthButton,
+  AuthField,
+  AuthHeader,
+  AuthResult,
+  AuthSwitch,
+  Emphasis,
+  authStyles,
+  emailCheck,
+} from '@/components/auth-form';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
-import { Button } from '@/components/ui/button';
-import { TextField } from '@/components/ui/text-field';
-import { Spacing, Type } from '@/constants/theme';
+import { Notice } from '@/components/ui/notice';
+import { Spacing } from '@/constants/theme';
 import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
+import { normalizePhone, PHONE_PREFIX } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 
+const MIN_PASSWORD = 8;
+
+/**
+ * What the phone field keeps: digits only, ten at most. +91 is already shown
+ * in front, so the field is exactly the mobile number.
+ *
+ * Not maxLength={10}: that cuts a pasted "+91 98765 43210" to "+91 98765 "
+ * before this ever sees it. A whole pasted number loses its +91 or leading 0
+ * here instead; anything else stops at the tenth digit.
+ */
+function tenDigits(input: string): string {
+  let digits = input.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+  return digits.slice(0, 10);
+}
+
+/**
+ * Create an account, in the same style as sign in.
+ *
+ * The password rule is shown before it is broken, not after: grey while you
+ * type, green with a tick once it is met, red only if you leave the field
+ * short. Being told "too short" while still typing the third character reads
+ * as being scolded for something you were about to do anyway.
+ */
 export default function RegisterScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [phoneTaken, setPhoneTaken] = useState(false);
   const [password, setPassword] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
 
-  const passwordTooShort = password.length > 0 && password.length < 8;
-  const canSubmit = name.trim().length > 0 && email.trim().length > 0 && password.length >= 8;
+  const passwordOk = password.length >= MIN_PASSWORD;
+  const passwordShort = passwordTouched && password.length > 0 && !passwordOk;
+
+  // Required: every account can sign in with its number as well as its email.
+  // Red only once you have left the field without a valid mobile in it.
+  const phoneE164 = normalizePhone(phone);
+  const phoneBad = phoneTouched && !phoneE164;
+  const phoneHint = phoneTaken
+    ? 'This number is already registered to another account.'
+    : phoneBad
+      ? // Ten digits that still fail can only be a wrong first digit, and
+        // "enter 10 digits" would be wrong when there already are ten.
+        phone.length === 10
+        ? 'Mobile numbers start with 6, 7, 8 or 9.'
+        : 'Enter a 10-digit mobile number.'
+      : phoneE164
+        ? 'You can sign in with this number.'
+        : undefined;
+  const phoneTone = phoneTaken || phoneBad ? 'danger' : phoneE164 ? 'success' : 'neutral';
+
+  // A typo here is worse than anywhere else: the confirmation link goes to the
+  // misspelt inbox and the account can never be opened.
+  const emailOk = emailCheck(email, emailTouched);
+
+  const canSubmit =
+    name.trim().length > 0 && emailOk.valid && !!phoneE164 && passwordOk && !busy;
 
   async function register() {
+    if (!canSubmit) return;
     setError(null);
+    setPhoneTaken(false);
     setBusy(true);
+
+    // Asked before creating the account, so a taken number reads as "pick
+    // another" on the field rather than as a failed sign-up.
+    const { data: free, error: checkError } = await supabase.rpc('phone_is_available', {
+      p_phone: phoneE164,
+    });
+    if (checkError) {
+      setBusy(false);
+      setError(humanError(checkError));
+      return;
+    }
+    if (!free) {
+      setBusy(false);
+      setPhoneTaken(true);
+      return;
+    }
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { display_name: name.trim() } },
+      options: { data: { display_name: name.trim(), phone: phoneE164 } },
     });
 
     setBusy(false);
 
     if (signUpError) {
+      // The database trigger refuses a number someone took in the moment
+      // since the check above; Supabase reports any trigger refusal this way.
+      if (/database error saving new user/i.test(signUpError.message)) {
+        setPhoneTaken(true);
+        return;
+      }
       setError(humanError(signUpError));
       return;
     }
@@ -70,115 +158,123 @@ export default function RegisterScreen() {
 
   if (checkEmail) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <View style={[styles.content, styles.centered]}>
-          <ThemedText type="subtitle">Check your email</ThemedText>
-          <ThemedText type="default" themeColor="textSecondary" style={styles.centeredText}>
-            We sent a confirmation link to {email.trim()}. Open it, then come back and log in.
-          </ThemedText>
-
-          {error ? (
-            <ThemedText themeColor="danger" style={[Type.caption, styles.centeredText]}>
-              {error}
-            </ThemedText>
-          ) : null}
-
-          <Button
-            title={resent ? 'Sent again' : 'Send it again'}
-            variant="secondary"
-            onPress={resend}
-            loading={resending}
-            disabled={resent}
-            style={styles.fullWidth}
-          />
-          <Link href="/sign-in" replace asChild>
-            <Button title="Back to login" variant="ghost" style={styles.fullWidth} />
-          </Link>
-        </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+        {/* Success, so green: the account exists, it only needs confirming. */}
+        <AuthResult
+          icon="mail-unread-outline"
+          title="Check your email"
+          help="Can’t find it? Check your spam folder."
+          actions={
+            <>
+              {error ? <Notice tone="danger" message={error} /> : null}
+              <AuthButton title="Back to sign in" onPress={() => router.replace('/sign-in')} />
+              <AuthButton
+                variant="secondary"
+                title={resent ? 'Sent again' : 'Send the link again'}
+                icon={resent ? 'checkmark-circle' : undefined}
+                onPress={resend}
+                busy={resending}
+                disabled={resent}
+              />
+            </>
+          }>
+          We sent a link to <Emphasis>{email.trim()}</Emphasis>. Open it to confirm your account,
+          then come back and sign in.
+        </AuthResult>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">Create your account</ThemedText>
-            <ThemedText type="default" themeColor="textSecondary">
-              One account per person in the house
-            </ThemedText>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      <KeyboardAwareScrollView contentContainerStyle={authStyles.content}>
+        <AuthHeader
+          icon="person-add"
+          title="Create your account"
+          subtitle="Each person in the house needs their own account."
+        />
+
+        <View style={authStyles.form}>
+          <AuthField
+            label="Your name"
+            icon="person-outline"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            autoComplete="name"
+            placeholder="Enter your name"
+            editable={!busy}
+            returnKeyType="next"
+          />
+
+          <AuthField
+            label="Email"
+            icon="mail-outline"
+            value={email}
+            onChangeText={(v) => {
+              setEmail(v);
+              setError(null);
+            }}
+            onBlur={() => setEmailTouched(true)}
+            {...emailOk.field}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="Enter your email"
+            editable={!busy}
+            returnKeyType="next"
+          />
+
+          <AuthField
+            label="Phone number"
+            icon="call-outline"
+            prefix={PHONE_PREFIX}
+            value={phone}
+            onChangeText={(v) => {
+              setPhone(tenDigits(v));
+              setPhoneTaken(false);
+            }}
+            onBlur={() => setPhoneTouched(true)}
+            keyboardType="number-pad"
+            autoComplete="tel-national"
+            placeholder="Enter mobile number"
+            editable={!busy}
+            returnKeyType="next"
+            hint={phoneHint}
+            hintTone={phoneTone}
+          />
+
+          <AuthField
+            label="Password"
+            icon="lock-closed-outline"
+            value={password}
+            onChangeText={setPassword}
+            onBlur={() => setPasswordTouched(true)}
+            secure
+            autoCapitalize="none"
+            autoComplete="new-password"
+            placeholder="Create a password"
+            editable={!busy}
+            onSubmitEditing={register}
+            returnKeyType="go"
+            hint={`At least ${MIN_PASSWORD} characters`}
+            hintTone={passwordOk ? 'success' : passwordShort ? 'danger' : 'neutral'}
+          />
+
+          {error ? <Notice tone="danger" message={error} /> : null}
+
+          <View style={styles.submit}>
+            <AuthButton title="Create account" onPress={register} busy={busy} disabled={!canSubmit} />
           </View>
+        </View>
 
-          <View style={styles.form}>
-            <TextField
-              label="Your name"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              placeholder="Mohan"
-              editable={!busy}
-              hint="This is how you'll appear in the ledger"
-            />
-
-            <TextField
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              placeholder="you@example.com"
-              editable={!busy}
-            />
-
-            <TextField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secure
-              autoCapitalize="none"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              editable={!busy}
-              hint="At least 8 characters"
-              error={passwordTooShort ? 'Use at least 8 characters' : (error ?? undefined)}
-            />
-
-            <Button title="Create account" onPress={register} loading={busy} disabled={!canSubmit} />
-          </View>
-
-          <View style={styles.footer}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Already have an account?
-            </ThemedText>
-            <Link href="/sign-in" replace>
-              <ThemedText type="smallBold" style={{ color: theme.primary }}>
-                Log in
-              </ThemedText>
-            </Link>
-          </View>
-        </KeyboardAwareScrollView>
+        <AuthSwitch prompt="Already have an account?" label="Sign in" href="/sign-in" />
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.five,
-  },
-  centered: { alignItems: 'center', gap: Spacing.four },
-  centeredText: { textAlign: 'center' },
-  fullWidth: { alignSelf: 'stretch' },
-  header: { gap: Spacing.one },
-  form: { gap: Spacing.three },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
+  submit: { marginTop: Spacing.one },
 });

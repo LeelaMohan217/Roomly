@@ -1,28 +1,49 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Linking from 'expo-linking';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
+import {
+  AuthButton,
+  AuthField,
+  AuthHeader,
+  AuthResult,
+  AuthSwitch,
+  authStyles,
+  emailCheck,
+} from '@/components/auth-form';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { TextField } from '@/components/ui/text-field';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Notice } from '@/components/ui/notice';
+import { Spacing } from '@/constants/theme';
 import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 
+/**
+ * Forgot password, in the same style as sign in.
+ *
+ * Email only, even though sign-in takes a phone too: the reset link goes to
+ * an inbox, and turning a phone number into an email here would tell a
+ * stranger which address an account uses.
+ */
 export default function ForgotPasswordScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Checked here, before anything is sent: Supabase would only answer a bad
+  // format with its own technical wording.
+  const check = emailCheck(email, emailTouched);
+  const canSubmit = check.valid && !busy;
+
   async function send() {
+    setEmailTouched(true);
+    if (!canSubmit) return;
     setError(null);
     setBusy(true);
 
@@ -45,104 +66,81 @@ export default function ForgotPasswordScreen() {
 
   if (sent) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <View style={styles.centered}>
-          <View style={[styles.icon, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="mail-open-outline" size={26} color={theme.primary} />
-          </View>
-          <ThemedText style={Type.title}>Check your email</ThemedText>
-          <ThemedText themeColor="textSecondary" style={[Type.body, styles.centeredText]}>
-            If an account exists for {email.trim()}, we&apos;ve sent a link to reset your
-            password. Open it on this phone.
-          </ThemedText>
-
-          <Card style={styles.tipCard}>
-            <ThemedText themeColor="textTertiary" style={Type.micro}>
-              The link expires after an hour. Check spam if it hasn&apos;t arrived in a couple of
-              minutes.
-            </ThemedText>
-          </Card>
-
-          <Link href="/sign-in" replace asChild>
-            <Button title="Back to sign in" variant="secondary" style={styles.fullWidth} />
-          </Link>
-        </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+        {/* The address gets a line of its own, large. Whether it has an
+            account is never said (that would tell a stranger who uses
+            Roomly), so the one thing that helps someone who typed
+            leelamohan@ instead of leelamohan217@ is seeing it plainly. */}
+        <AuthResult
+          icon="mail-open-outline"
+          title="Check your email"
+          address={email.trim()}
+          help="Nothing after 2 minutes? Check the address above and your spam folder."
+          actions={
+            <>
+              <AuthButton title="Back to sign in" onPress={() => router.replace('/sign-in')} />
+              <AuthButton
+                variant="secondary"
+                title="Wrong email? Change it"
+                onPress={() => {
+                  // Kept, not cleared: fixing "leelamohan" to "leelamohan217"
+                  // is a two-character edit, not a retype.
+                  setSent(false);
+                  setEmailTouched(false);
+                }}
+              />
+            </>
+          }>
+          If this email has a Roomly account, we sent it a link to set a new password. The link
+          works for one hour.
+        </AuthResult>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ThemedText style={Type.title}>Reset your password</ThemedText>
-            <ThemedText themeColor="textSecondary" style={Type.body}>
-              We&apos;ll email you a link to set a new one.
-            </ThemedText>
-          </View>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      <KeyboardAwareScrollView contentContainerStyle={authStyles.content}>
+        <AuthHeader
+          icon="key"
+          title="Forgot your password?"
+          subtitle="Enter the email on your account and we’ll send you a link to set a new one."
+        />
 
-          <TextField
+        <View style={authStyles.form}>
+          <AuthField
             label="Email"
+            icon="mail-outline"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => {
+              setEmail(v);
+              setError(null);
+            }}
+            onBlur={() => setEmailTouched(true)}
+            {...check.field}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
-            placeholder="you@example.com"
+            placeholder="Enter your email"
             editable={!busy}
-            error={error ?? undefined}
             onSubmitEditing={send}
             returnKeyType="send"
           />
 
-          <Button title="Send reset link" onPress={send} loading={busy} disabled={!email.trim()} />
+          {error ? <Notice tone="danger" message={error} /> : null}
 
-          <View style={styles.footer}>
-            <ThemedText themeColor="textSecondary" style={Type.caption}>
-              Remembered it?
-            </ThemedText>
-            <Link href="/sign-in" replace>
-              <ThemedText style={[Type.caption, { color: theme.primary, fontWeight: '700' }]}>
-                Sign in
-              </ThemedText>
-            </Link>
+          <View style={styles.submit}>
+            <AuthButton title="Send reset link" onPress={send} busy={busy} disabled={!canSubmit} />
           </View>
-        </KeyboardAwareScrollView>
+        </View>
+
+        <AuthSwitch prompt="Remembered it?" label="Sign in" href="/sign-in" />
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.four,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-  centeredText: { textAlign: 'center' },
-  fullWidth: { alignSelf: 'stretch' },
-  icon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.two,
-  },
-  tipCard: { alignSelf: 'stretch', borderRadius: Radius.md },
-  header: { gap: Spacing.one },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
+  submit: { marginTop: Spacing.one },
 });

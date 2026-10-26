@@ -59,6 +59,9 @@ const TABLES = [
   'push_tokens',
   'recurring_expenses',
   'recurring_postings',
+  // 0035: which number belongs to which account, and the lockout counter.
+  'phone_logins',
+  'phone_login_attempts',
 ];
 
 for (const t of TABLES) {
@@ -190,6 +193,17 @@ for (const [fn, args] of INTERNAL) {
   const denied = res.status === 401 || res.status === 403 || /"42501"/.test(res.body);
   check(`anon cannot call ${fn} at all`, denied, `status ${res.status} body ${res.body.slice(0, 80)}`);
 }
+
+// Phone sign-in (0035) is the one thing anon may call. It must hand back an
+// email only for the right password, so it cannot be used to collect them.
+// A malformed number returns early without counting as an attempt, so this
+// check never locks anyone out.
+const phoneProbe = await post('rpc/phone_sign_in_email', { p_phone: 'not-a-phone', p_password: 'x' });
+check(
+  'phone sign-in returns nothing without a valid number and password',
+  phoneProbe.status === 200 && phoneProbe.body.trim() === 'null',
+  `status ${phoneProbe.status} body ${phoneProbe.body.slice(0, 80)}`
+);
 
 // An invite code must not expose the ledger to someone who has not joined.
 const preview = await post('rpc/preview_invite', { p_code: 'AAA-AAA' });

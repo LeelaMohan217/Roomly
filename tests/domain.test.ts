@@ -37,6 +37,8 @@ import { evaluate, toAmountString } from '../src/lib/calc.ts';
 import { humanError } from '../src/lib/errors.ts';
 import { amountOf, auditKind, changesOf, entityLabel, subjectOf } from '../src/lib/audit.ts';
 import { backupFilename, csvAmount, csvCell, toCsv } from '../src/lib/csv.ts';
+import { looksLikePhone, normalizePhone } from '../src/lib/phone.ts';
+import { isProperEmail, isValidEmail } from '../src/lib/email.ts';
 
 // ------------------------------- money -------------------------------
 suite('money');
@@ -1089,5 +1091,51 @@ throws('a doctored split is rejected', () => {
   pair.lines[0].routedPaise = 1;
   assertRoutingSplitsPayments(pair);
 });
+
+suite('phone / one number, one spelling');
+
+eq('plain ten digits', normalizePhone('9876543210'), '+919876543210');
+eq('spaces are ignored', normalizePhone('98765 43210'), '+919876543210');
+eq('country code with plus', normalizePhone('+91 98765-43210'), '+919876543210');
+eq('country code without plus', normalizePhone('919876543210'), '+919876543210');
+eq('leading trunk zero', normalizePhone('09876543210'), '+919876543210');
+eq('landline-style start is refused', normalizePhone('2234567890'), null);
+eq('nine digits is refused', normalizePhone('987654321'), null);
+eq('eleven digits without a zero is refused', normalizePhone('98765432101'), null);
+eq('empty is refused', normalizePhone(''), null);
+check('digits read as a phone', looksLikePhone('98765 43210'));
+check('a plus and dashes read as a phone', looksLikePhone('+91 98765-43210'));
+check('an email does not', !looksLikePhone('mohan@example.com'));
+check('a name does not', !looksLikePhone('mohan'));
+check('blank does not', !looksLikePhone('   '));
+
+suite('email / caught before anything is sent');
+
+check('a normal address is valid', isValidEmail('leelamohan217@gmail.com'));
+check('surrounding spaces are fine', isValidEmail('  leelamohan217@gmail.com '));
+check('a work domain is valid', isValidEmail('mohan@procureanalytics.ai'));
+check('no @ is refused', !isValidEmail('leelamohan217gmail.com'));
+check('nothing after @ is refused', !isValidEmail('leelamohan217@'));
+check('no dot in the domain is refused', !isValidEmail('leelamohan217@gmail'));
+check('a one-letter ending is refused', !isValidEmail('leelamohan217@gmail.c'));
+check('a space inside is refused', !isValidEmail('leela mohan@gmail.com'));
+check('two @ is refused', !isValidEmail('a@b@gmail.com'));
+check('a phone number is refused', !isValidEmail('9876543210'));
+check('a college address is valid', isValidEmail('mohan@cs.iitb.ac.in'));
+check('gma.con is not proper', !isProperEmail('nleelamohan727@gma.con'));
+check('a cut-off gmail is not proper', !isProperEmail('mohan@gma.com'));
+check('swapped letters are not proper', !isProperEmail('mohan@gmial.com'));
+check('.con on a real provider is not proper', !isProperEmail('mohan@gmail.con'));
+check('.con on a work domain is not proper', !isProperEmail('mohan@company.con'));
+check('yahoo misspelt is not proper', !isProperEmail('mohan@yaho.com'));
+check('gmail is proper', isProperEmail('nleelamohan727@gmail.com'));
+check('capitals are fine', isProperEmail('Mohan@Gmail.com'));
+check('yahoo India is proper', isProperEmail('mohan@yahoo.co.in'));
+check('ymail is real', isProperEmail('mohan@ymail.com'));
+check('mail.com is real', isProperEmail('mohan@mail.com'));
+check('a work domain is proper', isProperEmail('mohan@procureanalytics.ai'));
+check('a college address is proper', isProperEmail('mohan@cs.iitb.ac.in'));
+check('love.com is not mistaken for live.com', isProperEmail('mohan@love.com'));
+check('a broken shape is not proper', !isProperEmail('mohan@'));
 
 process.exit(report() > 0 ? 1 : 0);
