@@ -30,6 +30,10 @@ type Props = {
    *  colour -- for lists drawn in the one brand colour, like Home's
    *  Balances. Everywhere else keeps the colour each member picked. */
   brand?: boolean;
+  /** Plain grey with dark initials -- for a list where green already means
+   *  something else, like Home's Balances, where it marks money owed to
+   *  you. Everywhere else keeps the colour each member picked. */
+  neutral?: boolean;
   style?: ViewStyle;
 };
 
@@ -42,6 +46,7 @@ export function Avatar({
   icon = false,
   color,
   brand = false,
+  neutral = false,
   style,
 }: Props) {
   const theme = useTheme();
@@ -55,18 +60,21 @@ export function Avatar({
   const [from, to] = avatarPairFor(color ?? stored, seed ?? name);
   const fontSize = Math.round(size * 0.38);
 
-  if (brand) {
+  // The two flat styles: a solid pale circle with coloured initials.
+  if (brand || neutral) {
+    const fill = brand ? theme.primarySoft : theme.backgroundSelected;
+    const ink = brand ? theme.brandInk : theme.textSecondary;
     return (
       <View
         style={[
           styles.circle,
-          { width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primarySoft },
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: fill },
           style,
         ]}>
         {icon ? (
-          <Ionicons name="person" size={Math.round(size * 0.52)} color={theme.brandInk} />
+          <Ionicons name="person" size={Math.round(size * 0.52)} color={ink} />
         ) : (
-          <Text style={[styles.text, { fontSize, color: theme.brandInk }]} allowFontScaling={false}>
+          <Text style={[styles.text, { fontSize, color: ink }]} allowFontScaling={false}>
             {initials(name)}
           </Text>
         )}

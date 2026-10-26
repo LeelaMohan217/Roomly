@@ -151,9 +151,12 @@ Running ${buildLabel()}.`;
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Edit your details"
-          onPress={() => router.push('/account-edit')}
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <Card style={styles.profile}>
+          onPress={() => router.push('/account-edit')}>
+          {/* Pressed is a tint, not a fade: opacity on an elevated card fades
+              the Android shadow and the contents separately, leaving a pale
+              band across a grey card. */}
+          {({ pressed }) => (
+          <Card style={[styles.profile, pressed && { backgroundColor: theme.backgroundSelected }]}>
             <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={52} />
 
           <View style={styles.identity}>
@@ -184,6 +187,7 @@ Running ${buildLabel()}.`;
 
             <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
           </Card>
+          )}
         </Pressable>
 
         {/* Account is who you are, not a second navigation menu. Recurring,

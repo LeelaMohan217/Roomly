@@ -15,7 +15,11 @@ export const Colors = {
   light: {
     text: '#0C0E12',
     textSecondary: '#646B7A',
-    textTertiary: '#98A0AF',
+    // The faintest text that still reads: 5.0:1 on a card, 4.6:1 on the
+    // page. It was #98A0AF, 2.6:1 -- every subtitle ("gets back", "Vinod ·
+    // 4 ways") and every inactive tab label was below the 4.5 small text
+    // needs.
+    textTertiary: '#697080',
 
     background: '#F6F7F9',
     backgroundElement: '#FFFFFF',
@@ -45,7 +49,10 @@ export const Colors = {
     infoSoft: '#EAF1FE',
     onInfo: '#FFFFFF',
 
-    positive: '#0E9A6C',
+    // Money coming to you, as text. Deeper than primary (#0E9A6C, 3.6:1 on
+    // white): a "+₹234.15" is small text, and needs 4.5. Primary stays the
+    // fill colour -- buttons, the active tab, the Add disc.
+    positive: '#087A55',
     negative: '#DC2626',
 
     // The balance card. In LIGHT mode it is a soft tint with dark green ink,
@@ -98,7 +105,8 @@ export const Colors = {
   dark: {
     text: '#ECEFF4',
     textSecondary: '#8C93A1',
-    textTertiary: '#5E6573',
+    // 5.0:1 on a card; #5E6573 was 3.1:1.
+    textTertiary: '#7F8796',
 
     background: '#0B0C10',
     backgroundElement: '#14161B',

@@ -32,6 +32,24 @@ export function formatPaise(paise: Paise): string {
   return inr.format(paise / 100);
 }
 
+const inrWhole = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+/**
+ * ₹40,899 — rounded to the rupee, for a month's spending summary read at a
+ * glance (Home's two small cards) and nothing else. Never for a balance, a
+ * settle-up amount or a single expense: those are figures someone acts on,
+ * and formatPaise's rule above -- exact, always -- holds for them. The exact
+ * totals are one tap away in History.
+ */
+export function formatWholeRupees(paise: Paise): string {
+  return inrWhole.format(Math.round(paise / 100));
+}
+
 /**
  * Parses free-typed input like "1,234.50" or "1234" into paise.
  *

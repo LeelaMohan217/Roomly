@@ -28,7 +28,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
 import { iconFor } from '@/lib/icons';
-import { formatPaise } from '@/lib/money';
+import { formatPaise, formatWholeRupees } from '@/lib/money';
 import {
   useAwayPeriods,
   useBalances,
@@ -142,47 +142,34 @@ function BalanceCard({
 }
 
 /**
- * One of the two small cards under the balance: what this month's figure is,
- * the figure, a rule, then the same figure for the whole of last month under
- * a plain label ("Spent in September"). Real amounts, not a percentage.
+ * One of the two small cards under the balance: whose money, this month's
+ * figure, and last month's as a quiet footnote. Three lines and nothing else
+ * -- the earlier versions carried an icon, a rule, a pill or a second
+ * labelled figure, and felt cramped next to the clean green card above.
+ *
+ * No month on the label: the big figure is plainly this month's, and the
+ * footnote names its own ("Sept ₹68,825"). Whole rupees here
+ * (formatWholeRupees): it's a glance at a month's spending. History has the
+ * exact figures.
  */
 function SmallCard({
-  icon,
   label,
-  period,
   value,
-  compareLabel,
-  compareValue,
+  compare,
 }: {
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  /** Whose money: "Household spent", "Your share". */
+  /** Whose money: "Household", "Your share". */
   label: string;
-  /** Which month, on its own line: "in October". */
-  period: string;
   value?: string;
-  /** Last month's figure, named: "Spent in September". */
-  compareLabel: string;
-  compareValue?: string;
+  /** Last month's figure: "Sept ₹68,825". */
+  compare?: string;
 }) {
   const theme = useTheme();
 
   return (
     <View style={[styles.smallCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-      {/* The brand green in a pale tile: the card itself stays neutral. */}
-      <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
-        <MaterialCommunityIcons name={icon} size={17} color={theme.brandInk} />
-      </View>
-      {/* Who, then when, each on a line of its own: a single sentence
-          wrapped on one card and not the other, which left the two
-          figures at different heights. */}
-      <View>
-        <ThemedText style={styles.smallLabel} numberOfLines={1}>
-          {label}
-        </ThemedText>
-        <ThemedText themeColor="textSecondary" style={styles.smallPeriod} numberOfLines={1}>
-          {period}
-        </ThemedText>
-      </View>
+      <ThemedText themeColor="textSecondary" style={styles.smallLabel} numberOfLines={1}>
+        {label}
+      </ThemedText>
       {value ? (
         <ThemedText
           style={styles.smallValue}
@@ -193,22 +180,16 @@ function SmallCard({
         </ThemedText>
       ) : (
         <View style={styles.smallValueSkeleton}>
-          <Skeleton width="80%" height={20} radius={Radius.sm} />
+          <Skeleton width="70%" height={22} radius={Radius.sm} />
         </View>
       )}
-
-      <View style={[styles.smallRule, { backgroundColor: theme.border }]} />
-
-      <ThemedText themeColor="textSecondary" style={styles.smallCompareLabel} numberOfLines={1}>
-        {compareLabel}
-      </ThemedText>
-      {compareValue ? (
-        <ThemedText style={styles.smallCompareValue} numberOfLines={1}>
-          {compareValue}
+      {compare ? (
+        <ThemedText themeColor="textTertiary" style={styles.smallFoot} numberOfLines={1}>
+          {compare}
         </ThemedText>
       ) : (
-        <View style={styles.smallCompareSkeleton}>
-          <Skeleton width="60%" height={12} />
+        <View style={styles.smallFootSkeleton}>
+          <Skeleton width={70} height={11} />
         </View>
       )}
     </View>
@@ -224,8 +205,10 @@ function SectionLink({ label, onPress }: { label: string; onPress: () => void })
       onPress={onPress}
       hitSlop={8}
       style={({ pressed }) => [styles.sectionLink, { opacity: pressed ? 0.6 : 1 }]}>
-      <ThemedText style={[Type.micro, { color: theme.primary }]}>{label}</ThemedText>
-      <Ionicons name="chevron-forward" size={12} color={theme.primary} />
+      {/* brandInk, not primary: primary is a fill colour and reads 3.3:1 as
+          small text on the page. */}
+      <ThemedText style={[Type.caption, styles.semi, { color: theme.brandInk }]}>{label}</ThemedText>
+      <Ionicons name="chevron-forward" size={14} color={theme.brandInk} />
     </Pressable>
   );
 }
@@ -259,7 +242,8 @@ export default function HomeScreen() {
 
   const members = useMembers();
   const balances = useBalances();
-  const expenses = useExpenses(4);
+  // The six newest, each its own card under Recent; "See all" opens History.
+  const expenses = useExpenses(6);
   const away = useAwayPeriods();
   const changes = usePendingChanges();
   const recurring = useRecurring();
@@ -376,10 +360,10 @@ export default function HomeScreen() {
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = (member?.display_name ?? '').trim().split(/\s+/)[0] || 'there';
-  const monthName = now.toLocaleDateString('en-IN', { month: 'long' });
-  const prevMonthName = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(
+  // Short ("Sept"): the small cards' footnote is half a screen wide.
+  const prevMonthShort = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(
     'en-IN',
-    { month: 'long' }
+    { month: 'short' }
   );
 
   // Not hand-memoized: React Compiler is enabled (app.json), and it could not
@@ -437,21 +421,22 @@ export default function HomeScreen() {
 
           <View style={styles.smallCards}>
             <SmallCard
-              icon="home-outline"
-              label="Household spent"
-              period={`in ${monthName}`}
-              value={spend.data ? formatPaise(spend.data.roomMonthPaise) : undefined}
-              compareLabel={`Spent in ${prevMonthName}`}
-              compareValue={spend.data ? formatPaise(spend.data.roomPrevMonthFullPaise) : undefined}
+              label="Household"
+              value={spend.data ? formatWholeRupees(spend.data.roomMonthPaise) : undefined}
+              compare={
+                spend.data
+                  ? `${prevMonthShort} ${formatWholeRupees(spend.data.roomPrevMonthFullPaise)}`
+                  : undefined
+              }
             />
             <SmallCard
-              icon="account-outline"
               label="Your share"
-              period={`in ${monthName}`}
-              value={spend.data ? formatPaise(spend.data.myMonthPaise) : undefined}
-              // Not "Your share in September": too long for half a screen.
-              compareLabel={`Share in ${prevMonthName}`}
-              compareValue={spend.data ? formatPaise(spend.data.myPrevMonthFullPaise) : undefined}
+              value={spend.data ? formatWholeRupees(spend.data.myMonthPaise) : undefined}
+              compare={
+                spend.data
+                  ? `${prevMonthShort} ${formatWholeRupees(spend.data.myPrevMonthFullPaise)}`
+                  : undefined
+              }
             />
           </View>
         </Appear>
@@ -511,12 +496,12 @@ export default function HomeScreen() {
         {dueForAmount > 0 ? (
           <Pressable onPress={() => router.push('/recurring')}>
             <Card padded={false} style={[styles.banner, { backgroundColor: theme.primarySoft }]}>
-              <Ionicons name="repeat" size={16} color={theme.primary} />
+              <Ionicons name="repeat" size={16} color={theme.brandInk} />
               <ThemedText style={[Type.caption, styles.flex]}>
                 {dueForAmount} recurring bill{dueForAmount === 1 ? '' : 's'} need
                 {dueForAmount === 1 ? 's' : ''} an amount
               </ThemedText>
-              <Ionicons name="chevron-forward" size={15} color={theme.primary} />
+              <Ionicons name="chevron-forward" size={15} color={theme.brandInk} />
             </Card>
           </Pressable>
         ) : null}
@@ -623,7 +608,9 @@ export default function HomeScreen() {
                     borderBottomColor: theme.border,
                   },
                 ]}>
-                <Avatar name={b.displayName} seed={b.memberId} size={36} brand />
+                {/* Neutral, so green on this card means only one thing: the
+                    "+" amount of money coming back. */}
+                <Avatar name={b.displayName} seed={b.memberId} size={36} neutral />
                 <View style={styles.flex}>
                   <ThemedText style={Type.body} numberOfLines={1}>
                     {b.displayName}
@@ -715,23 +702,29 @@ export default function HomeScreen() {
               {expenses.data?.map((e) => (
                 <Pressable
                   key={e.id}
-                  onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-                  <Card padded={false} style={styles.row}>
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
-                    </View>
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.body} numberOfLines={1}>
-                        {e.description || e.categoryName}
-                      </ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        {e.paidByName} · {e.participantCount} way
-                        {e.participantCount === 1 ? '' : 's'}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={Type.amount}>{formatPaise(e.totalPaise)}</ThemedText>
-                  </Card>
+                  onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}>
+                  {/* Pressed is a tint, not a fade: lowering opacity on a card
+                      with Android elevation fades the shadow and the contents
+                      separately, leaving a pale band across a grey card. */}
+                  {({ pressed }) => (
+                    <Card
+                      padded={false}
+                      style={[styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
+                      <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                        <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
+                      </View>
+                      <View style={styles.flex}>
+                        <ThemedText style={Type.body} numberOfLines={1}>
+                          {e.description || e.categoryName}
+                        </ThemedText>
+                        <ThemedText themeColor="textTertiary" style={Type.micro}>
+                          {e.paidByName} · {e.participantCount} way
+                          {e.participantCount === 1 ? '' : 's'}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={Type.amount}>{formatPaise(e.totalPaise)}</ThemedText>
+                    </Card>
+                  )}
                 </Pressable>
               ))}
             </View>
@@ -769,11 +762,10 @@ function Section({
     <View style={styles.section}>
       <View style={styles.sectionHead}>
         <View style={styles.sectionTitleRow}>
-          {/* Sentence case at caption size, not spaced capitals: a section
-              title orients, it shouldn't shout like the figures under it. */}
-          <ThemedText themeColor="textSecondary" style={Type.caption}>
-            {title}
-          </ThemedText>
+          {/* Sentence case, not spaced capitals, but a step above the rows:
+              at grey caption size "Balances" and "Recent" weighed the same
+              as the subtitles under them, so the page had no chapters. */}
+          <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
           {count ? (
             <View style={[styles.countPill, { backgroundColor: theme.danger }]}>
               <ThemedText style={styles.countText}>{count}</ThemedText>
@@ -827,25 +819,18 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three + Spacing.one,
     gap: Spacing.one,
   },
-  smallIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.one,
-  },
-  smallLabel: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  smallPeriod: { fontSize: 12, lineHeight: 16 },
-  smallValue: { fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.4 },
-  smallValueSkeleton: { height: 26, justifyContent: 'center' },
-  smallRule: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.two },
-  smallCompareLabel: { fontSize: 12, lineHeight: 16 },
-  smallCompareValue: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
-  smallCompareSkeleton: { height: 19, justifyContent: 'center' },
+  smallLabel: { fontSize: 14, lineHeight: 19, fontWeight: '500' },
+  // The one big thing in the card, so the room around it does the work.
+  smallValue: { fontSize: 26, lineHeight: 33, fontWeight: '600', letterSpacing: -0.6 },
+  smallValueSkeleton: { height: 33, justifyContent: 'center' },
+  // Regular weight: ThemedText's default 500 made the footnote compete with
+  // the label above it.
+  smallFoot: { fontSize: 13, lineHeight: 18, fontWeight: '400', marginTop: Spacing.one },
+  smallFootSkeleton: { height: 18, marginTop: Spacing.one, justifyContent: 'center' },
   rowSkeletonText: { gap: 6 },
 
   banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },
@@ -858,6 +843,7 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.half,
   },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
   countPill: {
     minWidth: 17,
     height: 17,
