@@ -18,25 +18,10 @@ import { Notice } from '@/components/ui/notice';
 import { Spacing } from '@/constants/theme';
 import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
-import { normalizePhone, PHONE_PREFIX } from '@/lib/phone';
+import { normalizePhone, PHONE_PREFIX, phoneProblem, toTenDigits } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 
 const MIN_PASSWORD = 8;
-
-/**
- * What the phone field keeps: digits only, ten at most. +91 is already shown
- * in front, so the field is exactly the mobile number.
- *
- * Not maxLength={10}: that cuts a pasted "+91 98765 43210" to "+91 98765 "
- * before this ever sees it. A whole pasted number loses its +91 or leading 0
- * here instead; anything else stops at the tenth digit.
- */
-function tenDigits(input: string): string {
-  let digits = input.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
-  return digits.slice(0, 10);
-}
 
 /**
  * Create an account, in the same style as sign in.
@@ -73,11 +58,7 @@ export default function RegisterScreen() {
   const phoneHint = phoneTaken
     ? 'This number is already registered to another account.'
     : phoneBad
-      ? // Ten digits that still fail can only be a wrong first digit, and
-        // "enter 10 digits" would be wrong when there already are ten.
-        phone.length === 10
-        ? 'Mobile numbers start with 6, 7, 8 or 9.'
-        : 'Enter a 10-digit mobile number.'
+      ? phoneProblem(phone)!
       : phoneE164
         ? 'You can sign in with this number.'
         : undefined;
@@ -231,7 +212,7 @@ export default function RegisterScreen() {
             prefix={PHONE_PREFIX}
             value={phone}
             onChangeText={(v) => {
-              setPhone(tenDigits(v));
+              setPhone(toTenDigits(v));
               setPhoneTaken(false);
             }}
             onBlur={() => setPhoneTouched(true)}

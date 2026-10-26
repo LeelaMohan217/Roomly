@@ -37,7 +37,13 @@ import { evaluate, toAmountString } from '../src/lib/calc.ts';
 import { humanError } from '../src/lib/errors.ts';
 import { amountOf, auditKind, changesOf, entityLabel, subjectOf } from '../src/lib/audit.ts';
 import { backupFilename, csvAmount, csvCell, toCsv } from '../src/lib/csv.ts';
-import { looksLikePhone, normalizePhone } from '../src/lib/phone.ts';
+import {
+  formatPhone,
+  looksLikePhone,
+  normalizePhone,
+  phoneProblem,
+  toTenDigits,
+} from '../src/lib/phone.ts';
 import { isProperEmail, isValidEmail } from '../src/lib/email.ts';
 
 // ------------------------------- money -------------------------------
@@ -1108,6 +1114,14 @@ check('a plus and dashes read as a phone', looksLikePhone('+91 98765-43210'));
 check('an email does not', !looksLikePhone('mohan@example.com'));
 check('a name does not', !looksLikePhone('mohan'));
 check('blank does not', !looksLikePhone('   '));
+eq('a pasted +91 number keeps ten digits', toTenDigits('+91 98765 43210'), '9876543210');
+eq('a pasted 0 number keeps ten digits', toTenDigits('098765 43210'), '9876543210');
+eq('an eleventh typed digit is dropped', toTenDigits('98765432101'), '9876543210');
+eq('letters are dropped', toTenDigits('98a765'), '98765');
+eq('a valid number has no problem', phoneProblem('9876543210'), null);
+eq('too short says ten digits', phoneProblem('98765'), 'Enter a 10-digit mobile number.');
+eq('a wrong first digit says so', phoneProblem('3454353454'), 'Mobile numbers start with 6, 7, 8 or 9.');
+eq('a saved number is spaced for reading', formatPhone('+919876543210'), '+91 98765 43210');
 
 suite('email / caught before anything is sent');
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthField } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
@@ -14,7 +15,8 @@ import { TextField } from '@/components/ui/text-field';
 import { AVATAR_COLORS, Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
-import { useMembers } from '@/lib/queries';
+import { formatPhone, normalizePhone, PHONE_PREFIX, phoneProblem, toTenDigits } from '@/lib/phone';
+import { useMembers, useMyPhone } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
@@ -42,7 +44,10 @@ export default function AccountEditScreen() {
   // inside the query function would be a setState during a fetch.
   const [houseName, setHouseName] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [password, setPassword] = useState('');
+  const myPhone = useMyPhone(session?.user.id);
 
   const household = useQuery({
     queryKey: ['household', member?.household_id],
@@ -113,6 +118,21 @@ export default function AccountEditScreen() {
     },
     onError: (e) =>
       void dialog.alert({ tone: 'danger', title: 'Could not change email', message: message(e) }),
+  });
+
+  const changePhone = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('set_my_phone', { p_phone: normalizePhone(phone) });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setPhone('');
+      setPhoneTouched(false);
+      void queryClient.invalidateQueries({ queryKey: ['my-phone'] });
+      dialog.toast({ message: 'Number saved. You can now sign in with it.' });
+    },
+    onError: (e) =>
+      void dialog.alert({ tone: 'danger', title: 'Could not save the number', message: message(e) }),
   });
 
   const changePassword = useMutation({
@@ -249,6 +269,41 @@ export default function AccountEditScreen() {
               onPress={() => changeEmail.mutate()}
               loading={changeEmail.isPending}
               disabled={!emailValid}
+            />
+          </Card>
+
+          {/* The number this account can sign in with. The one place to add
+              it for accounts made before phone sign-in, and to change it. */}
+          <Card style={styles.card}>
+            <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
+              <Ionicons name="call-outline" size={14} color={theme.textTertiary} />
+              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
+                {myPhone.data
+                  ? `Signs in with ${formatPhone(myPhone.data)}`
+                  : 'No phone number yet. Add one to sign in with it.'}
+              </ThemedText>
+            </View>
+
+            <AuthField
+              label={myPhone.data ? 'New phone number' : 'Phone number'}
+              icon="call-outline"
+              prefix={PHONE_PREFIX}
+              value={phone}
+              onChangeText={(v) => setPhone(toTenDigits(v))}
+              onBlur={() => setPhoneTouched(true)}
+              keyboardType="number-pad"
+              autoComplete="tel-national"
+              placeholder="Enter mobile number"
+              editable={!changePhone.isPending}
+              hint={phoneTouched && phone ? (phoneProblem(phone) ?? undefined) : undefined}
+              hintTone={phoneTouched && phone && phoneProblem(phone) ? 'danger' : 'neutral'}
+            />
+            <Button
+              title="Save number"
+              variant="ghost"
+              onPress={() => changePhone.mutate()}
+              loading={changePhone.isPending}
+              disabled={!normalizePhone(phone)}
             />
           </Card>
 

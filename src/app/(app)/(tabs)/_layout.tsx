@@ -3,6 +3,7 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PhoneNudge } from '@/components/phone-nudge';
 import { SyncBanner } from '@/components/ui/sync-banner';
 import { Elevation, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -127,6 +128,10 @@ export default function TabsLayout() {
       <View style={[styles.bannerWrap, { bottom: barHeight + 16 + (showFab ? 68 : 0) }]}>
         <SyncBanner />
       </View>
+
+      {/* Mounted once for the tab shell, like the banner: it asks accounts
+          made before phone sign-in to add a number, wherever they land. */}
+      <PhoneNudge />
 
       {showFab ? (
       <Pressable

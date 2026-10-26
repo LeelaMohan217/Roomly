@@ -22,6 +22,7 @@ the SQL Editor can roll back silently.
 | 0028–0033 | Fixes | Joined-on dates, payment guards, household timezone, member autonomy, settlement period trigger |
 | 0034 | Lock function grants | Every function closed to clients except an explicit allowlist; new functions start closed |
 | 0035 | Phone sign-in | Phone number + password as a second way to sign in, no SMS. The only two functions open to `anon` |
+| 0036 | Set my phone | An existing account adds or changes its own phone number |
 
 ## Adding a function
 

@@ -1245,3 +1245,25 @@ export function useSuggestions() {
     },
   });
 }
+
+/**
+ * The phone number this account signs in with, or null if it has none yet.
+ * Accounts made before phone sign-in (migration 0035) have none until they
+ * add one. Keyed by user so a second account on the phone never sees the
+ * first one's answer from the saved cache.
+ */
+export function useMyPhone(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['my-phone', userId],
+    enabled: !!userId,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('phone_logins')
+        .select('phone')
+        .eq('user_id', userId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.phone as string | undefined) ?? null;
+    },
+  });
+}
