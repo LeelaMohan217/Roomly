@@ -90,8 +90,12 @@ export default function HistoryScreen() {
         }
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              {section.title.toUpperCase()}
+            {/* Sentence case at caption size, as Home's section titles are.
+                Spaced capitals (Type.label) clipped the last letter on
+                Android -- letterSpacing plus a bold weight cuts off the
+                final glyph, so "Yesterday" showed as "YESTERDA". */}
+            <ThemedText themeColor="textSecondary" style={Type.caption}>
+              {section.title}
             </ThemedText>
             <ThemedText themeColor="textTertiary" style={Type.micro}>
               {formatPaise(section.total)}

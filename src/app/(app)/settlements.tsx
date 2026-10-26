@@ -154,8 +154,10 @@ export default function SettlementsScreen() {
         }
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              {section.title.toUpperCase()}
+            {/* Sentence case at caption size, as on History: spaced capitals
+                clipped the final letter on Android. */}
+            <ThemedText themeColor="textSecondary" style={Type.caption}>
+              {section.title}
             </ThemedText>
             <ThemedText themeColor="textTertiary" style={Type.micro}>
               {formatPaise(section.total)}
