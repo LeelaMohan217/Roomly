@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -9,7 +9,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,10 +19,10 @@ import { HomeHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { Appear } from '@/components/ui/appear';
 import { QuickActions } from '@/components/ui/quick-actions';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayIso } from '@/lib/dates';
@@ -52,65 +51,118 @@ type JoinRequest = {
   claim_member_id: string | null;
 };
 
-/**
- * The current page's dot stretches into a pill.
- *
- * Through useAnimatedStyle rather than putting withTiming() straight into a
- * style object: reanimated only evaluates animations inside an animated style,
- * and an animation object in a plain style resolves to width 0 -- which made
- * both dots vanish rather than fail loudly. Shape as well as colour, so the
- * current page is still obvious on a dim screen or to a colourblind eye.
- */
-function PagerDot({ active }: { active: boolean }) {
-  const theme = useTheme();
-  const animated = useAnimatedStyle(() => ({
-    width: withTiming(active ? 16 : 6, { duration: 180 }),
-  }));
 
+/**
+ * Household name and head-count, one quiet line above the two cards. Half a
+ * screen is too narrow to carry it inside a card as well as a figure.
+ */
+function HouseholdLine({ name, people }: { name?: string; people?: number }) {
   return (
-    <Animated.View
-      style={[
-        styles.dotNav,
-        { backgroundColor: active ? theme.textSecondary : theme.border },
-        animated,
-      ]}
-    />
+    <View style={styles.householdLine}>
+      {name ? (
+        <ThemedText themeColor="textSecondary" style={[Type.caption, styles.flex]} numberOfLines={1}>
+          {name}
+        </ThemedText>
+      ) : (
+        <Skeleton width={140} height={12} />
+      )}
+      {people ? (
+        <ThemedText themeColor="textSecondary" style={Type.caption}>
+          {people === 1 ? '1 person' : `${people} people`}
+        </ThemedText>
+      ) : null}
+    </View>
   );
 }
 
-function Trend({
-  current,
-  previous,
-  period,
+/**
+ * One of Home's two summary tiles: a round icon, a label, the figure, and a
+ * smaller figure underneath. An undefined value shows a skeleton -- a ₹0.00
+ * before the data arrives would be a claim.
+ */
+function StatTile({
+  icon,
+  tone,
+  label,
+  value,
+  footLabel,
+  footValue,
 }: {
-  current: number;
-  previous: number;
-  period: 'week' | 'month';
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  tone: 'success' | 'danger' | 'neutral';
+  label: string;
+  value?: string;
+  /** Short -- it shares one line with footValue: "Your share ₹9,652.78". */
+  footLabel: string;
+  footValue?: string;
 }) {
   const theme = useTheme();
+  const ink =
+    tone === 'success' ? theme.success : tone === 'danger' ? theme.danger : theme.textSecondary;
+  // The icon's own colour as a wash behind it (hex alpha), so the circle is
+  // always the same hue as the glyph -- clearly green, red or grey.
+  const wash = `${ink}${tone === 'neutral' ? '24' : '33'}`;
 
-  const pill = (icon: 'trending-up' | 'trending-down' | 'remove-outline', tint: string, text: string) => (
-    <View style={[styles.heroPill, { backgroundColor: theme.heroChip }]}>
-      <Ionicons name={icon} size={12} color={tint} />
-      <ThemedText style={[Type.micro, { color: theme.onHero }]}>{text}</ThemedText>
+  return (
+    <View
+      style={[
+        styles.statTile,
+        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+      ]}>
+      <View>
+        <View style={[styles.tileIcon, { backgroundColor: wash }]}>
+          <MaterialCommunityIcons name={icon} size={17} color={ink} />
+        </View>
+        <ThemedText themeColor="textSecondary" style={[Type.micro, styles.tileLabel]} numberOfLines={1}>
+          {label}
+        </ThemedText>
+        {value ? (
+          <ThemedText
+            style={[styles.tileValue, tone !== 'neutral' && { color: ink }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}>
+            {value}
+          </ThemedText>
+        ) : (
+          <View style={styles.tileValueSkeleton}>
+            <Skeleton width="80%" height={20} radius={Radius.sm} />
+          </View>
+        )}
+      </View>
+
+      {footValue ? (
+        <ThemedText themeColor="textSecondary" style={styles.tileFoot} numberOfLines={1}>
+          {footLabel} <ThemedText style={styles.tileFootValue}>{footValue}</ThemedText>
+        </ThemedText>
+      ) : (
+        <View style={styles.tileFootLoading}>
+          <ThemedText themeColor="textSecondary" style={styles.tileFoot}>
+            {footLabel}
+          </ThemedText>
+          <Skeleton width={64} height={12} />
+        </View>
+      )}
     </View>
   );
+}
 
-  if (previous === 0) {
-    // Both zero is a genuine "no change" -- 0% is true there.
-    return current === 0
-      ? pill('remove-outline', theme.onHeroMuted, `0% vs last ${period}`)
-      : pill('remove-outline', theme.onHeroMuted, `first ${period}`);
-  }
-
-  const delta = Math.round(((current - previous) / previous) * 100);
-
-  if (delta === 0) return pill('remove-outline', theme.onHeroMuted, `0% vs last ${period}`);
-
-  return pill(
-    delta > 0 ? 'trending-up' : 'trending-down',
-    delta > 0 ? theme.heroUp : theme.heroAccent,
-    `${Math.abs(delta)}% vs last ${period}`
+/** A list row's shape -- round or square tile, two lines, an amount. */
+function RowSkeleton({ round = false, last = false }: { round?: boolean; last?: boolean }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[
+        styles.row,
+        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+      ]}>
+      <Skeleton width={round ? 36 : 38} height={round ? 36 : 38} radius={round ? 18 : Radius.md} />
+      <View style={[styles.flex, styles.rowSkeletonText]}>
+        <Skeleton width="55%" height={12} />
+        <Skeleton width="35%" height={10} />
+      </View>
+      <Skeleton width={64} height={13} />
+    </View>
   );
 }
 
@@ -120,8 +172,6 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const { member } = useSession();
   const { pending } = useSync();
-  const { width: windowWidth } = useWindowDimensions();
-  const [card, setCard] = useState(0);
   const isOwner = member?.role === 'owner';
 
   const members = useMembers();
@@ -250,11 +300,10 @@ export default function HomeScreen() {
     month: 'long',
   });
   const monthName = now.toLocaleDateString('en-IN', { month: 'long' });
-
-  // The pager lives inside the screen's horizontal padding, so a page is the
-  // content width -- that keeps both cards aligned with everything below them.
-  const cardWidth = windowWidth - Spacing.four * 2;
-  const pageStride = cardWidth + Spacing.three;
+  const prevMonthName = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(
+    'en-IN',
+    { month: 'long' }
+  );
 
   const monthRows = (totals.data ?? []).filter(
     (t) => t.year === now.getFullYear() && t.month === now.getMonth() + 1
@@ -309,144 +358,51 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Deep and calm. One saturated fill on a screen is a highlight; two
-            is noise, and a full-bleed bright one is neither. */}
-        {/* Two cards, swiped, rather than one card carrying six numbers.
-            Each answers exactly one question: what did the room spend, and
-            where do I stand in it.
- 
-            Both follow the same shape, so swiping does not rearrange the
-            layout under you:
- 
-              household . people chip
-              label
-              BIG NUMBER
-              --------------------------
-              secondary label . value
-              trend pills
- 
-            The pills sit below the rule on BOTH cards rather than under the
-            big number. On card two the big number is a balance -- a position,
-            not a flow -- so a percentage change on it would be meaningless,
-            and pills adjacent to it would be read as describing it. Keeping
-            them at the bottom attaches them to the spend figures on both
-            cards, and keeps the two structures identical. */}
-        <Appear style={styles.pagerWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={pageStride}
-            snapToAlignment="start"
-            decelerationRate="fast"
-            // Momentum end rather than onScroll: the dots only care about the
-            // settled page, and a scroll handler would re-render every frame.
-            onMomentumScrollEnd={(e) =>
-              setCard(Math.round(e.nativeEvent.contentOffset.x / pageStride))
-            }
-            contentContainerStyle={styles.pager}>
-            {/* ---------------- what the room spent ---------------- */}
-            <LinearGradient
-              colors={[theme.heroFrom, theme.heroTo]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.hero, { width: cardWidth }]}>
-              <View style={styles.heroTop}>
-                <ThemedText style={[Type.caption, { color: theme.onHeroMuted }]}>
-                  {household.data?.name ?? '…'}
-                </ThemedText>
-                <View style={[styles.heroChip, { backgroundColor: theme.heroChip }]}>
-                  <Ionicons name="people" size={11} color={theme.onHero} />
-                  <ThemedText style={[Type.micro, { color: theme.onHero }]}>
-                    {members.data?.length ?? 0}
-                  </ThemedText>
-                </View>
-              </View>
+        {/* Two plain tiles side by side, both visible without a swipe. They
+            used to be pages of a horizontal pager, which had to share one
+            height and so left the shorter card half empty.
 
-              <ThemedText style={[Type.micro, styles.heroLabel, { color: theme.onHeroMuted }]}>
-                Total spend in {monthName}
-              </ThemedText>
-              <ThemedText style={[Type.display, { color: theme.onHero }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                {formatPaise(spend.data?.roomMonthPaise ?? 0)}
-              </ThemedText>
+            No coloured fill: the colour is in the small round icon and, on
+            the balance, in the amount -- green when the house owes you, red
+            when you owe it, grey when you're square. That keeps colour for
+            meaning, the way the rest of the app uses it, instead of as
+            decoration. */}
+        <Appear style={styles.cards}>
+          <HouseholdLine name={household.data?.name} people={members.data?.length} />
 
-              <View style={[styles.heroFoot, { borderTopColor: theme.heroRule }]}>
-                <ThemedText style={[Type.micro, { color: theme.onHeroMuted }]}>This week</ThemedText>
-                <ThemedText style={[styles.heroFootValue, { color: theme.onHero }]}>
-                  {formatPaise(spend.data?.roomWeekPaise ?? 0)}
-                </ThemedText>
-              </View>
-
-              <View style={styles.heroTrends}>
-                <Trend
-                  current={spend.data?.roomWeekPaise ?? 0}
-                  previous={spend.data?.roomPrevWeekPaise ?? 0}
-                  period="week"
-                />
-                <Trend
-                  current={spend.data?.roomMonthPaise ?? 0}
-                  previous={spend.data?.roomPrevMonthPaise ?? 0}
-                  period="month"
-                />
-              </View>
-            </LinearGradient>
-
-            {/* ---------------- where you stand ---------------- */}
-            <LinearGradient
-              colors={[theme.heroFrom, theme.heroTo]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.hero, { width: cardWidth }]}>
-              <View style={styles.heroTop}>
-                <ThemedText style={[Type.caption, { color: theme.onHeroMuted }]}>
-                  {household.data?.name ?? '…'}
-                </ThemedText>
-                <View style={[styles.heroChip, { backgroundColor: theme.heroChip }]}>
-                  <Ionicons name="people" size={11} color={theme.onHero} />
-                  <ThemedText style={[Type.micro, { color: theme.onHero }]}>
-                    {members.data?.length ?? 0}
-                  </ThemedText>
-                </View>
-              </View>
-
-              <ThemedText style={[Type.micro, styles.heroLabel, { color: theme.onHeroMuted }]}>
-                {myBalance > 0
-                  ? 'The house owes you'
-                  : myBalance < 0
-                    ? 'You owe the house'
-                    : 'Everyone is square'}
-              </ThemedText>
-              <ThemedText style={[Type.display, { color: theme.onHero }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                {formatPaise(Math.abs(myBalance))}
-              </ThemedText>
-
-              <View style={[styles.heroFoot, { borderTopColor: theme.heroRule }]}>
-                <ThemedText style={[Type.micro, { color: theme.onHeroMuted }]}>
-                  Your share of {monthName}
-                </ThemedText>
-                <ThemedText style={[styles.heroFootValue, { color: theme.onHero }]}>
-                  {formatPaise(spend.data?.myMonthPaise ?? 0)}
-                </ThemedText>
-              </View>
-
-              <View style={styles.heroTrends}>
-                <Trend
-                  current={spend.data?.myWeekPaise ?? 0}
-                  previous={spend.data?.myPrevWeekPaise ?? 0}
-                  period="week"
-                />
-                <Trend
-                  current={spend.data?.myMonthPaise ?? 0}
-                  previous={spend.data?.myPrevMonthPaise ?? 0}
-                  period="month"
-                />
-              </View>
-            </LinearGradient>
-          </ScrollView>
-
-          <View style={styles.dots}>
-            {[0, 1].map((i) => (
-              <PagerDot key={i} active={i === card} />
-            ))}
+          <View style={styles.tiles}>
+            <StatTile
+              icon={
+                !balances.data
+                  ? 'wallet-outline'
+                  : myBalance > 0
+                    ? 'arrow-bottom-left'
+                    : myBalance < 0
+                      ? 'arrow-top-right'
+                      : 'check'
+              }
+              tone={!balances.data || myBalance === 0 ? 'neutral' : myBalance > 0 ? 'success' : 'danger'}
+              label={
+                !balances.data
+                  ? 'Your balance'
+                  : myBalance > 0
+                    ? 'The house owes you'
+                    : myBalance < 0
+                      ? 'You owe the house'
+                      : 'You’re all square'
+              }
+              value={balances.data ? formatPaise(Math.abs(myBalance)) : undefined}
+              footLabel="Your share"
+              footValue={spend.data ? formatPaise(spend.data.myMonthPaise) : undefined}
+            />
+            <StatTile
+              icon="receipt-text-outline"
+              tone="neutral"
+              label={`Spent in ${monthName}`}
+              value={spend.data ? formatPaise(spend.data.roomMonthPaise) : undefined}
+              footLabel={prevMonthName}
+              footValue={spend.data ? formatPaise(spend.data.roomPrevMonthPaise) : undefined}
+            />
           </View>
         </Appear>
 
@@ -573,7 +529,26 @@ export default function HomeScreen() {
           </Section>
         ) : null}
 
-        {monthTotal > 0 ? (
+        {/* Still loading: the card's shape, so the page does not jump when it
+            arrives. Loaded and empty: no card at all, as before. */}
+        {!totals.data ? (
+          <Section title="THIS MONTH">
+            <Card style={styles.spendCard}>
+              <View style={styles.spendHead}>
+                <Skeleton width={46} height={10} />
+                <Skeleton width={150} height={24} radius={Radius.sm} />
+              </View>
+              <View style={styles.spend}>
+                <Skeleton width={112} height={112} radius={56} />
+                <View style={styles.legend}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} width={i % 2 ? '70%' : '85%'} height={12} />
+                  ))}
+                </View>
+              </View>
+            </Card>
+          </Section>
+        ) : monthTotal > 0 ? (
           <Section
             title="THIS MONTH"
             action={
@@ -632,6 +607,9 @@ export default function HomeScreen() {
           // something else to read.
           title="BALANCES">
           <Card padded={false}>
+            {!balances.data
+              ? [0, 1, 2, 3].map((i) => <RowSkeleton key={i} round last={i === 3} />)
+              : null}
             {balances.data?.map((b, i) => (
               <View
                 key={b.memberId}
@@ -688,7 +666,15 @@ export default function HomeScreen() {
               </Pressable>
             ) : null
           }>
-          {(expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
+          {/* Loading is not empty: "Nothing logged yet" used to show for the
+              moment before the list arrived, in a household full of expenses. */}
+          {!expenses.data && pending.length === 0 ? (
+            <Card padded={false}>
+              {[0, 1, 2].map((i) => (
+                <RowSkeleton key={i} last={i === 2} />
+              ))}
+            </Card>
+          ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
             <Card padded={false}>
               {/* Queued entries sit at the top marked as sending, so what you
                   just typed is visibly there rather than seeming lost. */}
@@ -818,51 +804,39 @@ const styles = StyleSheet.create({
   centered: { textAlign: 'center' },
   semi: { fontWeight: '700' },
 
-  pagerWrap: { gap: Spacing.three },
-  // The gap is the only thing between the two pages; snapToInterval accounts
-  // for it, so page N always lands flush with the container's left edge.
-  pager: { gap: Spacing.three },
-  dots: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
-  // width is supplied by PagerDot's animated style
-  dotNav: { height: 6, borderRadius: 3 },
-
-  // A floor, not a fixed height: the two cards carry different footers, and a
-  // pager whose pages disagree on height jumps as you swipe.
-  hero: { borderRadius: Radius.xl, padding: Spacing.four, minHeight: 196 },
-  heroTop: {
+  cards: { gap: Spacing.two },
+  householdLine: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.half,
+  },
+  // Two equal halves. The row stretches both to the taller one's height, and
+  // space-between pins each footer to the bottom, so the two rules line up.
+  tiles: { flexDirection: 'row', gap: Spacing.two + Spacing.one },
+  statTile: {
+    flex: 1,
+    borderRadius: Radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three,
+    gap: Spacing.three,
     justifyContent: 'space-between',
-    marginBottom: Spacing.five,
   },
-  heroLabel: { marginBottom: 4 },
-  heroChip: {
-    flexDirection: 'row',
+  tileIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
-    gap: 4,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 3,
+    justifyContent: 'center',
   },
-  heroTrends: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
-  heroPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 4,
-  },
-  heroFoot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.three,
-    paddingTop: Spacing.three,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  heroFootValue: { fontSize: 15, lineHeight: 20, fontWeight: '700', letterSpacing: -0.2 },
+  tileLabel: { marginTop: Spacing.two + Spacing.one },
+  tileValue: { fontSize: 21, lineHeight: 27, fontWeight: '500', letterSpacing: -0.4, marginTop: 2 },
+  // The same 26px line as the figure it stands in for, so nothing moves.
+  tileValueSkeleton: { height: 27, marginTop: 2, justifyContent: 'center' },
+  tileFoot: { fontSize: 12, lineHeight: 17 },
+  tileFootValue: { fontSize: 12, lineHeight: 17, fontWeight: '500' },
+  tileFootLoading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  rowSkeletonText: { gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
 
   banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },
