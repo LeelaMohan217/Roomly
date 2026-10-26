@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DonutChart, type Slice } from '@/components/charts/donut-chart';
 import { ThemedText } from '@/components/themed-text';
 import { HomeHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
@@ -27,7 +26,7 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
-import { iconFor } from '@/lib/icons';
+import { iconFor, lineIconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import {
   useAwayPeriods,
@@ -144,6 +143,70 @@ function StatTile({
         </View>
       )}
     </View>
+  );
+}
+
+/**
+ * One category in "Where it went": a tinted line icon, the name and amount,
+ * and a thin bar for its share of the month.
+ */
+function CategoryRow({
+  icon,
+  name,
+  amount,
+  share,
+  color,
+}: {
+  icon: string;
+  name: string;
+  amount: string;
+  /** 0 to 1, of the month's total. */
+  share: number;
+  color: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.categoryRow}>
+      <View style={[styles.tileIcon, { backgroundColor: `${color}2E` }]}>
+        <MaterialCommunityIcons
+          name={icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
+          size={16}
+          color={color}
+        />
+      </View>
+      <View style={[styles.flex, styles.categoryText]}>
+        <View style={styles.categoryHead}>
+          <ThemedText style={[Type.caption, styles.flex]} numberOfLines={1}>
+            {name}
+          </ThemedText>
+          <ThemedText style={Type.caption}>{amount}</ThemedText>
+        </View>
+        <View style={[styles.categoryTrack, { backgroundColor: theme.backgroundSelected }]}>
+          <View
+            style={[
+              styles.categoryFill,
+              // A sliver stays visible for a tiny category rather than vanishing.
+              { width: `${Math.max(share * 100, 2)}%`, backgroundColor: color },
+            ]}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** A section's "go further" link. Green, but regular weight: it's a way on, not a headline. */
+function SectionLink({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [styles.sectionLink, { opacity: pressed ? 0.6 : 1 }]}>
+      <ThemedText style={[Type.micro, { color: theme.primary }]}>{label}</ThemedText>
+      <Ionicons name="chevron-forward" size={12} color={theme.primary} />
+    </Pressable>
   );
 }
 
@@ -310,23 +373,18 @@ export default function HomeScreen() {
   );
   const monthTotal = monthRows.reduce((sum, r) => sum + r.totalPaise, 0);
 
-  const palette = [theme.chart1, theme.chart2, theme.chart3, theme.chart4, theme.chart5, theme.chart6];
+  const palette = [theme.chart1, theme.chart2, theme.chart3, theme.chart4];
   // Not hand-memoized: React Compiler is enabled (app.json), and it could not
   // preserve a useMemo whose deps are rebuilt every render -- it reported
   // "Compilation Skipped", meaning the whole file went un-optimised to keep a
   // memo that was not helping. Plain derivation lets the compiler do it.
-  const slices: Slice[] = [...monthRows]
-    .sort((a, b) => b.totalPaise - a.totalPaise)
-    .slice(0, 6)
-    .map((r, i) => ({ key: r.categoryId, value: r.totalPaise, color: palette[i % palette.length] }));
-  const legend = [...monthRows].sort((a, b) => b.totalPaise - a.totalPaise).slice(0, 4);
+  const topCategories = [...monthRows].sort((a, b) => b.totalPaise - a.totalPaise).slice(0, 4);
 
-  // The biggest slice is what the ring is actually saying. It goes in the hole
-  // so the chart explains itself without reading the legend.
-  const topSlice = legend[0];
-  const topShare = topSlice && monthTotal > 0
-    ? Math.round((topSlice.totalPaise / monthTotal) * 100)
-    : null;
+  const others = (balances.data ?? []).filter((b) => b.memberId !== member?.id);
+  const openBalances = others
+    .filter((b) => b.balancePaise !== 0)
+    .sort((a, b) => Math.abs(b.balancePaise) - Math.abs(a.balancePaise));
+  const settledCount = others.length - openBalances.length;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -408,19 +466,23 @@ export default function HomeScreen() {
 
         <Appear delay={60}>
         <QuickActions
+          // No Add here: the floating + button already adds an expense, and
+          // two Add buttons on one screen left recurring bills with no way in
+          // from Home.
           actions={[
-            {
-              key: 'add',
-              icon: 'add',
-              label: 'Add',
-              accent: true,
-              onPress: () => router.push('/add-expense'),
-            },
             {
               key: 'settle',
               icon: 'swap-horizontal',
               label: 'Settle',
               onPress: () => router.push('/settle'),
+            },
+            {
+              key: 'bills',
+              // A calendar, not the repeat arrows: those sat beside Settle's
+              // swap arrows and the two read as the same button.
+              icon: 'calendar-outline',
+              label: 'Bills',
+              onPress: () => router.push('/recurring'),
             },
             { key: 'away', icon: 'airplane', label: 'Away', onPress: () => router.push('/away') },
             {
@@ -463,7 +525,7 @@ export default function HomeScreen() {
         ) : null}
 
         {isOwner && approvalCount > 0 ? (
-          <Section title="NEEDS YOU" count={approvalCount}>
+          <Section title="Needs you" count={approvalCount}>
             {changes.data?.map((c) => (
               <Card key={c.id} style={styles.approval}>
                 <Pressable
@@ -532,71 +594,39 @@ export default function HomeScreen() {
         {/* Still loading: the card's shape, so the page does not jump when it
             arrives. Loaded and empty: no card at all, as before. */}
         {!totals.data ? (
-          <Section title="THIS MONTH">
+          <Section title="Where it went">
             <Card style={styles.spendCard}>
-              <View style={styles.spendHead}>
-                <Skeleton width={46} height={10} />
-                <Skeleton width={150} height={24} radius={Radius.sm} />
-              </View>
-              <View style={styles.spend}>
-                <Skeleton width={112} height={112} radius={56} />
-                <View style={styles.legend}>
-                  {[0, 1, 2, 3].map((i) => (
-                    <Skeleton key={i} width={i % 2 ? '70%' : '85%'} height={12} />
-                  ))}
+              {[0, 1, 2, 3].map((i) => (
+                <View key={i} style={styles.categoryRow}>
+                  <Skeleton width={30} height={30} radius={15} />
+                  <View style={[styles.flex, styles.categoryText]}>
+                    <Skeleton width={i % 2 ? '45%' : '60%'} height={12} />
+                    <Skeleton height={4} radius={2} />
+                  </View>
                 </View>
-              </View>
+              ))}
             </Card>
           </Section>
         ) : monthTotal > 0 ? (
           <Section
-            title="THIS MONTH"
-            action={
-              <Pressable onPress={() => router.push('/reports')} hitSlop={8}>
-                <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
-                  Reports
-                </ThemedText>
-              </Pressable>
-            }>
+            title="Where it went"
+            action={<SectionLink label="Reports" onPress={() => router.push('/reports')} />}>
+            {/* Categories only. The month's total is in the spend tile at the
+                top of Home; repeating it here put the same figure on screen
+                twice. Rows rather than a ring: an amount you can read beats a
+                percentage you have to turn back into rupees, and the line
+                icons match the tiles above. */}
             <Card style={styles.spendCard}>
-              {/* The total sits at the top of the card with the full width to
-                  itself. It was in the donut hole, where a rupee amount with
-                  paise had to shrink to 14px to fit -- making the headline
-                  figure the smallest number on the card. */}
-              <View style={styles.spendHead}>
-                <ThemedText themeColor="textTertiary" style={Type.label}>
-                  SPENT
-                </ThemedText>
-                <ThemedText style={styles.spendTotal} numberOfLines={1}>
-                  {formatPaise(monthTotal)}
-                </ThemedText>
-              </View>
-
-              <View style={styles.spend}>
-                <DonutChart
-                  data={slices}
-                  size={112}
-                  thickness={14}
-                  caption={topSlice?.categoryName}
-                  value={topShare !== null ? `${topShare}%` : undefined}
+              {topCategories.map((r, i) => (
+                <CategoryRow
+                  key={r.categoryId}
+                  icon={lineIconFor(r.icon)}
+                  name={r.categoryName}
+                  amount={formatPaise(r.totalPaise)}
+                  share={r.totalPaise / monthTotal}
+                  color={palette[i % palette.length]}
                 />
-                <View style={styles.legend}>
-                  {legend.map((r, i) => (
-                    <View key={r.categoryId} style={styles.legendRow}>
-                      <View style={[styles.dot, { backgroundColor: palette[i % palette.length] }]} />
-                      <ThemedText
-                        themeColor="textSecondary"
-                        style={[Type.caption, styles.flex]}
-                        numberOfLines={1}>
-                        {r.categoryName}
-                      </ThemedText>
-                      <ThemedText style={Type.caption}>
-                        {Math.round((r.totalPaise / monthTotal) * 100)}%
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-              </View>
+              ))}
             </Card>
           </Section>
         ) : null}
@@ -605,17 +635,30 @@ export default function HomeScreen() {
           // No "Manage" link: the People quick action above goes to the same
           // screen, and two doors to one place on a single screen is just
           // something else to read.
-          title="BALANCES">
+          title="Balances">
+          {/* Other people, and only those with something open, largest
+              first. Your own row repeated the balance tile at the top, and a
+              settled housemate's "—" row answers nothing. */}
           <Card padded={false}>
             {!balances.data
-              ? [0, 1, 2, 3].map((i) => <RowSkeleton key={i} round last={i === 3} />)
+              ? [0, 1, 2].map((i) => <RowSkeleton key={i} round last={i === 2} />)
               : null}
-            {balances.data?.map((b, i) => (
+            {balances.data && openBalances.length === 0 ? (
+              <View style={styles.row}>
+                <View style={[styles.lineIcon, { backgroundColor: theme.backgroundSelected }]}>
+                  <MaterialCommunityIcons name="check" size={17} color={theme.textSecondary} />
+                </View>
+                <ThemedText themeColor="textSecondary" style={[Type.caption, styles.flex]}>
+                  Everyone else is settled up
+                </ThemedText>
+              </View>
+            ) : null}
+            {openBalances.map((b, i) => (
               <View
                 key={b.memberId}
                 style={[
                   styles.row,
-                  i < (balances.data?.length ?? 0) - 1 && {
+                  (i < openBalances.length - 1 || settledCount > 0) && {
                     borderBottomWidth: StyleSheet.hairlineWidth,
                     borderBottomColor: theme.border,
                   },
@@ -624,7 +667,6 @@ export default function HomeScreen() {
                 <View style={styles.flex}>
                   <ThemedText style={Type.body} numberOfLines={1}>
                     {b.displayName}
-                    {b.memberId === member?.id ? ' (you)' : ''}
                   </ThemedText>
                   <ThemedText themeColor="textTertiary" style={Type.micro}>
                     {b.balancePaise > 0
@@ -646,24 +688,23 @@ export default function HomeScreen() {
                             : theme.textTertiary,
                     },
                   ]}>
-                  {b.balancePaise === 0
-                    ? '—'
-                    : `${b.balancePaise > 0 ? '+' : '−'}${formatPaise(Math.abs(b.balancePaise))}`}
+                  {`${b.balancePaise > 0 ? '+' : '−'}${formatPaise(Math.abs(b.balancePaise))}`}
                 </ThemedText>
               </View>
             ))}
+            {openBalances.length > 0 && settledCount > 0 ? (
+              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.settledNote]}>
+                {settledCount === 1 ? '1 other is' : `${settledCount} others are`} settled up
+              </ThemedText>
+            ) : null}
           </Card>
         </Section>
 
         <Section
-          title="RECENT"
+          title="Recent"
           action={
             expenses.data && expenses.data.length > 0 ? (
-              <Pressable onPress={() => router.push('/history')} hitSlop={8}>
-                <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
-                  See all
-                </ThemedText>
-              </Pressable>
+              <SectionLink label="See all" onPress={() => router.push('/history')} />
             ) : null
           }>
           {/* Loading is not empty: "Nothing logged yet" used to show for the
@@ -746,7 +787,7 @@ export default function HomeScreen() {
               </View>
               <ThemedText style={Type.headline}>Nothing logged yet</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-                Tap Add to record your first expense.
+                Tap + to record your first expense.
               </ThemedText>
             </Card>
           )}
@@ -773,7 +814,9 @@ function Section({
     <View style={styles.section}>
       <View style={styles.sectionHead}>
         <View style={styles.sectionTitleRow}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
+          {/* Sentence case at caption size, not spaced capitals: a section
+              title orients, it shouldn't shout like the figures under it. */}
+          <ThemedText themeColor="textSecondary" style={Type.caption}>
             {title}
           </ThemedText>
           {count ? (
@@ -837,7 +880,6 @@ const styles = StyleSheet.create({
   tileFootValue: { fontSize: 12, lineHeight: 17, fontWeight: '500' },
   tileFootLoading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
   rowSkeletonText: { gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
 
   banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },
 
@@ -859,13 +901,12 @@ const styles = StyleSheet.create({
   },
   countText: { color: '#fff', fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
 
-  spendCard: { gap: Spacing.four },
-  spendHead: { gap: 2 },
-  // Full card width, so it never has to shrink for a longer amount.
-  spendTotal: { fontSize: 24, lineHeight: 30, fontWeight: '700', letterSpacing: -0.6 },
-  spend: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four },
-  legend: { flex: 1, gap: Spacing.two },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  spendCard: { gap: Spacing.three + Spacing.one },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  categoryText: { gap: 6 },
+  categoryHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  categoryTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  categoryFill: { height: 4, borderRadius: 2 },
 
   row: {
     flexDirection: 'row',
@@ -882,6 +923,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileGlyph: { fontSize: 18 },
+  lineIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  settledNote: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + Spacing.one },
   pendingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
 
   approval: { gap: Spacing.three },

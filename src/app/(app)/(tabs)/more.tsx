@@ -62,9 +62,10 @@ export default function MoreScreen() {
     },
     {
       href: '/recurring',
-      icon: 'repeat',
-      label: 'Recurring',
-      hint: 'Bills that post themselves each month',
+      // "Bills", matching the Home button that opens the same screen.
+      icon: 'calendar',
+      label: 'Bills',
+      hint: 'Rent, wifi and other bills that post themselves each month',
       tint: 'plain',
     },
     {

@@ -88,7 +88,7 @@ export default function RecurringScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScreenHeader
-        title="Recurring"
+        title="Bills"
         action={
           /* A member may add a bill they pay themselves — "I buy the water
              can" (migration 0031). Committing somebody ELSE to paying every
