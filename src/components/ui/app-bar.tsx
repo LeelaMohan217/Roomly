@@ -267,10 +267,11 @@ const styles = StyleSheet.create({
   homeLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flex: 1 },
   homeText: { flex: 1, gap: 1 },
   homeTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  // A circle, matching the round avatar opposite it in the header.
   iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
