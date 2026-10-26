@@ -61,6 +61,26 @@ export const Colors = {
     heroRule: 'rgba(6,48,31,0.12)',
     heroAccent: '#096647',
     heroUp: '#7A4E00',
+    // "You owe" on the green card. The page's danger red is 3.9:1 on the
+    // darker end of the gradient; this is 5.3:1.
+    heroDanger: '#B42318',
+
+    // Home's two tiles, sampled from the design mockup: near-white mint,
+    // with an S-shaped wave of deeper mint down the right edge. The wave
+    // fades from top to bottom, so the top-right corner is the greenest.
+    tileFrom: '#F0FDF8',
+    tileTo: '#E2FAEF',
+    tileWaveTop: 'rgba(16,185,129,0.16)',
+    tileWaveBottom: 'rgba(16,185,129,0.05)',
+
+    // Home's quick actions, one hue each so they can be told apart at a
+    // glance. Deep enough to pass 4.5:1 as label text on the page (4.6+).
+    // Blue leans cyan and orange leans amber on purpose: #2563EB read as
+    // violet beside the purple, and #C2410C as red.
+    actionGreen: '#087A55',
+    actionBlue: '#0B6BCB',
+    actionPurple: '#7C3AED',
+    actionOrange: '#B45309',
 
     chart1: '#0E9A6C',
     chart2: '#3B82F6',
@@ -114,6 +134,21 @@ export const Colors = {
     heroRule: 'rgba(255,255,255,0.18)',
     heroAccent: '#6EE7B7',
     heroUp: '#FCD34D',
+    // The page's danger red is 3.1:1 on the lighter end of the gradient.
+    heroDanger: '#FCA5A5',
+
+    // Dark at the bottom left rising to emerald at the top right, as in the
+    // mockup, with the wave as a SHADOW: it darkens the brightest corner, so
+    // the light band just left of the curve is what reads as the glow.
+    tileFrom: '#012824',
+    tileTo: '#01805E',
+    tileWaveTop: 'rgba(0,30,22,0.45)',
+    tileWaveBottom: 'rgba(0,30,22,0.22)',
+
+    actionGreen: '#3ECF8E',
+    actionBlue: '#60A5FA',
+    actionPurple: '#A78BFA',
+    actionOrange: '#FB923C',
 
     chart1: '#3ECF8E',
     chart2: '#60A5FA',

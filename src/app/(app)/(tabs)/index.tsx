@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   AppState,
   Pressable,
@@ -12,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { HomeHeader } from '@/components/ui/app-bar';
@@ -75,9 +77,60 @@ function HouseholdLine({ name, people }: { name?: string; people?: number }) {
 }
 
 /**
+ * The tiles' background, after the design mockup: a diagonal gradient rising
+ * from the bottom left to the top right, and two nested S-shaped waves down
+ * the right edge -- each bulging in at mid-height and back out at the top and
+ * bottom. Drawn behind the content and ignoring touches, so it is purely
+ * surface.
+ */
+function TileBackdrop() {
+  const theme = useTheme();
+  // Gradient ids are document-global on web; useId keeps this one from
+  // clashing with any other on the page. Its colons are not valid inside
+  // url(#...).
+  const id = useId().replace(/:/g, '');
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient
+        colors={[theme.tileFrom, theme.tileTo]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* A 100x100 box stretched to the tile, so the waves keep their place
+          whatever height the row settles on. */}
+      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <Defs>
+          <SvgGradient id={`wave${id}`} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={theme.tileWaveTop} />
+            <Stop offset="1" stopColor={theme.tileWaveBottom} />
+          </SvgGradient>
+        </Defs>
+        {/* The outer wave, then a narrower one inside it: where they overlap
+            the colour doubles, which is the deeper band in the corner. */}
+        <Path
+          d="M86 0 C 76 16, 56 30, 58 50 C 60 70, 72 84, 76 100 L 100 100 L 100 0 Z"
+          fill={`url(#wave${id})`}
+        />
+        <Path
+          d="M100 4 C 90 20, 74 34, 76 52 C 78 70, 90 82, 100 92 Z"
+          fill={`url(#wave${id})`}
+        />
+      </Svg>
+    </View>
+  );
+}
+
+/**
  * One of Home's two summary tiles: a round icon, a label, the figure, and a
  * smaller figure underneath. An undefined value shows a skeleton -- a ₹0.00
  * before the data arrives would be a claim.
+ *
+ * `featured` puts the tile on the green wave backdrop -- the balance only, so
+ * the screen has one obvious place to start. A featured tile takes every
+ * colour from the hero tokens: the page's own green and red measured under
+ * 4.5:1 on it. A plain tile keeps the page's colours.
  */
 function StatTile({
   icon,
@@ -86,6 +139,7 @@ function StatTile({
   value,
   footLabel,
   footValue,
+  featured = false,
 }: {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   tone: 'success' | 'danger' | 'neutral';
@@ -94,30 +148,45 @@ function StatTile({
   /** Short -- it shares one line with footValue: "Your share ₹9,652.78". */
   footLabel: string;
   footValue?: string;
+  featured?: boolean;
 }) {
   const theme = useTheme();
-  const ink =
-    tone === 'success' ? theme.success : tone === 'danger' ? theme.danger : theme.textSecondary;
-  // The icon's own colour as a wash behind it (hex alpha), so the circle is
-  // always the same hue as the glyph -- clearly green, red or grey.
-  const wash = `${ink}${tone === 'neutral' ? '24' : '33'}`;
+  const ink = featured
+    ? tone === 'success'
+      ? theme.heroAccent
+      : tone === 'danger'
+        ? theme.heroDanger
+        : theme.onHero
+    : tone === 'success'
+      ? theme.success
+      : tone === 'danger'
+        ? theme.danger
+        : theme.textSecondary;
+  const muted = featured ? theme.onHeroMuted : theme.textSecondary;
+  const strong = featured ? theme.onHero : theme.text;
+  const rule = featured ? theme.heroRule : theme.border;
+  // On the plain tile, the icon's own colour as a wash behind it (hex alpha).
+  const chip = featured ? theme.heroChip : `${ink}24`;
+  const skeletonTint = featured ? theme.heroChip : undefined;
 
   return (
     <View
       style={[
         styles.statTile,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+        { borderColor: rule },
+        !featured && { backgroundColor: theme.backgroundElement },
       ]}>
+      {featured ? <TileBackdrop /> : null}
       <View>
-        <View style={[styles.tileIcon, { backgroundColor: wash }]}>
+        <View style={[styles.tileIcon, { backgroundColor: chip }]}>
           <MaterialCommunityIcons name={icon} size={17} color={ink} />
         </View>
-        <ThemedText themeColor="textSecondary" style={[Type.micro, styles.tileLabel]} numberOfLines={1}>
+        <ThemedText style={[Type.micro, styles.tileLabel, { color: muted }]} numberOfLines={1}>
           {label}
         </ThemedText>
         {value ? (
           <ThemedText
-            style={[styles.tileValue, tone !== 'neutral' && { color: ink }]}
+            style={[styles.tileValue, { color: tone === 'neutral' ? strong : ink }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}>
@@ -125,23 +194,24 @@ function StatTile({
           </ThemedText>
         ) : (
           <View style={styles.tileValueSkeleton}>
-            <Skeleton width="80%" height={20} radius={Radius.sm} />
+            <Skeleton width="80%" height={20} radius={Radius.sm} tint={skeletonTint} />
           </View>
         )}
       </View>
 
-      {footValue ? (
-        <ThemedText themeColor="textSecondary" style={styles.tileFoot} numberOfLines={1}>
-          {footLabel} <ThemedText style={styles.tileFootValue}>{footValue}</ThemedText>
-        </ThemedText>
-      ) : (
-        <View style={styles.tileFootLoading}>
-          <ThemedText themeColor="textSecondary" style={styles.tileFoot}>
-            {footLabel}
+      <View style={[styles.tileFootRow, { borderTopColor: rule }]}>
+        {footValue ? (
+          <ThemedText style={[styles.tileFoot, { color: muted }]} numberOfLines={1}>
+            {footLabel}{' '}
+            <ThemedText style={[styles.tileFootValue, { color: strong }]}>{footValue}</ThemedText>
           </ThemedText>
-          <Skeleton width={64} height={12} />
-        </View>
-      )}
+        ) : (
+          <View style={styles.tileFootLoading}>
+            <ThemedText style={[styles.tileFoot, { color: muted }]}>{footLabel}</ThemedText>
+            <Skeleton width={64} height={12} tint={skeletonTint} />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -420,11 +490,10 @@ export default function HomeScreen() {
             used to be pages of a horizontal pager, which had to share one
             height and so left the shorter card half empty.
 
-            No coloured fill: the colour is in the small round icon and, on
-            the balance, in the amount -- green when the house owes you, red
-            when you owe it, grey when you're square. That keeps colour for
-            meaning, the way the rest of the app uses it, instead of as
-            decoration. */}
+            Only the balance sits on the green wave backdrop: two identical
+            green cards gave the eye nowhere to start. Meaning stays in the
+            amount and the words -- green when the house owes you, red when
+            you owe it, plain when you're square. */}
         <Appear style={styles.cards}>
           <HouseholdLine name={household.data?.name} people={members.data?.length} />
 
@@ -452,6 +521,7 @@ export default function HomeScreen() {
               value={balances.data ? formatPaise(Math.abs(myBalance)) : undefined}
               footLabel="Your share"
               footValue={spend.data ? formatPaise(spend.data.myMonthPaise) : undefined}
+              featured
             />
             <StatTile
               icon="receipt-text-outline"
@@ -474,6 +544,7 @@ export default function HomeScreen() {
               key: 'settle',
               icon: 'swap-horizontal',
               label: 'Settle',
+              color: theme.actionGreen,
               onPress: () => router.push('/settle'),
             },
             {
@@ -481,14 +552,22 @@ export default function HomeScreen() {
               // A calendar, not the repeat arrows: those sat beside Settle's
               // swap arrows and the two read as the same button.
               icon: 'calendar-outline',
+              color: theme.actionBlue,
               label: 'Bills',
               onPress: () => router.push('/recurring'),
             },
-            { key: 'away', icon: 'airplane', label: 'Away', onPress: () => router.push('/away') },
+            {
+              key: 'away',
+              icon: 'airplane',
+              label: 'Away',
+              color: theme.actionPurple,
+              onPress: () => router.push('/away'),
+            },
             {
               key: 'people',
               icon: 'people',
               label: 'People',
+              color: theme.actionOrange,
               onPress: () => router.push('/household'),
             },
           ]}
@@ -864,6 +943,8 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.three,
     justifyContent: 'space-between',
+    // Clips the gradient and the curves to the rounded corners.
+    overflow: 'hidden',
   },
   tileIcon: {
     width: 30,
@@ -873,7 +954,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileLabel: { marginTop: Spacing.two + Spacing.one },
-  tileValue: { fontSize: 21, lineHeight: 27, fontWeight: '500', letterSpacing: -0.4, marginTop: 2 },
+  tileValue: { fontSize: 21, lineHeight: 27, fontWeight: '700', letterSpacing: -0.4, marginTop: 2 },
+  // A rule over the footer, as on the mockup, splitting the figure from its aside.
+  tileFootRow: { paddingTop: Spacing.two + Spacing.one, borderTopWidth: StyleSheet.hairlineWidth },
   // The same 26px line as the figure it stands in for, so nothing moves.
   tileValueSkeleton: { height: 27, marginTop: 2, justifyContent: 'center' },
   tileFoot: { fontSize: 12, lineHeight: 17 },

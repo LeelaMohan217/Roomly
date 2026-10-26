@@ -11,6 +11,9 @@ export type QuickAction = {
   label: string;
   onPress: () => void;
   accent?: boolean;
+  /** The action's own hue, for its glyph, label and a wash behind the glyph.
+   *  Must pass 4.5:1 on the page, since the label is small text. */
+  color?: string;
 };
 
 /**
@@ -34,17 +37,26 @@ export function QuickActions({ actions }: { actions: QuickAction[] }) {
             style={[
               styles.circle,
               {
-                backgroundColor: a.accent ? theme.primarySoft : theme.backgroundElement,
-                borderColor: a.accent ? 'transparent' : theme.border,
+                // A coloured action gets a wash of its own hue (hex alpha),
+                // so the tile, glyph and label read as one colour.
+                backgroundColor: a.color
+                  ? `${a.color}1F`
+                  : a.accent
+                    ? theme.primarySoft
+                    : theme.backgroundElement,
+                borderColor: a.color ? `${a.color}33` : a.accent ? 'transparent' : theme.border,
               },
             ]}>
             <Ionicons
               name={a.icon}
               size={19}
-              color={a.accent ? theme.primary : theme.textSecondary}
+              color={a.color ?? (a.accent ? theme.primary : theme.textSecondary)}
             />
           </View>
-          <ThemedText themeColor="textSecondary" style={Type.micro} numberOfLines={1}>
+          <ThemedText
+            themeColor="textSecondary"
+            style={[Type.micro, a.color ? { color: a.color, fontWeight: '600' } : null]}
+            numberOfLines={1}>
             {a.label}
           </ThemedText>
         </Pressable>
