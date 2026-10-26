@@ -26,7 +26,8 @@ export function AppBar({
   title?: string;
   /** Quiet line above the title — the date on Home. */
   overline?: string;
-  /** Replaces the avatar, for screens with their own control. */
+  /** Replaces the avatar, for screens with their own control. `null` shows
+   *  nothing at all -- for a screen whose controls live below the title. */
   action?: React.ReactNode;
 }) {
   const theme = useTheme();
@@ -50,7 +51,7 @@ export function AppBar({
         <Logo size={28} />
       )}
 
-      {action ?? (
+      {action !== undefined ? action : (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Your account and settings"
@@ -280,5 +281,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  screenTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
+  // lineHeight set explicitly: ThemedText's default style carries 24, and a
+  // 22px bold title in a 24px line box clipped its descenders -- the tail
+  // of the "y" in "History" was cut off.
+  screenTitle: { fontSize: 22, lineHeight: 30, fontWeight: '700', letterSpacing: -0.5 },
 });

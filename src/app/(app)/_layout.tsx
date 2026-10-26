@@ -20,7 +20,7 @@ export default function AppLayout() {
       <Stack.Screen name="owner" />
       <Stack.Screen name="categories" />
       <Stack.Screen name="category-edit" />
-      <Stack.Screen name="search" />
+      <Stack.Screen name="history-filters" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="settlements" />
       <Stack.Screen name="month-statement" />

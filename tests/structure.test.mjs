@@ -688,10 +688,13 @@ check(
   !/router\.push\('\/'\)/.test(read('src', 'app', '(app)', 'owner.tsx')),
   "push('/') stacks another copy of the tab shell; the file's own comment says to navigate"
 );
+// Calculator left the tab bar for a row in More, so it is a pushed screen
+// now: it needs the back chevron it used to hide as a tab root.
 check(
-  'a tab root has no dead back button',
-  /showBack=\{false\}/.test(read('src', 'app', '(app)', '(tabs)', 'calculator.tsx')),
-  'the Calculator tab renders a back chevron with nothing to pop'
+  'the calculator, opened from More, can go back',
+  !existsSync(join(ROOT, 'src', 'app', '(app)', '(tabs)', 'calculator.tsx')) &&
+    !/showBack=\{false\}/.test(read('src', 'app', '(app)', 'calculator.tsx')),
+  'Calculator is a tab again, or hides its back chevron as a pushed screen with nowhere else to go'
 );
 check(
   'the recurring form does not swallow the first tap',

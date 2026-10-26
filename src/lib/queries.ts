@@ -53,7 +53,9 @@ export type Expense = {
   totalPaise: number;
   description: string | null;
   expenseDate: string;
+  paidById: string;
   paidByName: string;
+  categoryId: string | null;
   categoryName: string;
   categoryIcon: string | null;
   participantCount: number;
@@ -340,19 +342,33 @@ export function useBalances() {
   });
 }
 
-export function useExpenses(limit = 50) {
+/**
+ * The newest expenses, or -- given a date range -- every expense in it.
+ *
+ * A range is fetched from the server rather than cut out of the newest few
+ * hundred, so History's date filter reaches back as far as you ask, not only
+ * as far as the default page happens to go.
+ */
+export function useExpenses(limit = 50, range?: { from: string | null; to: string | null }) {
+  const from = range?.from ?? null;
+  const to = range?.to ?? null;
   return useQuery({
-    queryKey: ['expenses', limit],
+    // Versioned: rows gained paidById and categoryId, and a cache persisted
+    // by an older build must not be read as the new shape.
+    queryKey: ['expenses', 2, limit, from, to],
     queryFn: async (): Promise<Expense[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
         .select(
-          `id, total_paise, description, expense_date,
+          `id, total_paise, description, expense_date, paid_by, category_id,
            categories ( name, icon ),
            members!expenses_paid_by_fkey ( display_name ),
            expense_splits ( member_id )`
         )
-        .is('voided_at', null)
+        .is('voided_at', null);
+      if (from) query = query.gte('expense_date', from);
+      if (to) query = query.lte('expense_date', to);
+      const { data, error } = await query
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -363,6 +379,8 @@ export function useExpenses(limit = 50) {
         total_paise: number;
         description: string | null;
         expense_date: string;
+        paid_by: string;
+        category_id: string | null;
         categories: { name: string; icon: string | null } | null;
         members: { display_name: string } | null;
         expense_splits: { member_id: string }[];
@@ -373,7 +391,9 @@ export function useExpenses(limit = 50) {
         totalPaise: Number(e.total_paise),
         description: e.description,
         expenseDate: e.expense_date,
+        paidById: e.paid_by,
         paidByName: e.members?.display_name ?? '—',
+        categoryId: e.category_id,
         categoryName: e.categories?.name ?? 'Uncategorised',
         categoryIcon: e.categories?.icon ?? null,
         participantCount: e.expense_splits.length,
