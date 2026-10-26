@@ -69,8 +69,11 @@ export function AuthField({
   hint,
   hintTone = 'neutral',
   hintAction,
+  inputStyle,
   ...rest
-}: TextInputProps & {
+}: Omit<TextInputProps, 'style'> & {
+  /** Extra text styling for the input itself, like the spaced invite code. */
+  inputStyle?: TextStyle;
   label: string;
   icon: IconName;
   secure?: boolean;
@@ -146,7 +149,7 @@ export function AuthField({
           </View>
         ) : null}
         <TextInput
-          style={[styles.input, NO_WEB_OUTLINE, { color: theme.text }]}
+          style={[styles.input, NO_WEB_OUTLINE, { color: theme.text }, inputStyle]}
           placeholderTextColor={theme.textTertiary}
           secureTextEntry={secure && !revealed}
           onFocus={() => setFocused(true)}
@@ -270,14 +273,18 @@ export function AuthResult({
   children: React.ReactNode;
   actions: React.ReactNode;
   help?: string;
-  tone?: 'success' | 'danger';
+  /** Green when it worked, red when it failed, amber when it is only a
+   *  hiccup -- like no connection -- that nothing was lost to. */
+  tone?: 'success' | 'danger' | 'warning';
   /** An email shown on its own, large, so a typo in it is hard to miss. */
   address?: string;
 }) {
   const theme = useTheme();
-  const ink = tone === 'danger' ? theme.danger : theme.success;
-  const soft = tone === 'danger' ? theme.dangerSoft : theme.successSoft;
-  const onInk = tone === 'danger' ? theme.onDanger : theme.onSuccess;
+  const ink = tone === 'danger' ? theme.danger : tone === 'warning' ? theme.warning : theme.success;
+  const soft =
+    tone === 'danger' ? theme.dangerSoft : tone === 'warning' ? theme.warningSoft : theme.successSoft;
+  const onInk =
+    tone === 'danger' ? theme.onDanger : tone === 'warning' ? theme.onWarning : theme.onSuccess;
   return (
     <View style={[authStyles.content, styles.result]}>
       <View style={[styles.resultRing, { backgroundColor: soft }]}>

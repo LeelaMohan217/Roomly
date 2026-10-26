@@ -1,31 +1,33 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthButton, AuthHeader, AuthResult, authStyles } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
 
 /**
- * Deliberately router.push() on a plain Pressable rather than <Link asChild>.
+ * The first screen after signing in, for an account that is not in a
+ * household yet: start one, or join one with a code.
  *
+ * Deliberately router.push() on a plain Pressable rather than <Link asChild>.
  * asChild renders the child through Radix's Slot, which merges `style` by
  * flattening it as an OBJECT. A Pressable's style is a FUNCTION -- it has to
  * be, to react to `pressed` -- and flattening a function yields {}. So the
- * cards silently lost their background, border, padding and flexDirection,
- * which is why nothing but the emoji was visible in either theme.
- *
- * Every other tappable card in this app already uses router.push on a plain
- * Pressable. This screen was the odd one out.
+ * cards silently lost their background, border, padding and flexDirection.
  */
 export default function OnboardingScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { signOut, unreachable, refresh } = useSession();
+  const { session, signOut, unreachable, refresh } = useSession();
   const [checking, setChecking] = useState(false);
+
+  const name = (session?.user.user_metadata?.display_name as string | undefined)?.trim().split(/\s+/)[0];
+  const email = session?.user.email;
 
   /**
    * `unreachable` means the membership read did not come back — which is NOT
@@ -46,66 +48,83 @@ export default function OnboardingScreen() {
 
   if (unreachable) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <ThemedText style={Type.display}>Can&apos;t reach Roomly</ThemedText>
-            <ThemedText themeColor="textSecondary" style={Type.body}>
-              We couldn&apos;t check which household you&apos;re in. This is a connection problem,
-              not a sign you&apos;ve been removed — nothing has changed.
-            </ThemedText>
-          </View>
-
-          <Button title="Try again" onPress={checkAgain} loading={checking} />
-          <Button
-            title="Sign out"
-            variant="ghost"
-            onPress={() => void signOut()}
-            disabled={checking}
-          />
-        </View>
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+        {/* Amber, not red: nothing failed or was lost, the phone just could
+            not ask. Grey button, so the screen says one thing. */}
+        <AuthResult
+          tone="warning"
+          icon="cloud-offline-outline"
+          title="Can’t reach Roomly"
+          actions={
+            <>
+              <AuthButton variant="secondary" title="Try again" onPress={checkAgain} busy={checking} />
+              <SignOutLink email={email} onPress={() => void signOut()} />
+            </>
+          }>
+          Check your internet connection. Your household and expenses are safe — nothing has
+          changed.
+        </AuthResult>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <ThemedText style={Type.display}>You&apos;re in</ThemedText>
-          <ThemedText themeColor="textSecondary" style={Type.body}>
-            One more step — join a household or start one.
-          </ThemedText>
-        </View>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      <View style={authStyles.content}>
+        <AuthHeader
+          icon="home"
+          title={name ? `Welcome, ${name}` : 'Welcome to Roomly'}
+          subtitle="Start a household for your flat, or join one a housemate has already made."
+        />
 
         <View style={styles.options}>
           <Choice
-            emoji="🏠"
+            icon="add-circle-outline"
             title="Create a household"
-            hint="You'll be the owner"
+            hint="Start fresh and invite your housemates."
             onPress={() => router.push('/create-household')}
           />
           <Choice
-            emoji="🔑"
-            title="Join with an invite code"
-            hint="A friend sent you a code"
+            icon="enter-outline"
+            title="Join a household"
+            hint="Use the invite code a housemate sent you."
             onPress={() => router.push('/join-household')}
           />
         </View>
 
-        <Button title="Sign out" variant="ghost" onPress={() => void signOut()} />
+        <SignOutLink email={email} onPress={() => void signOut()} />
       </View>
     </SafeAreaView>
   );
 }
 
+/**
+ * A quiet way out at the bottom, naming the account -- someone who signed in
+ * with the wrong email sees it here before creating a household with it.
+ */
+function SignOutLink({ email, onPress }: { email?: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.signOut}>
+      {email ? (
+        <ThemedText themeColor="textTertiary" style={styles.signedIn} numberOfLines={1}>
+          Signed in as {email}
+        </ThemedText>
+      ) : null}
+      <Pressable accessibilityRole="button" onPress={onPress} hitSlop={10}>
+        <ThemedText style={[authStyles.link, { color: theme.textSecondary }]}>Sign out</ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+
 function Choice({
-  emoji,
+  icon,
   title,
   hint,
   onPress,
 }: {
-  emoji: string;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   hint: string;
   onPress: () => void;
@@ -115,58 +134,55 @@ function Choice({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={`${title}. ${hint}`}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: theme.backgroundElement,
-          borderColor: theme.border,
-          opacity: pressed ? 0.85 : 1,
+          backgroundColor: theme.backgroundSelected,
+          transform: [{ scale: pressed ? 0.99 : 1 }],
+          opacity: pressed ? 0.9 : 1,
         },
       ]}>
-      <View style={[styles.glyph, { backgroundColor: theme.primarySoft }]}>
-        <ThemedText style={styles.emoji}>{emoji}</ThemedText>
+      {/* An icon in a soft green tile, not an emoji: the same family as the
+          rest of the screen, and the same on every phone. */}
+      <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
+        <Ionicons name={icon} size={22} color={theme.primary} />
       </View>
 
       <View style={styles.cardText}>
         <ThemedText style={styles.cardTitle}>{title}</ThemedText>
-        <ThemedText themeColor="textTertiary" style={Type.caption}>
+        <ThemedText themeColor="textSecondary" style={styles.cardHint}>
           {hint}
         </ThemedText>
       </View>
+
+      <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.five,
-  },
-  header: { gap: Spacing.one },
   options: { gap: Spacing.three },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.four,
+    gap: 14,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three,
   },
-  // A tinted tile rather than a bare glyph, so the row reads as a control
-  // instead of a stray character floating on the page.
-  glyph: {
+  tile: {
     width: 44,
     height: 44,
-    borderRadius: Radius.md,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emoji: { fontSize: 22, lineHeight: 28 },
   cardText: { flex: 1, gap: 2 },
-  cardTitle: { fontSize: 15.5, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2 },
+  cardTitle: { fontSize: 15, lineHeight: 20, fontWeight: '500' },
+  cardHint: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  signOut: { alignItems: 'center', gap: Spacing.one },
+  signedIn: { fontSize: 12.5, lineHeight: 17 },
 });

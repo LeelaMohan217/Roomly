@@ -1,12 +1,10 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
+import { AuthButton, AuthField, AuthHeader, authStyles } from '@/components/auth-form';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
-import { Button } from '@/components/ui/button';
-import { TextField } from '@/components/ui/text-field';
+import { Notice } from '@/components/ui/notice';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -15,17 +13,23 @@ import { supabase } from '@/lib/supabase';
 
 export default function CreateHouseholdScreen() {
   const theme = useTheme();
-  const router = useRouter();
   const { session, refresh } = useSession();
 
   const [houseName, setHouseName] = useState('');
+  const [houseTouched, setHouseTouched] = useState(false);
   const [displayName, setDisplayName] = useState(
     (session?.user.user_metadata?.display_name as string | undefined) ?? ''
   );
+  const [nameTouched, setNameTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const houseMissing = houseTouched && !houseName.trim();
+  const nameMissing = nameTouched && !displayName.trim();
+  const canSubmit = !!houseName.trim() && !!displayName.trim() && !busy;
+
   async function create() {
+    if (!canSubmit) return;
     setError(null);
     setBusy(true);
 
@@ -58,62 +62,63 @@ export default function CreateHouseholdScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">Name your household</ThemedText>
-            <ThemedText type="default" themeColor="textSecondary">
-              You&apos;ll be the owner, and can invite the others once it exists.
-            </ThemedText>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      <KeyboardAwareScrollView contentContainerStyle={authStyles.content}>
+        <AuthHeader
+          icon="home"
+          title="Create your household"
+          subtitle="You’ll manage it, and can invite your housemates right after."
+        />
+
+        <View style={authStyles.form}>
+          <AuthField
+            label="Household name"
+            icon="home-outline"
+            value={houseName}
+            onChangeText={(v) => {
+              setHouseName(v);
+              setError(null);
+            }}
+            onBlur={() => setHouseTouched(true)}
+            placeholder="Enter household name"
+            autoCapitalize="words"
+            editable={!busy}
+            returnKeyType="next"
+            // A nudge toward something everyone in the flat will recognise.
+            hint={houseMissing ? 'Enter a household name.' : 'Like your flat number and area.'}
+            hintTone={houseMissing ? 'danger' : 'neutral'}
+          />
+
+          <AuthField
+            label="Your name"
+            icon="person-outline"
+            value={displayName}
+            onChangeText={(v) => {
+              setDisplayName(v);
+              setError(null);
+            }}
+            onBlur={() => setNameTouched(true)}
+            placeholder="Enter your name"
+            autoCapitalize="words"
+            editable={!busy}
+            onSubmitEditing={create}
+            returnKeyType="go"
+            hint={nameMissing ? 'Enter your name.' : undefined}
+            hintTone={nameMissing ? 'danger' : 'neutral'}
+          />
+
+          {error ? <Notice tone="danger" message={error} /> : null}
+
+          <View style={styles.submit}>
+            <AuthButton title="Create household" onPress={create} busy={busy} disabled={!canSubmit} />
           </View>
-
-          <View style={styles.form}>
-            <TextField
-              label="Household name"
-              value={houseName}
-              onChangeText={setHouseName}
-              placeholder="Flat 302, Gachibowli"
-              autoCapitalize="words"
-              editable={!busy}
-            />
-
-            <TextField
-              label="Your name"
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Mohan"
-              autoCapitalize="words"
-              editable={!busy}
-              error={error ?? undefined}
-            />
-
-            <Button
-              title="Create household"
-              onPress={create}
-              loading={busy}
-              disabled={!houseName.trim() || !displayName.trim()}
-            />
-
-            <Button
-              title="Back"
-              variant="ghost"
-              onPress={() => router.back()}
-              disabled={busy}
-            />
-          </View>
-        </KeyboardAwareScrollView>
+        </View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.five,
-  },
-  header: { gap: Spacing.one },
-  form: { gap: Spacing.three },
+  submit: { marginTop: Spacing.one },
 });

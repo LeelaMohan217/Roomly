@@ -1,13 +1,13 @@
-import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthButton, AuthField, AuthHeader, authStyles } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
-import { Button } from '@/components/ui/button';
-import { TextField } from '@/components/ui/text-field';
-import { Spacing } from '@/constants/theme';
+import { Notice } from '@/components/ui/notice';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
 import { useSession } from '@/lib/session';
@@ -25,9 +25,13 @@ function formatCode(raw: string): string {
   return clean.length > 3 ? `${clean.slice(0, 3)}-${clean.slice(3)}` : clean;
 }
 
+/**
+ * Join a household, in two steps on one screen: check the code, then say who
+ * you are. The second step only appears once the code has found a household,
+ * so the screen never asks for a name before it can say what you are joining.
+ */
 export default function JoinHouseholdScreen() {
   const theme = useTheme();
-  const router = useRouter();
   const { session, refresh } = useSession();
 
   const [code, setCode] = useState('');
@@ -36,24 +40,31 @@ export default function JoinHouseholdScreen() {
   const [name, setName] = useState(
     (session?.user.user_metadata?.display_name as string | undefined) ?? ''
   );
+  // A code that did not work belongs under the code field; anything after
+  // that (the join request itself) goes in the red box above the button.
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const codeComplete = code.replace('-', '').length === 6;
+
   async function checkCode() {
-    setError(null);
+    if (!codeComplete || busy) return;
+    setCodeError(null);
     setBusy(true);
 
     const { data, error: rpcError } = await supabase.rpc('preview_invite', { p_code: code });
 
     setBusy(false);
     if (rpcError) {
-      setError(humanError(rpcError));
+      setCodeError(humanError(rpcError));
       return;
     }
     setPreview(data as Preview);
   }
 
   async function requestJoin() {
+    if (!name.trim() || busy) return;
     setError(null);
     setBusy(true);
 
@@ -82,105 +93,133 @@ export default function JoinHouseholdScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-        <KeyboardAwareScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">Enter invite code</ThemedText>
-            <ThemedText type="default" themeColor="textSecondary">
-              Ask whoever set up the household for a code.
-            </ThemedText>
-          </View>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      <KeyboardAwareScrollView contentContainerStyle={authStyles.content}>
+        <AuthHeader
+          icon="enter"
+          title="Join a household"
+          subtitle="Enter the invite code a housemate sent you."
+        />
 
-          <View style={styles.form}>
-            <TextField
-              label="Invite code"
-              value={code}
-              onChangeText={(t) => {
-                setCode(formatCode(t));
-                setPreview(null);
-                setClaimId(null);
-              }}
-              placeholder="ABC-123"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              editable={!busy}
-              style={styles.codeInput}
-              error={preview ? undefined : (error ?? undefined)}
-            />
+        <View style={authStyles.form}>
+          <AuthField
+            label="Invite code"
+            icon="key-outline"
+            value={code}
+            onChangeText={(t) => {
+              setCode(formatCode(t));
+              setPreview(null);
+              setClaimId(null);
+              setCodeError(null);
+              setError(null);
+            }}
+            placeholder="Enter 6-character code"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            editable={!busy}
+            onSubmitEditing={checkCode}
+            returnKeyType="go"
+            inputStyle={code ? styles.codeInput : undefined}
+            hint={codeError ?? undefined}
+            hintTone={codeError ? 'danger' : 'neutral'}
+          />
 
-            {!preview ? (
-              <Button
+          {!preview ? (
+            <View style={styles.submit}>
+              <AuthButton
                 title="Check code"
                 onPress={checkCode}
-                loading={busy}
-                disabled={code.replace('-', '').length < 6}
+                busy={busy}
+                disabled={!codeComplete}
               />
-            ) : (
-              <>
-                <View
-                  style={[
-                    styles.confirm,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  ]}>
-                  <ThemedText type="smallBold" themeColor="textSecondary">
-                    JOINING
+            </View>
+          ) : (
+            <>
+              {/* What the code found, before anything else is asked. */}
+              <View style={[styles.found, { backgroundColor: theme.backgroundSelected }]}>
+                <View style={[styles.foundIcon, { backgroundColor: theme.primarySoft }]}>
+                  <Ionicons name="home-outline" size={20} color={theme.primary} />
+                </View>
+                <View style={styles.foundText}>
+                  <ThemedText themeColor="textSecondary" style={styles.small}>
+                    You’re joining
                   </ThemedText>
-                  <ThemedText type="default" style={styles.houseName}>
+                  <ThemedText style={styles.foundName} numberOfLines={2}>
                     {preview.household_name}
                   </ThemedText>
                 </View>
+              </View>
 
-                {preview.claimable.length > 0 ? (
-                  <View style={styles.claims}>
-                    <ThemedText type="smallBold" themeColor="textSecondary">
-                      WHICH ONE ARE YOU?
-                    </ThemedText>
+              {preview.claimable.length > 0 ? (
+                <View
+                  accessibilityRole="radiogroup"
+                  accessibilityLabel="Which one are you?"
+                  style={styles.claims}>
+                  <ThemedText themeColor="textSecondary" style={styles.label}>
+                    Which one are you?
+                  </ThemedText>
+                  <ThemedText themeColor="textTertiary" style={styles.small}>
+                    The owner may have added you already. Pick your name to keep your past expenses.
+                  </ThemedText>
 
-                    {preview.claimable.map((c) => (
-                      <ClaimRow
-                        key={c.id}
-                        label={c.display_name}
-                        selected={claimId === c.id}
-                        onPress={() => {
-                          setClaimId(c.id);
-                          setName(c.display_name);
-                        }}
-                      />
-                    ))}
-
+                  {preview.claimable.map((c) => (
                     <ClaimRow
-                      label="I'm someone new"
-                      selected={claimId === null}
-                      onPress={() => setClaimId(null)}
+                      key={c.id}
+                      label={c.display_name}
+                      selected={claimId === c.id}
+                      onPress={() => {
+                        setClaimId(c.id);
+                        setName(c.display_name);
+                      }}
                     />
-                  </View>
-                ) : null}
+                  ))}
 
-                <TextField
-                  label="Your name"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  editable={!busy}
-                  error={error ?? undefined}
-                />
+                  <ClaimRow
+                    label="I’m someone new"
+                    selected={claimId === null}
+                    onPress={() => setClaimId(null)}
+                  />
+                </View>
+              ) : null}
 
-                <Button
+              <AuthField
+                label="Your name"
+                icon="person-outline"
+                value={name}
+                onChangeText={(v) => {
+                  setName(v);
+                  setError(null);
+                }}
+                placeholder="Enter your name"
+                autoCapitalize="words"
+                editable={!busy}
+                onSubmitEditing={requestJoin}
+                returnKeyType="go"
+              />
+
+              {error ? <Notice tone="danger" message={error} /> : null}
+
+              <View style={styles.submit}>
+                <AuthButton
                   title="Request to join"
                   onPress={requestJoin}
-                  loading={busy}
+                  busy={busy}
                   disabled={!name.trim()}
                 />
-              </>
-            )}
-
-            <Button title="Back" variant="ghost" onPress={() => router.back()} disabled={busy} />
-          </View>
-        </KeyboardAwareScrollView>
+              </View>
+            </>
+          )}
+        </View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
 
+/**
+ * One choice in "which one are you?". Selection is shown in dark ink, not
+ * green: green means "correct" in this app, and picking your own name is a
+ * choice, not a right answer.
+ */
 function ClaimRow({
   label,
   selected,
@@ -197,61 +236,67 @@ function ClaimRow({
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         styles.claimRow,
         {
-          borderColor: selected ? theme.primary : theme.border,
-          backgroundColor: selected ? theme.backgroundSelected : 'transparent',
+          backgroundColor: selected ? theme.backgroundElement : theme.backgroundSelected,
+          borderColor: selected ? theme.text : 'transparent',
+          opacity: pressed ? 0.85 : 1,
         },
       ]}>
-      <View
-        style={[
-          styles.radio,
-          { borderColor: selected ? theme.primary : theme.border },
-          selected && { backgroundColor: theme.primary },
-        ]}
-      />
-      <ThemedText type="default">{label}</ThemedText>
+      <View style={[styles.radio, { borderColor: selected ? theme.text : theme.textTertiary }]}>
+        {selected ? <View style={[styles.radioDot, { backgroundColor: theme.text }]} /> : null}
+      </View>
+      <ThemedText style={styles.claimLabel}>{label}</ThemedText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.five,
-  },
-  header: { gap: Spacing.one },
-  form: { gap: Spacing.three },
-  codeInput: {
-    fontSize: 24,
-    letterSpacing: 4,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  confirm: {
-    borderRadius: 14,
-    borderWidth: 1,
+  submit: { marginTop: Spacing.one },
+  // Only once something is typed: spaced capitals read like the code in the
+  // message it was copied from, but would make the placeholder look shouty.
+  codeInput: { fontSize: 17, letterSpacing: 3, fontWeight: '500' },
+
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  small: { fontSize: 12.5, lineHeight: 17, fontWeight: '400' },
+
+  found: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     padding: Spacing.three,
-    gap: Spacing.half,
+    borderRadius: Radius.md,
   },
-  houseName: { fontWeight: '600' },
+  foundIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  foundText: { flex: 1, gap: 1 },
+  foundName: { fontSize: 16, lineHeight: 22, fontWeight: '500' },
+
   claims: { gap: Spacing.two },
   claimRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: Spacing.three,
+    minHeight: 50,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
   },
   radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 2,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  claimLabel: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
 });
