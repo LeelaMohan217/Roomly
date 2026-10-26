@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,8 @@ import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-v
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useDialog } from '@/components/ui/dialog';
+import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -32,6 +33,7 @@ const DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 
 export default function RecurringEditScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -141,15 +143,15 @@ export default function RecurringEditScreen() {
     onError: (e) => setError(humanError(e)),
   });
 
-  function confirmRemove() {
-    Alert.alert(
-      'Delete this recurring expense?',
-      'Expenses it has already posted stay exactly as they are — only future months stop.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
-      ]
-    );
+  async function confirmRemove() {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'trash-outline',
+      title: 'Delete this recurring expense?',
+      message: 'Expenses it has already posted stay exactly as they are — only future months stop.',
+      confirmLabel: 'Delete',
+    });
+    if (ok) remove.mutate();
   }
 
   return (
@@ -339,14 +341,7 @@ export default function RecurringEditScreen() {
             </Pressable>
           ) : null}
 
-          {error ? (
-            <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-              <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-              <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-                {error}
-              </ThemedText>
-            </View>
-          ) : null}
+          {error ? <Notice tone="danger" message={error} /> : null}
 
           <Button
             title={

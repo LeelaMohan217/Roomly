@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +28,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function OwnerScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const { member } = useSession();
   const isOwner = member?.role === 'owner';
@@ -69,19 +71,19 @@ export default function OwnerScreen() {
     },
     onError: (e) => {
       rejected();
-      Alert.alert('Could not hand over', humanError(e));
+      void dialog.alert({ tone: 'danger', title: 'Could not hand over', message: humanError(e) });
     },
   });
 
-  function confirmHandOver(id: string, who: string) {
-    Alert.alert(
-      `Make ${who} the owner?`,
-      `You become a regular member straight away. ${who} can hand it back to you whenever you want it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: `Hand over to ${who}`, onPress: () => transfer.mutate(id) },
-      ]
-    );
+  async function confirmHandOver(id: string, who: string) {
+    const ok = await dialog.confirm({
+      tone: 'warning',
+      icon: 'key-outline',
+      title: `Make ${who} the owner?`,
+      message: `You become a regular member straight away. ${who} can hand it back to you whenever you want it.`,
+      confirmLabel: `Hand over to ${who}`,
+    });
+    if (ok) transfer.mutate(id);
   }
 
   if (!isOwner) {

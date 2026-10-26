@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
   Pressable,
   StyleSheet,
   View,
@@ -15,6 +14,8 @@ import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-v
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
+import { Notice } from '@/components/ui/notice';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,6 +50,7 @@ const KINDS: { kind: Kind; label: string; blurb: string; icon: keyof typeof Ioni
 
 export default function CategoryEditScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -136,11 +138,15 @@ export default function CategoryEditScreen() {
     onError: (e) => setError(humanError(e)),
   });
 
-  function confirmRemove() {
-    Alert.alert('Delete this category?', 'Only possible if no expense has ever used it.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => remove.mutate() },
-    ]);
+  async function confirmRemove() {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'trash-outline',
+      title: 'Delete this category?',
+      message: 'Only possible if no expense has ever used it. This cannot be undone.',
+      confirmLabel: 'Delete',
+    });
+    if (ok) remove.mutate();
   }
 
   const inUse = (existing?.expenseCount ?? 0) > 0;
@@ -267,14 +273,7 @@ export default function CategoryEditScreen() {
             </View>
           ) : null}
 
-          {error ? (
-            <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-              <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-              <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-                {error}
-              </ThemedText>
-            </View>
-          ) : null}
+          {error ? <Notice tone="danger" message={error} /> : null}
 
           <Button
             title="Save"

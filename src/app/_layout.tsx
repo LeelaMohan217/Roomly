@@ -6,6 +6,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 
+import { DialogProvider } from '@/components/ui/dialog';
 // One source of truth for the colour scheme. The navigator theme and the
 // design tokens reading different hooks is how you get light cards on a dark
 // page.
@@ -48,7 +49,9 @@ export default function RootLayout() {
         persistOptions={{ persister, maxAge: 7 * DAY }}>
         <SessionProvider>
           <SyncProvider>
-            <RootNavigator />
+            <DialogProvider>
+              <RootNavigator />
+            </DialogProvider>
           </SyncProvider>
         </SessionProvider>
       </PersistQueryClientProvider>

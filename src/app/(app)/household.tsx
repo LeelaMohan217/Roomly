@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,7 +10,9 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
+import { Notice } from '@/components/ui/notice';
 import { Sheet } from '@/components/ui/sheet';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -23,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function HouseholdScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const queryClient = useQueryClient();
   const { member } = useSession();
   const isOwner = member?.role === 'owner';
@@ -85,13 +88,18 @@ export default function HouseholdScreen() {
       // A plain delete needs no announcement — they simply disappear. A
       // move-out does, because the name stays on every past expense.
       if (outcome === 'moved_out') {
-        Alert.alert(
-          `${name} has moved out`,
-          'Their past expenses and balances stay exactly as they are. They just will not be part of any new split.'
-        );
+        void dialog.alert({
+          tone: 'info',
+          icon: 'exit-outline',
+          title: `${name} has moved out`,
+          message:
+            'Their past expenses and balances stay exactly as they are. They just will not be part of any new split.',
+        });
+      } else {
+        dialog.toast({ message: `${name} removed` });
       }
     },
-    onError: (e) => Alert.alert('Could not remove', humanError(e)),
+    onError: (e) => void dialog.alert({ tone: 'danger', title: 'Could not remove', message: humanError(e) }),
   });
 
   const createInvite = useMutation({
@@ -110,19 +118,16 @@ export default function HouseholdScreen() {
     onError: (e) => setError(humanError(e)),
   });
 
-  function confirmRemove(id: string, who: string) {
-    Alert.alert(
-      `Remove ${who}?`,
-      'If they have no expenses yet they are removed outright. If they do, their history stays and they are marked as moved out instead.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => removeMember.mutate({ id, name: who }),
-        },
-      ]
-    );
+  async function confirmRemove(id: string, who: string) {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'person-remove-outline',
+      title: `Remove ${who}?`,
+      message:
+        'If they have no expenses yet they are removed outright. If they do, their history stays and they are marked as moved out instead.',
+      confirmLabel: 'Remove',
+    });
+    if (ok) removeMember.mutate({ id, name: who });
   }
 
   const list = members.data ?? [];
@@ -250,14 +255,7 @@ export default function HouseholdScreen() {
           </View>
         </Pressable>
 
-        {error ? (
-          <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-            <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-              {error}
-            </ThemedText>
-          </View>
-        ) : null}
+        {error ? <Notice tone="danger" message={error} /> : null}
 
         <Button
           title="Add to household"
@@ -311,14 +309,7 @@ export default function HouseholdScreen() {
             {/* The error state was written here but rendered only inside the
                 Add-a-housemate sheet, so a failed "Create a code" stopped its
                 spinner and did nothing else — forever. */}
-            {error ? (
-              <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-                <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-                <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-                  {error}
-                </ThemedText>
-              </View>
-            ) : null}
+            {error ? <Notice tone="danger" message={error} /> : null}
             <Button
               title="Create a code"
               onPress={() => createInvite.mutate()}

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,6 +10,8 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
+import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +29,7 @@ const MONTHS = [
 
 export default function MonthStatementScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -72,26 +75,29 @@ export default function MonthStatementScreen() {
     onError: (e) => setError(humanError(e)),
   });
 
-  function confirmClose() {
-    Alert.alert(
-      `Close ${MONTHS[month - 1]}?`,
-      'Expenses in a closed month can no longer be edited without your approval. This is the point everyone squares up.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Close month', style: 'destructive', onPress: () => close.mutate() },
-      ]
-    );
+  // Amber, not red: closing and reopening are consequential but reversible.
+  async function confirmClose() {
+    const ok = await dialog.confirm({
+      tone: 'warning',
+      icon: 'lock-closed-outline',
+      title: `Close ${MONTHS[month - 1]}?`,
+      message:
+        'Expenses in a closed month can no longer be edited without your approval. This is the point everyone squares up.',
+      confirmLabel: 'Close month',
+    });
+    if (ok) close.mutate();
   }
 
-  function confirmReopen() {
-    Alert.alert(
-      `Reopen ${MONTHS[month - 1]}?`,
-      'Everyone agreed on these figures when the month closed. Reopening lets them change again — do it to correct a genuine mistake, then close it back.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reopen month', onPress: () => reopen.mutate() },
-      ]
-    );
+  async function confirmReopen() {
+    const ok = await dialog.confirm({
+      tone: 'warning',
+      icon: 'lock-open-outline',
+      title: `Reopen ${MONTHS[month - 1]}?`,
+      message:
+        'Everyone agreed on these figures when the month closed. Reopening lets them change again — do it to correct a genuine mistake, then close it back.',
+      confirmLabel: 'Reopen month',
+    });
+    if (ok) reopen.mutate();
   }
 
   const label = `${MONTHS[month - 1]} ${year}`;
@@ -271,14 +277,7 @@ export default function MonthStatementScreen() {
           </>
         )}
 
-        {error ? (
-          <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="alert-circle-outline" size={15} color={theme.danger} />
-            <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-              {error}
-            </ThemedText>
-          </View>
-        ) : null}
+        {error ? <Notice tone="danger" message={error} /> : null}
 
         <Button
           title="See all payments"

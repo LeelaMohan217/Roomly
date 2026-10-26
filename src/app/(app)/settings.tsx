@@ -3,13 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useUpdates } from 'expo-updates';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useMembers } from '@/lib/queries';
@@ -28,6 +29,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function SettingsScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const { member, session, signOut } = useSession();
   const members = useMembers();
@@ -47,7 +49,7 @@ export default function SettingsScreen() {
 
     // Success needs no alert -- the share sheet opening IS the feedback, and a
     // dialog behind it would be waiting when they come back from WhatsApp.
-    if (!result.ok) Alert.alert('Could not export', result.reason);
+    if (!result.ok) void dialog.alert({ tone: 'danger', title: 'Could not export', message: result.reason });
   }
 
   // isUpdatePending lives on this hook in SDK 57, not on the Updates module.
@@ -64,16 +66,18 @@ export default function SettingsScreen() {
     // 'pending' means it is already on the phone from a background fetch on a
     // previous launch, so it needs the same offer as one downloaded just now.
     if (outcome.kind === 'downloaded' || outcome.kind === 'pending') {
-      Alert.alert(
-        'Update ready',
-        outcome.kind === 'pending'
-          ? 'A newer version is already downloaded. Restart the app to use it?'
-          : 'Restart the app to use it?',
-        [
-          { text: 'Later', style: 'cancel' },
-          { text: 'Restart now', onPress: () => void applyUpdate() },
-        ]
-      );
+      const restart = await dialog.confirm({
+        tone: 'success',
+        icon: 'cloud-download-outline',
+        title: 'Update ready',
+        message:
+          outcome.kind === 'pending'
+            ? 'A newer version is already downloaded. Restart the app to use it?'
+            : 'Restart the app to use it?',
+        confirmLabel: 'Restart now',
+        cancelLabel: 'Later',
+      });
+      if (restart) void applyUpdate();
       return;
     }
 
@@ -99,7 +103,13 @@ Running ${buildLabel()}.`;
             ? `Could not reach the update server. Check your connection and try again.${stamp}`
             : `No update has been published yet, so this is the newest version there is.${stamp}`;
 
-    Alert.alert('Updates', message);
+    // Green when there is simply nothing newer, amber when something stopped
+    // the check, blue when this build just cannot take updates.
+    void dialog.alert({
+      tone: outcome.kind === 'offline' ? 'warning' : outcome.kind === 'unavailable' ? 'info' : 'success',
+      title: outcome.kind === 'offline' ? 'Could not check' : 'Updates',
+      message,
+    });
   }
 
   const isOwner = member?.role === 'owner';
@@ -118,11 +128,15 @@ Running ${buildLabel()}.`;
     },
   });
 
-  function confirmSignOut() {
-    Alert.alert('Sign out?', 'Your household and expenses stay exactly as they are.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-    ]);
+  async function confirmSignOut() {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'log-out-outline',
+      title: 'Sign out?',
+      message: 'Your household and expenses stay exactly as they are.',
+      confirmLabel: 'Sign out',
+    });
+    if (ok) void signOut();
   }
 
   return (

@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -253,14 +254,7 @@ export default function PairHistoryScreen() {
           }}
           ListFooterComponent={
             <View style={styles.footer}>
-              {error ? (
-                <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-                  <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-                  <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-                    {error}
-                  </ThemedText>
-                </View>
-              ) : null}
+              {error ? <Notice tone="danger" message={error} /> : null}
 
               <Button
                 title={exporting ? 'Preparing…' : 'Download as CSV'}
@@ -337,11 +331,4 @@ const styles = StyleSheet.create({
   },
 
   footer: { gap: Spacing.two, paddingTop: Spacing.four },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-  },
 });

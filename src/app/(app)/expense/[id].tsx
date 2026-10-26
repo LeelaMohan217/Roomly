@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExpenseForm, type ExpenseFormValues } from '@/components/expense-form';
@@ -12,6 +12,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -24,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function ExpenseDetailScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -159,21 +161,27 @@ export default function ExpenseDetailScreen() {
     onError: (err) => setError(humanError(err)),
   });
 
-  function confirmRemove() {
-    Alert.alert(
-      canEditNow ? 'Delete this expense?' : 'Request deletion?',
+  async function confirmRemove() {
+    // Red when it happens now; amber when it is only a request the owner
+    // still has to approve.
+    const ok = await dialog.confirm(
       canEditNow
-        ? 'It stays in the history as deleted, and drops out of everyone’s balance.'
-        : 'The owner has to approve before it is removed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: canEditNow ? 'Delete' : 'Request',
-          style: canEditNow ? 'destructive' : 'default',
-          onPress: () => remove.mutate(),
-        },
-      ]
+        ? {
+            tone: 'danger',
+            icon: 'trash-outline',
+            title: 'Delete this expense?',
+            message: 'It stays in the history as deleted, and drops out of everyone’s balance.',
+            confirmLabel: 'Delete',
+          }
+        : {
+            tone: 'warning',
+            icon: 'hand-left-outline',
+            title: 'Request deletion?',
+            message: 'The owner has to approve before it is removed.',
+            confirmLabel: 'Send request',
+          }
     );
+    if (ok) remove.mutate();
   }
 
   if (!e) {

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { TextField } from '@/components/ui/text-field';
 import { AVATAR_COLORS, Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +28,7 @@ import { supabase } from '@/lib/supabase';
  */
 export default function AccountEditScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const queryClient = useQueryClient();
   const { member, session, refresh } = useSession();
   const members = useMembers();
@@ -71,8 +73,9 @@ export default function AccountEditScreen() {
       setColor(null);
       await refresh();
       void queryClient.invalidateQueries();
+      dialog.toast({ message: 'Profile saved' });
     },
-    onError: (e) => Alert.alert('Could not save', message(e)),
+    onError: (e) => void dialog.alert({ tone: 'danger', title: 'Could not save', message: message(e) }),
   });
 
   const saveHousehold = useMutation({
@@ -87,8 +90,11 @@ export default function AccountEditScreen() {
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Only the owner can rename the household.');
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
-    onError: (e) => Alert.alert('Could not rename', message(e)),
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
+      dialog.toast({ message: 'Household renamed' });
+    },
+    onError: (e) => void dialog.alert({ tone: 'danger', title: 'Could not rename', message: message(e) }),
   });
 
   const changeEmail = useMutation({
@@ -97,13 +103,16 @@ export default function AccountEditScreen() {
       if (error) throw error;
     },
     onSuccess: () => {
-      Alert.alert(
-        'Check your new inbox',
-        `We sent a confirmation link to ${email.trim()}. Your sign-in email changes once you open it.`
-      );
+      void dialog.alert({
+        tone: 'info',
+        icon: 'mail-unread-outline',
+        title: 'Check your new inbox',
+        message: `We sent a confirmation link to ${email.trim()}. Your sign-in email changes once you open it.`,
+      });
       setEmail('');
     },
-    onError: (e) => Alert.alert('Could not change email', message(e)),
+    onError: (e) =>
+      void dialog.alert({ tone: 'danger', title: 'Could not change email', message: message(e) }),
   });
 
   const changePassword = useMutation({
@@ -112,10 +121,11 @@ export default function AccountEditScreen() {
       if (error) throw error;
     },
     onSuccess: () => {
-      Alert.alert('Password changed', 'Any other device will need the new password.');
+      dialog.toast({ message: 'Password changed. Other devices will need the new one.' });
       setPassword('');
     },
-    onError: (e) => Alert.alert('Could not change password', message(e)),
+    onError: (e) =>
+      void dialog.alert({ tone: 'danger', title: 'Could not change password', message: message(e) }),
   });
 
   const trimmedName = name.trim();

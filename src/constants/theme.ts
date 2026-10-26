@@ -29,10 +29,21 @@ export const Colors = {
     primarySoft: '#E7F5EF',
     onPrimary: '#FFFFFF',
 
+    // Status colours. Each one means the same thing on every screen: green is
+    // done or good, red is failed or destructive, amber is "careful", blue is
+    // just information. The `on*` colour is the text on a filled button.
+    success: '#0E9A6C',
+    successSoft: '#E7F5EF',
+    onSuccess: '#FFFFFF',
     danger: '#DC2626',
     dangerSoft: '#FDEDED',
+    onDanger: '#FFFFFF',
     warning: '#B45309',
     warningSoft: '#FDF3E4',
+    onWarning: '#FFFFFF',
+    info: '#2563EB',
+    infoSoft: '#EAF1FE',
+    onInfo: '#FFFFFF',
 
     positive: '#0E9A6C',
     negative: '#DC2626',
@@ -76,10 +87,19 @@ export const Colors = {
     primarySoft: '#10281F',
     onPrimary: '#04231A',
 
+    // Lifted for dark mode, so filled buttons carry DARK text instead of white.
+    success: '#3ECF8E',
+    successSoft: '#10281F',
+    onSuccess: '#04231A',
     danger: '#F26D6D',
     dangerSoft: '#291517',
+    onDanger: '#2B0A0A',
     warning: '#F0B23C',
     warningSoft: '#2A2011',
+    onWarning: '#2A1B00',
+    info: '#60A5FA',
+    infoSoft: '#132036',
+    onInfo: '#071A33',
 
     positive: '#3ECF8E',
     negative: '#F26D6D',

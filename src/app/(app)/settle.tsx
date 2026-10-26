@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -56,6 +57,7 @@ type SettleView = 'owe' | 'owed' | 'plan';
 
 export default function SettleScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -259,7 +261,7 @@ export default function SettleScreen() {
   const paying = (t: Transfer) =>
     markPaid.isPending && markPaid.variables?.from === t.from && markPaid.variables?.to === t.to;
 
-  function confirmPaid(t: Transfer, kind: TransferKind) {
+  async function confirmPaid(t: Transfer, kind: TransferKind) {
     // Whether this counts immediately turns on whether YOU were the one paid,
     // not on whether you are the owner. Recording money you received is its own
     // confirmation; recording money you sent is a claim the payee has to agree
@@ -284,10 +286,15 @@ export default function SettleScreen() {
               'Record it',
             ];
 
-    Alert.alert(title, body + note, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: action, onPress: () => markPaid.mutate(t) },
-    ]);
+    // Green: recording money that moved is the good outcome, not a risk.
+    const ok = await dialog.confirm({
+      tone: 'success',
+      icon: 'cash-outline',
+      title,
+      message: body + note,
+      confirmLabel: action,
+    });
+    if (ok) markPaid.mutate(t);
   }
 
   return (

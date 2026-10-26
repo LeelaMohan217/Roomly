@@ -8,6 +8,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -403,14 +404,7 @@ export function ExpenseForm({
         ) : null}
       </View>
 
-      {error ?? splitError ? (
-        <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-          <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-          <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-            {error ?? splitError}
-          </ThemedText>
-        </View>
-      ) : null}
+      {error ?? splitError ? <Notice tone="danger" message={(error ?? splitError)!} /> : null}
 
       <Button
         title={amountPaise ? `${submitLabel} ${formatPaise(amountPaise)}` : submitLabel}

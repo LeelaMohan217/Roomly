@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -9,7 +9,9 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
+import { Notice } from '@/components/ui/notice';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -24,6 +26,7 @@ const PALETTE = ['#4F7DF0', '#12A594', '#E0862C', '#8B6DE0', '#D9557F', '#3A9E6E
 
 export default function AwayScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const queryClient = useQueryClient();
   const { member } = useSession();
 
@@ -153,11 +156,15 @@ export default function AwayScreen() {
     onError: (e) => setError(humanError(e)),
   });
 
-  function confirmRemove(id: string, label: string) {
-    Alert.alert('Remove this trip?', `${label}\n\nSplits already saved won't change.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(id) },
-    ]);
+  async function confirmRemove(id: string, label: string) {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'trash-outline',
+      title: 'Remove this trip?',
+      message: `${label}\n\nSplits already saved won't change.`,
+      confirmLabel: 'Remove',
+    });
+    if (ok) remove.mutate(id);
   }
 
   const nights = start && end ? daysBetween(start, end) : start ? 1 : 0;
@@ -307,14 +314,7 @@ export default function AwayScreen() {
           </View>
         ) : null}
 
-        {error ? (
-          <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="alert-circle-outline" size={15} color={theme.danger} />
-            <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-              {error}
-            </ThemedText>
-          </View>
-        ) : null}
+        {error ? <Notice tone="danger" message={error} /> : null}
 
         <View style={styles.section}>
           <ThemedText themeColor="textTertiary" style={Type.label}>

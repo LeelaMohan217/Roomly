@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -248,14 +249,7 @@ export default function RecurringScreen() {
           </View>
         ) : null}
 
-        {error ? (
-          <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="alert-circle-outline" size={15} color={theme.danger} />
-            <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-              {error}
-            </ThemedText>
-          </View>
-        ) : null}
+        {error ? <Notice tone="danger" message={error} /> : null}
 
         <View style={styles.section}>
           <ThemedText themeColor="textTertiary" style={Type.label}>
@@ -413,12 +407,5 @@ const styles = StyleSheet.create({
   },
   glyph: { fontSize: 18 },
 
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-  },
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
 });
