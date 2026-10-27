@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -26,7 +25,6 @@ import {
   canPayByUpi,
   listPayApps,
   openPayApp,
-  pasteableAmount,
   type PayApp,
 } from '@/lib/pay-apps';
 import {
@@ -316,8 +314,8 @@ export default function SettleScreen() {
   /**
    * Pay: the phone's own UPI apps, one tap from the payment you owe.
    *
-   * Roomly opens the app and copies the amount; who to pay is picked inside
-   * the app, since Roomly keeps no UPI IDs. Whether the money moved cannot be
+   * Roomly opens the app; who to pay and how much are entered inside it,
+   * since Roomly keeps no UPI IDs. Whether the money moved cannot be
    * read back, so coming back to Roomly asks -- and a yes records it exactly
    * as "I have paid this" does, still for the payee to confirm.
    */
@@ -333,8 +331,7 @@ export default function SettleScreen() {
     void listPayApps().then(setPayApps);
   }
 
-  async function payWith(t: Transfer, app: PayApp) {
-    await Clipboard.setStringAsync(pasteableAmount(t.amountPaise));
+  function payWith(t: Transfer, app: PayApp) {
     setPayFor(null);
     awayFor.current = t;
     if (!openPayApp(app.packageName)) {
@@ -700,7 +697,7 @@ export default function SettleScreen() {
                     key={app.packageName}
                     accessibilityRole="button"
                     accessibilityLabel={`Pay with ${app.label}`}
-                    onPress={() => void payWith(payFor, app)}
+                    onPress={() => payWith(payFor, app)}
                     style={({ pressed }) => [styles.payTile, { opacity: pressed ? 0.6 : 1 }]}>
                     {app.icon ? (
                       <Image source={{ uri: app.icon }} style={styles.payIcon} contentFit="contain" />
@@ -721,14 +718,6 @@ export default function SettleScreen() {
                 ))}
               </View>
             )}
-
-            {/* Blue: information, not a warning. */}
-            <View style={[styles.payNote, { backgroundColor: theme.infoSoft }]}>
-              <Ionicons name="copy-outline" size={15} color={theme.info} />
-              <ThemedText style={[Type.micro, { color: theme.info, flex: 1 }]}>
-                The amount is copied when you pick an app
-              </ThemedText>
-            </View>
           </>
         ) : null}
       </Sheet>
@@ -1241,13 +1230,14 @@ function routingNotes(pair: PairNet, them: string): string[] {
 }
 
 /**
- * The one button on this screen: a small, soft pill. Green for the thing to
- * do, grey for the alternative beside it, and grey with muted words once it
- * is already sent and waiting -- same place and shape, so a sent payment
- * reads as a status rather than a vanished button.
+ * The one button on this screen: a compact pill. Solid green with white words
+ * for the thing to do; outlined for the alternative beside it; flat grey with
+ * muted words once it is already sent and waiting -- same place and shape, so
+ * a sent payment reads as a status rather than a vanished button.
  *
- * Deliberately quiet: no outline, medium weight, compact. The screen used
- * full-width solid buttons, which made every row shout.
+ * Solid and outlined, not the pale tints this used to be: a pale green pill
+ * next to a pale grey one read as two tags, not as something to press. Still
+ * compact, so a plan with three payments does not become three slabs.
  */
 function PillButton({
   title,
@@ -1268,10 +1258,23 @@ function PillButton({
   onTint?: boolean;
 }) {
   const theme = useTheme();
-  const live = tone === 'primary' ? theme.brandInk : theme.text;
-  const ink = disabled ? theme.textTertiary : live;
-  const soft = tone === 'primary' ? theme.primarySoft : theme.backgroundSelected;
-  const fill = onTint ? theme.backgroundElement : soft;
+  // On the green balance card a solid green pill would vanish, so there it
+  // is white with green words instead.
+  const solid = tone === 'primary' && !onTint;
+  const ink = disabled
+    ? theme.textTertiary
+    : solid
+      ? theme.onPrimary
+      : onTint
+        ? theme.brandInk
+        : theme.text;
+  const fill = disabled
+    ? theme.backgroundSelected
+    : solid
+      ? theme.primary
+      : onTint
+        ? theme.backgroundElement
+        : 'transparent';
 
   return (
     <Pressable
@@ -1282,11 +1285,11 @@ function PillButton({
       hitSlop={6}
       style={({ pressed }) => [
         styles.pill,
-        {
-          backgroundColor: disabled ? theme.backgroundSelected : theme.backgroundElement,
-          opacity: pressed ? 0.7 : 1,
-        },
-        !disabled && { backgroundColor: fill },
+        { backgroundColor: fill, opacity: pressed ? 0.75 : 1 },
+        // The alternative is outlined, so it still reads as a button.
+        // textTertiary rather than borderStrong: borderStrong is a card edge,
+        // and around a pill it was too faint to read as a button.
+        !disabled && !solid && !onTint && [styles.pillOutline, { borderColor: theme.textTertiary }],
       ]}>
       {loading ? (
         <ActivityIndicator size="small" color={ink} />
@@ -1461,13 +1464,16 @@ const styles = StyleSheet.create({
   },
   planFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pill: {
-    minHeight: 32,
-    paddingHorizontal: Spacing.three - 2,
+    minHeight: 36,
+    paddingHorizontal: Spacing.three + 2,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pillText: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  // 1px, not a hairline: a hairline on a dark card was too faint to read as
+  // an edge.
+  pillOutline: { borderWidth: 1 },
+  pillText: { fontSize: 14, lineHeight: 19, fontWeight: '600' },
   pillInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
 
   payAmount: { alignItems: 'center', gap: 2 },
@@ -1478,14 +1484,6 @@ const styles = StyleSheet.create({
   payIcon: { width: 52, height: 52, borderRadius: 14 },
   payIconBlank: { alignItems: 'center', justifyContent: 'center' },
   payLabel: { fontSize: 12, lineHeight: 16, textAlign: 'center', paddingHorizontal: 2 },
-  payNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
   // A row of pills, pushed to the right of the card.
   pillRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },

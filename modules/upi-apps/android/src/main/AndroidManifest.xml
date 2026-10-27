@@ -1,12 +1,33 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <!-- Android 11+ hides other apps unless the APK says which kind it looks
-       for. This asks for exactly one kind: apps that open upi:// links. It
-       does not need (and must not use) the "see every installed app"
-       permission, which Play Store review rejects for an app like this. Merged into the app's manifest. -->
+       for. This asks for apps that open upi:// links. It does not need (and
+       must not use) the "see every installed app" permission, which Play
+       Store review rejects for an app like this. Merged into the app's
+       manifest.
+
+       Two link forms, because Android matches these against each app's own
+       intent filter literally. The first reads as the bare link "upi:",
+       which an app whose filter also names the host (scheme upi, host pay)
+       does not match: the likely reason Paytm and super.money were missing
+       on build 14. The second names the host too.
+
+       The packages below are the UPI apps nearly everyone uses, named
+       outright so they are visible whatever their filters say. A listed app
+       still only appears in the sheet if it actually opens upi links.
+
+       No double hyphens anywhere in this comment: XML forbids them inside
+       comments, and the build fails to parse the file. -->
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW" />
       <data android:scheme="upi" />
     </intent>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="upi" android:host="pay" />
+    </intent>
+    <package android:name="com.google.android.apps.nbu.paisa.user" />
+    <package android:name="com.phonepe.app" />
+    <package android:name="net.one97.paytm" />
   </queries>
 </manifest>

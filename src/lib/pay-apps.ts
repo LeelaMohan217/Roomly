@@ -44,14 +44,3 @@ export function openPayApp(packageName: string): boolean {
     return false;
   }
 }
-
-/**
- * The amount as a payment app's amount box wants it pasted: digits and at
- * most two decimals, no rupee sign, no grouping commas. 124000 -> "1240",
- * 124050 -> "1240.50".
- */
-export function pasteableAmount(paise: number): string {
-  const rupees = Math.floor(paise / 100);
-  const rest = paise % 100;
-  return rest === 0 ? String(rupees) : `${rupees}.${String(rest).padStart(2, '0')}`;
-}

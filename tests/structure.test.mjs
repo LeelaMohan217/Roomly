@@ -711,6 +711,8 @@ check(
 check(
   'the APK asks only for UPI apps, not every installed app',
   /android:scheme="upi"/.test(read('modules', 'upi-apps', 'android', 'src', 'main', 'AndroidManifest.xml')) &&
+    // Apps whose filter names the host too (upi://pay) only match a query that does.
+    /android:scheme="upi" android:host="pay"/.test(read('modules', 'upi-apps', 'android', 'src', 'main', 'AndroidManifest.xml')) &&
     !/QUERY_ALL_PACKAGES/.test(read('modules', 'upi-apps', 'android', 'src', 'main', 'AndroidManifest.xml')),
   'the manifest is missing the upi <queries> entry, or asks for QUERY_ALL_PACKAGES'
 );
@@ -1072,8 +1074,8 @@ check(
     'the pending state is not the same colour as the live one',
     // The plan's action is a PillButton since the Settle redesign: both its
     // fill and its ink change between the live and the waiting state.
-    /disabled \? theme\.backgroundSelected : theme\.backgroundElement/.test(settle) &&
-      /disabled \? theme\.textTertiary : live/.test(settle),
+    /const fill = disabled\s*\?\s*theme\.backgroundSelected/.test(settle) &&
+      /const ink = disabled\s*\?\s*theme\.textTertiary/.test(settle),
     'opacity is the only difference between "do this" and "already done"'
   );
   check(
