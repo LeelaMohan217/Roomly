@@ -20,8 +20,10 @@ export function TextField({ label, hint, error, secure = false, style, ...rest }
   return (
     <View style={styles.wrapper}>
       {label ? (
-        <ThemedText themeColor="textTertiary" style={Type.label}>
-          {label.toUpperCase()}
+        // Sentence case, as AuthField's labels: spaced capitals clipped their
+        // last letter on Android, and sat oddly beside the phone field.
+        <ThemedText themeColor="textSecondary" style={styles.label}>
+          {label}
         </ThemedText>
       ) : null}
 
@@ -71,6 +73,7 @@ export function TextField({ label, hint, error, secure = false, style, ...rest }
 
 const styles = StyleSheet.create({
   wrapper: { gap: Spacing.two },
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
   field: {
     flexDirection: 'row',
     alignItems: 'center',
