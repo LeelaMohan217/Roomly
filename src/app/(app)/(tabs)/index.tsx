@@ -142,21 +142,25 @@ function BalanceCard({
 }
 
 /**
- * One of the two small cards under the balance: whose money, this month's
- * figure, and last month's as a quiet footnote. Three lines and nothing else
- * -- the earlier versions carried an icon, a rule, a pill or a second
- * labelled figure, and felt cramped next to the clean green card above.
+ * One of the two small cards under the balance: whose money with its icon on
+ * the same line, this month's figure, a rule, and last month's figure.
  *
- * No month on the label: the big figure is plainly this month's, and the
- * footnote names its own ("Sept ₹68,825"). Whole rupees here
- * (formatWholeRupees): it's a glance at a month's spending. History has the
- * exact figures.
+ * Two greens, one per card -- mint for the household, a soft lime for you --
+ * so the pair stays on-brand yet reads as two different things; each tone
+ * carries its own darker ink from the theme. No month on the label: the big
+ * figure is plainly this month's, and the footnote names its own ("Sept
+ * ₹68,825"). Whole rupees here (formatWholeRupees): it's a glance at a
+ * month's spending. History has the exact figures.
  */
 function SmallCard({
+  tone,
+  icon,
   label,
   value,
   compare,
 }: {
+  tone: 'house' | 'share';
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
   /** Whose money: "Household", "Your share". */
   label: string;
   value?: string;
@@ -164,15 +168,42 @@ function SmallCard({
   compare?: string;
 }) {
   const theme = useTheme();
+  const c =
+    tone === 'house'
+      ? {
+          card: theme.houseCard,
+          edge: theme.houseEdge,
+          ink: theme.houseInk,
+          muted: theme.houseMuted,
+          icon: theme.houseIcon,
+          chip: theme.houseChip,
+          rule: theme.houseRule,
+        }
+      : {
+          card: theme.shareCard,
+          edge: theme.shareEdge,
+          ink: theme.shareInk,
+          muted: theme.shareMuted,
+          icon: theme.shareIcon,
+          chip: theme.shareChip,
+          rule: theme.shareRule,
+        };
 
   return (
-    <View style={[styles.smallCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-      <ThemedText themeColor="textSecondary" style={styles.smallLabel} numberOfLines={1}>
-        {label}
-      </ThemedText>
+    <View style={[styles.smallCard, { backgroundColor: c.card, borderColor: c.edge }]}>
+      {/* Label left, icon right, tops level: one line, not a tile stacked
+          over the text. */}
+      <View style={styles.smallHead}>
+        <ThemedText style={[styles.smallLabel, { color: c.muted }]} numberOfLines={1}>
+          {label}
+        </ThemedText>
+        <View style={[styles.smallIcon, { backgroundColor: c.chip }]}>
+          <MaterialCommunityIcons name={icon} size={16} color={c.icon} />
+        </View>
+      </View>
       {value ? (
         <ThemedText
-          style={styles.smallValue}
+          style={[styles.smallValue, { color: c.ink }]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.7}>
@@ -180,16 +211,17 @@ function SmallCard({
         </ThemedText>
       ) : (
         <View style={styles.smallValueSkeleton}>
-          <Skeleton width="70%" height={22} radius={Radius.sm} />
+          <Skeleton width="70%" height={22} radius={Radius.sm} tint={c.edge} />
         </View>
       )}
+      <View style={[styles.smallRule, { backgroundColor: c.rule }]} />
       {compare ? (
-        <ThemedText themeColor="textTertiary" style={styles.smallFoot} numberOfLines={1}>
+        <ThemedText style={[styles.smallFoot, { color: c.muted }]} numberOfLines={1}>
           {compare}
         </ThemedText>
       ) : (
         <View style={styles.smallFootSkeleton}>
-          <Skeleton width={70} height={11} />
+          <Skeleton width={70} height={11} tint={c.edge} />
         </View>
       )}
     </View>
@@ -421,6 +453,8 @@ export default function HomeScreen() {
 
           <View style={styles.smallCards}>
             <SmallCard
+              tone="house"
+              icon="home-outline"
               label="Household"
               value={spend.data ? formatWholeRupees(spend.data.roomMonthPaise) : undefined}
               compare={
@@ -430,6 +464,8 @@ export default function HomeScreen() {
               }
             />
             <SmallCard
+              tone="share"
+              icon="account-outline"
               label="Your share"
               value={spend.data ? formatWholeRupees(spend.data.myMonthPaise) : undefined}
               compare={
@@ -823,14 +859,25 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three + Spacing.one,
     gap: Spacing.one,
   },
-  smallLabel: { fontSize: 14, lineHeight: 19, fontWeight: '500' },
+  // The label and its icon on one line, centred on each other: top-aligned,
+  // the text's line box put its letters visibly below the tile's top edge.
+  smallHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  smallLabel: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  smallIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallRule: { height: StyleSheet.hairlineWidth, marginTop: Spacing.two + Spacing.one, marginBottom: Spacing.one },
   // The one big thing in the card, so the room around it does the work.
   smallValue: { fontSize: 26, lineHeight: 33, fontWeight: '600', letterSpacing: -0.6 },
   smallValueSkeleton: { height: 33, justifyContent: 'center' },
   // Regular weight: ThemedText's default 500 made the footnote compete with
   // the label above it.
-  smallFoot: { fontSize: 13, lineHeight: 18, fontWeight: '400', marginTop: Spacing.one },
-  smallFootSkeleton: { height: 18, marginTop: Spacing.one, justifyContent: 'center' },
+  smallFoot: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  smallFootSkeleton: { height: 18, justifyContent: 'center' },
   rowSkeletonText: { gap: 6 },
 
   banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },

@@ -91,6 +91,25 @@ export const Colors = {
     balancePositive: '#FFFFFF',
     balanceNegative: '#FFD5D5',
 
+    // Home's two small cards, two greens so they stay on-brand yet read as
+    // different things: mint for the household, a soft lime for you. Each
+    // carries its own darker ink -- muted labels 5.4:1 and 6.5:1, amounts
+    // 12:1+ -- and a white icon tile.
+    houseCard: '#DDF3E8',
+    houseEdge: '#C9EBDA',
+    houseInk: '#06301F',
+    houseMuted: '#2F6B56',
+    houseIcon: '#087A55',
+    houseChip: '#FFFFFF',
+    houseRule: 'rgba(6,48,31,0.12)',
+    shareCard: '#EEF7D9',
+    shareEdge: '#DFEDBF',
+    shareInk: '#1F2A06',
+    shareMuted: '#4A5E1A',
+    shareIcon: '#4D6B0A',
+    shareChip: '#FFFFFF',
+    shareRule: 'rgba(31,42,6,0.12)',
+
     // The floating tab bar's drawn shadow, two layers of this.
     barShadow: 'rgba(16,24,40,0.06)',
 
@@ -161,6 +180,22 @@ export const Colors = {
     balanceRule: 'rgba(255,255,255,0.16)',
     balancePositive: '#3ECF8E',
     balanceNegative: '#FCA5A5',
+
+    // Deep green and deep olive, with pale ink (12:1+) and brighter icons.
+    houseCard: '#10281F',
+    houseEdge: '#1B4A38',
+    houseInk: '#ECFDF5',
+    houseMuted: '#A7F3D0',
+    houseIcon: '#3ECF8E',
+    houseChip: '#1B4A38',
+    houseRule: 'rgba(167,243,208,0.16)',
+    shareCard: '#1D2410',
+    shareEdge: '#33401A',
+    shareInk: '#F7FEE7',
+    shareMuted: '#D6EFA3',
+    shareIcon: '#BEF264',
+    shareChip: '#33401A',
+    shareRule: 'rgba(214,239,163,0.16)',
 
     barShadow: 'rgba(0,0,0,0.45)',
 
