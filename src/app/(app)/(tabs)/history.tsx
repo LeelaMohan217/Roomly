@@ -289,7 +289,9 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
-  top: { paddingHorizontal: Spacing.four, gap: Spacing.two },
+  // Bottom padding so rows scrolling up stop short of the search bar instead
+  // of sliding right under its edge.
+  top: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.three, gap: Spacing.two },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,7 +316,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
     paddingHorizontal: Spacing.one,
-    marginTop: Spacing.four,
+    marginTop: Spacing.three,
     marginBottom: Spacing.one,
   },
   monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
