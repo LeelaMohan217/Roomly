@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatRange } from '@/lib/dates';
+import { addDays, formatRange, todayIso } from '@/lib/dates';
 import { activeFilterCount, useHistoryFilters } from '@/lib/history-filters';
 import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
@@ -21,8 +21,11 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** "27 Oct" -- the month is already in the section header above it. */
-function shortDate(iso: string): string {
+/** "Today", "Yesterday", else "25 Oct" -- the heading over one day's list. */
+function dayLabel(iso: string): string {
+  const today = todayIso();
+  if (iso === today) return 'Today';
+  if (iso === addDays(today, -1)) return 'Yesterday';
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -63,19 +66,24 @@ export default function HistoryScreen() {
         [e.description ?? '', e.categoryName, e.paidByName].join(' ').toLowerCase().includes(needle))
   );
 
-  // Rows arrive newest first, so months come out in order as they're met.
-  const sections = Object.entries(
-    shown.reduce<Record<string, Expense[]>>((acc, e) => {
-      (acc[e.expenseDate.slice(0, 7)] ??= []).push(e);
-      return acc;
-    }, {})
-  ).map(([key, data]) => {
+  // Rows arrive newest first, so months -- and the days inside each -- come
+  // out in order as they're met. A section is a month; its items are days,
+  // each drawn as one grouped list.
+  const byKey = (rows: Expense[], keyOf: (e: Expense) => string) =>
+    Object.entries(
+      rows.reduce<Record<string, Expense[]>>((acc, e) => {
+        (acc[keyOf(e)] ??= []).push(e);
+        return acc;
+      }, {})
+    );
+
+  const sections = byKey(shown, (e) => e.expenseDate.slice(0, 7)).map(([key, rows]) => {
     const [y, m] = key.split('-').map(Number);
     return {
       key,
       title: `${MONTHS[m - 1]} ${y}`,
-      total: data.reduce((sum, e) => sum + e.totalPaise, 0),
-      data,
+      total: rows.reduce((sum, e) => sum + e.totalPaise, 0),
+      data: byKey(rows, (e) => e.expenseDate).map(([day, items]) => ({ day, items })),
     };
   });
 
@@ -115,7 +123,7 @@ export default function HistoryScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search milk, Ravi, groceries…"
+            placeholder="Search"
             placeholderTextColor={theme.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -176,7 +184,7 @@ export default function HistoryScreen() {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.day}
         contentContainerStyle={styles.content}
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
@@ -208,9 +216,9 @@ export default function HistoryScreen() {
           ))
         }
         renderSectionHeader={({ section }) => (
-          // A soft green band per month, its total on the right; tapping it
-          // opens that month's statement. Sentence case, as on Home --
-          // spaced capitals clipped the last letter on Android ("YESTERDA").
+          // Plain text, the month on the left and its total in grey on the
+          // right; tapping it opens that month's statement. Sentence case, as
+          // on Home -- spaced capitals clipped the last letter on Android.
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${section.title}, ${formatPaise(section.total)}. Open statement`}
@@ -220,49 +228,58 @@ export default function HistoryScreen() {
                 params: { year: section.key.slice(0, 4), month: String(Number(section.key.slice(5, 7))) },
               })
             }
-            style={({ pressed }) => [
-              styles.monthBand,
-              { backgroundColor: theme.primarySoft, opacity: pressed ? 0.7 : 1 },
-            ]}>
-            <ThemedText style={[Type.headline, styles.flex]}>{section.title}</ThemedText>
-            <ThemedText style={[Type.headline, { color: theme.brandInk }]}>
+            hitSlop={6}
+            style={({ pressed }) => [styles.monthHead, { opacity: pressed ? 0.6 : 1 }]}>
+            <ThemedText style={[styles.monthTitle, styles.flex]}>{section.title}</ThemedText>
+            <ThemedText themeColor="textSecondary" style={Type.caption}>
               {formatPaise(section.total)}
             </ThemedText>
-            <Ionicons name="chevron-forward" size={16} color={theme.brandInk} />
+            <Ionicons name="chevron-forward" size={14} color={theme.textTertiary} />
           </Pressable>
         )}
-        // One card per expense, a small gap apart, as on Home's Recent.
-        ItemSeparatorComponent={() => <View style={styles.gap} />}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push({ pathname: '/expense/[id]', params: { id: item.id } })}>
-            {/* Pressed is a tint, not a fade: lowering opacity on a card with
-                Android elevation fades the shadow and the contents separately,
-                leaving a pale band across a grey card. */}
-            {({ pressed }) => (
-              <Card
-                padded={false}
-                style={[styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
-                <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
-                  <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
-                    {iconFor(item.categoryIcon)}
-                  </ThemedText>
-                </View>
+        // One grouped list per day, under the day's name: the date lives in
+        // the heading, so the rows carry only what differs between them.
+        renderItem={({ item: day }) => (
+          <View style={styles.day}>
+            <ThemedText themeColor="textTertiary" style={Type.caption}>
+              {dayLabel(day.day)}
+            </ThemedText>
+            <Card padded={false}>
+              {day.items.map((item, i) => (
+                <Pressable
+                  key={item.id}
+                  onPress={() => router.push({ pathname: '/expense/[id]', params: { id: item.id } })}
+                  // Pressed is a tint, not a fade: lowering opacity under a
+                  // card with Android elevation leaves a pale band.
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                    pressed && { backgroundColor: theme.backgroundSelected },
+                    pressed && i === 0 && styles.rowFirst,
+                    pressed && i === day.items.length - 1 && styles.rowLast,
+                  ]}>
+                  {/* Grey, so green stays for money and actions. */}
+                  <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                    <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
+                      {iconFor(item.categoryIcon)}
+                    </ThemedText>
+                  </View>
 
-                <View style={styles.rowText}>
-                  <ThemedText style={Type.body} numberOfLines={1}>
-                    {item.description || item.categoryName}
-                  </ThemedText>
-                  <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
-                    {item.paidByName} · {item.participantCount} way
-                    {item.participantCount === 1 ? '' : 's'} · {shortDate(item.expenseDate)}
-                  </ThemedText>
-                </View>
+                  <View style={styles.rowText}>
+                    <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>
+                      {item.description || item.categoryName}
+                    </ThemedText>
+                    <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
+                      {item.paidByName} · {item.participantCount} way
+                      {item.participantCount === 1 ? '' : 's'}
+                    </ThemedText>
+                  </View>
 
-                <ThemedText style={Type.amount}>{formatPaise(item.totalPaise)}</ThemedText>
-              </Card>
-            )}
-          </Pressable>
+                  <ThemedText style={styles.amount}>{formatPaise(item.totalPaise)}</ThemedText>
+                </Pressable>
+              ))}
+            </Card>
+          </View>
         )}
       />
     </SafeAreaView>
@@ -292,16 +309,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  monthBand: {
+  monthHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + Spacing.one,
-    borderRadius: Radius.md,
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.one,
     marginTop: Spacing.four,
-    marginBottom: Spacing.two + Spacing.one,
+    marginBottom: Spacing.one,
   },
+  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  day: { gap: Spacing.one + 2, marginTop: Spacing.two + Spacing.one },
   filterLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingHorizontal: Spacing.half },
   clear: { fontWeight: '700' },
   content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance },
@@ -319,22 +336,26 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 14 },
   centered: { textAlign: 'center' },
-  gap: { height: Spacing.two },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + Spacing.one,
   },
+  // A pressed tint follows the card's corners on its first and last rows.
+  rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
+  rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  medium: { fontWeight: '600' },
+  amount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
   tile: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileGlyph: { fontSize: 18 },
+  tileGlyph: { fontSize: 16 },
   rowText: { flex: 1, gap: 1 },
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
 });
