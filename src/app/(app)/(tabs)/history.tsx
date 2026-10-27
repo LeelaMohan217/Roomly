@@ -100,9 +100,24 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      {/* Title only: search and filter sit in the bar below, and each month
-          band opens that month's statement. */}
-      <AppBar title="History" action={null} />
+      {/* Search and filter sit in the bar below, and each month band opens
+          that month's statement. The one header control downloads one. */}
+      <AppBar
+        title="History"
+        action={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Download statement"
+            onPress={() => router.push('/statement')}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.headerIcon,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+            ]}>
+            <Ionicons name="download-outline" size={19} color={theme.text} />
+          </Pressable>
+        }
+      />
 
       <View style={styles.top}>
         {/* Search and filter share one bar: the two ways of narrowing the
@@ -293,6 +308,14 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   searchInput: { flex: 1, paddingVertical: Spacing.two },
+  headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   searchDivider: { width: StyleSheet.hairlineWidth, height: 24 },
   filterButton: {
     width: 38,
