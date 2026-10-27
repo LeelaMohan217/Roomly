@@ -495,8 +495,9 @@ check(
   'money in and money out are never one list',
   /const iOwe = pairs\.rows\.filter/.test(settleSrc) &&
     /const owedToMe = pairs\.rows\.filter/.test(settleSrc) &&
-    /renderPairs\('OWED TO YOU'/.test(settleSrc) &&
-    /renderPairs\('YOU OWE'/.test(settleSrc),
+    // Sentence case since the Settle redesign; still two separate lists.
+    /renderPairs\('Owed to you'/.test(settleSrc) &&
+    /renderPairs\('You owe'/.test(settleSrc),
   'settle.tsx groups every row a member is part of under one heading again'
 );
 check(
@@ -942,7 +943,9 @@ check(
   );
   check(
     'the simplified plan is labelled as a shortcut',
-    /SQUARE IT IN/.test(settle) && /will not match the other two tabs/.test(settle),
+    // Sentence-case heading since the Settle redesign, and the explanation
+    // sits behind "How?" -- whitespace-tolerant, as it wraps across lines.
+    /Square up in/.test(settle) && /will not\s+match Balances/.test(settle),
     'the plan sits beside the pairwise lists with nothing explaining why the numbers differ'
   );
   check(
@@ -1050,7 +1053,10 @@ check(
   );
   check(
     'the pending state is not the same colour as the live one',
-    /variant: 'secondary' as const/.test(settle) && /variant: 'primary' as const/.test(settle),
+    // The plan's action is a PillButton since the Settle redesign: both its
+    // fill and its ink change between the live and the waiting state.
+    /disabled \? theme\.backgroundSelected : theme\.backgroundElement/.test(settle) &&
+      /disabled \? theme\.textTertiary : live/.test(settle),
     'opacity is the only difference between "do this" and "already done"'
   );
   check(
@@ -1063,7 +1069,7 @@ check(
   // "View all" and "Download".
   check(
     'the You owe tab has a way to act',
-    /title="Settle this"/.test(settle) && /show\('plan'\)/.test(settle),
+    /title="Settle up"/.test(settle) && /show\('plan'\)/.test(settle),
     'the tab a debtor lands on by default is a dead end again'
   );
   // Pairwise nets sum to the balance rather than each being constrained, so

@@ -2,13 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { queryState } from '@/components/ui/query-state';
@@ -52,8 +51,8 @@ const MONTHS = [
  */
 type TransferKind = 'owe' | 'owed' | 'other';
 
-/** Which of the three questions the screen is answering right now. */
-type SettleView = 'owe' | 'owed' | 'plan';
+/** Who you are square with, or how the house squares up. */
+type SettleView = 'balances' | 'plan';
 
 export default function SettleScreen() {
   const theme = useTheme();
@@ -116,15 +115,22 @@ export default function SettleScreen() {
   const owedToMe = pairs.rows.filter((p: PairNet) => p.netPaise > 0);
   const iOwe = pairs.rows.filter((p: PairNet) => p.netPaise < 0);
 
+  // The summary card's three figures. The overall one is the balance itself,
+  // so it holds even when the pairwise lists are withheld for drift; the two
+  // halves are those lists summed, and they add up to it by construction
+  // (assertPairwiseReconciles above).
+  const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise;
+  const iOweTotal = iOwe.reduce((sum, p) => sum - p.netPaise, 0);
+  const owedTotal = owedToMe.reduce((sum, p) => sum + p.netPaise, 0);
+
   /**
-   * Money going OUT first, because it is the only one of the three that is a
-   * task. Falls through to what you are owed, then to the plan.
+   * Balances when there are any, else the plan.
    *
    * Derived rather than stored in state: the lists arrive asynchronously, so a
    * useState initialiser would always run against empty data and land on the
    * wrong tab. `picked` records a deliberate choice and wins from then on.
    */
-  const auto: SettleView = iOwe.length > 0 ? 'owe' : owedToMe.length > 0 ? 'owed' : 'plan';
+  const auto: SettleView = pairs.rows.length > 0 ? 'balances' : 'plan';
   const view = picked ?? auto;
 
   async function downloadPair(pair: PairNet) {
@@ -305,15 +311,79 @@ export default function SettleScreen() {
         ref={scroller}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
+        {/* Where you stand overall, before anything else -- the answer the
+            three tabs otherwise left you to add up. The same green card as
+            Home's, so the two screens agree on what the headline is. */}
+        {myBalance !== undefined ? (
+          <View
+            style={[
+              styles.summary,
+              { backgroundColor: theme.balanceCard, borderColor: theme.balanceEdge },
+            ]}>
+            <ThemedText style={[Type.caption, { color: theme.onBalanceMuted }]}>
+              {myBalance > 0
+                ? 'Overall, you get back'
+                : myBalance < 0
+                  ? 'Overall, you owe'
+                  : 'You’re all square'}
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.summaryValue,
+                {
+                  color:
+                    myBalance > 0
+                      ? theme.balancePositive
+                      : myBalance < 0
+                        ? theme.balanceNegative
+                        : theme.onBalance,
+                },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}>
+              {formatPaise(Math.abs(myBalance))}
+            </ThemedText>
+            {/* The way to act, on the card a debtor reads first. Only when the
+                plan actually asks you to pay: pairwise nets SUM to your
+                balance, so you can owe one person and still have nothing to
+                pay, and then this would open a plan with nothing of yours. */}
+            {view !== 'plan' && iPayInPlan ? (
+              <View style={styles.summaryAction}>
+                <PillButton title="Settle up" onTint onPress={() => show('plan')} />
+              </View>
+            ) : null}
+            {/* Only with lists to sum: when they are withheld for drift, two
+                zeros here would contradict the figure above. */}
+            {pairs.rows.length > 0 ? (
+              <View style={[styles.summarySplit, { borderTopColor: theme.balanceRule }]}>
+                <View style={styles.flex}>
+                  <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>You owe</ThemedText>
+                  <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
+                    {formatPaise(iOweTotal)}
+                  </ThemedText>
+                </View>
+                <View style={[styles.summaryDivider, { backgroundColor: theme.balanceRule }]} />
+                <View style={[styles.flex, styles.summaryRight]}>
+                  <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>
+                    Owed to you
+                  </ThemedText>
+                  <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
+                    {formatPaise(owedTotal)}
+                  </ThemedText>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Money somebody says they sent you. Above the plan, because it is the
             only thing on this screen waiting on a person rather than on money.
             You are asked because you are the one who was paid — you can see it
             arrive; nobody else can. */}
         {toConfirm.length > 0 ? (
           <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              DID YOU GET THIS? ({toConfirm.length})
-            </ThemedText>
+            <SectionTitle title={`Did you get this? (${toConfirm.length})`} />
 
             {toConfirm.map((q) => (
               <Card key={q.id} style={styles.transfer}>
@@ -327,7 +397,7 @@ export default function SettleScreen() {
                       {q.fromName} → {q.toName}
                     </ThemedText>
                     <ThemedText themeColor="textTertiary" style={Type.micro}>
-                      {q.recordedByName} recorded it · not counted until you confirm
+                      Recorded by {q.recordedByName}
                     </ThemedText>
                   </View>
 
@@ -336,17 +406,15 @@ export default function SettleScreen() {
                   </ThemedText>
                 </View>
 
-                <View style={styles.reviewRow}>
-                  <Button
+                <View style={styles.pillRow}>
+                  <PillButton
                     title="Not received"
-                    variant="ghost"
-                    style={styles.flex}
+                    tone="neutral"
                     onPress={() => review.mutate({ id: q.id, approve: false })}
                     loading={reviewing(q.id)}
                   />
-                  <Button
+                  <PillButton
                     title="Got it"
-                    style={styles.flex}
                     onPress={() => review.mutate({ id: q.id, approve: true })}
                     loading={reviewing(q.id)}
                   />
@@ -361,9 +429,7 @@ export default function SettleScreen() {
             a placeholder with no account to confirm from. */}
         {watching.length > 0 ? (
           <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              WAITING TO BE CONFIRMED ({watching.length})
-            </ThemedText>
+            <SectionTitle title={`Waiting to be confirmed (${watching.length})`} />
 
             {watching.map((q) => (
               <Card key={q.id} style={styles.transfer}>
@@ -377,7 +443,7 @@ export default function SettleScreen() {
                       {q.fromName} → {q.toName}
                     </ThemedText>
                     <ThemedText themeColor="textTertiary" style={Type.micro}>
-                      Waiting on {q.toName} to confirm they got it
+                      Waiting for {q.toName}
                     </ThemedText>
                   </View>
 
@@ -387,18 +453,16 @@ export default function SettleScreen() {
                 </View>
 
                 {isOwner ? (
-                  <View style={styles.reviewRow}>
-                    <Button
+                  <View style={styles.pillRow}>
+                    <PillButton
                       title="Reject"
-                      variant="ghost"
-                      style={styles.flex}
+                      tone="neutral"
                       onPress={() => review.mutate({ id: q.id, approve: false })}
                       loading={reviewing(q.id)}
                     />
-                    <Button
+                    <PillButton
                       title="Confirm for them"
-                      variant="ghost"
-                      style={styles.flex}
+                      tone="neutral"
                       onPress={() => review.mutate({ id: q.id, approve: true })}
                       loading={reviewing(q.id)}
                     />
@@ -436,61 +500,64 @@ export default function SettleScreen() {
           </Card>
         ) : (
           <>
-            {/* One view at a time. All three stacked meant scrolling past two
-                lists to reach the one you came for, and the two pairwise lists
-                answer opposite questions — there is no reading of the screen
-                where both are what you want at once. */}
+            {/* Two views, not a stack: your balances person by person, or the
+                household's plan. They are different arithmetic on the same
+                money, and side by side their amounts looked contradictory. */}
             <Segmented
               options={[
-                { value: 'owe', label: 'You owe', count: iOwe.length },
-                { value: 'owed', label: 'Owed to you', count: owedToMe.length },
-                // No count on this one. The other two are to-do counts —
-                // people who owe you, people you owe — and this one would be a
-                // transfer count, which the section heading below already
-                // states. Dropping it also keeps the longest label on one line.
-                { value: 'plan', label: 'Fewest payments' },
+                { value: 'balances', label: 'Balances' },
+                { value: 'plan', label: 'Best plan' },
               ]}
               value={view}
               onChange={show}
             />
 
-            {view === 'owed' ? (
-              owedToMe.length > 0 ? (
-                renderPairs('OWED TO YOU', owedToMe)
+            {view === 'balances' ? (
+              pairs.rows.length > 0 ? (
+                <>
+                  {/* "Since" once, under whichever heading comes first. */}
+                  {renderPairs('Owed to you', owedToMe, true)}
+                  {renderPairs('You owe', iOwe, owedToMe.length === 0)}
+                </>
               ) : (
-                <EmptyView icon="happy-outline" text="Nobody owes you anything right now." />
-              )
-            ) : null}
-
-            {view === 'owe' ? (
-              iOwe.length > 0 ? (
-                renderPairs('YOU OWE', iOwe)
-              ) : (
-                <EmptyView icon="thumbs-up-outline" text="You don't owe anyone anything." />
+                <EmptyView icon="thumbs-up-outline" text="You're square with everyone." />
               )
             ) : null}
 
             {view === 'plan' ? (
               <View style={styles.section}>
-                <ThemedText themeColor="textTertiary" style={Type.label}>
-                  {`SQUARE IT IN ${visible.length} PAYMENT${visible.length === 1 ? '' : 'S'}`}
-                </ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  Fewer transfers than paying everyone directly — the totals are the same. Amounts
-                  here will not match the other two tabs, because a payment can be routed through
-                  somebody else.
-                </ThemedText>
+                {/* The heading and a ? -- the explanation is a popup, not a
+                    paragraph on the screen that most people read once and then
+                    scroll past for good. */}
+                <View style={styles.titleRow}>
+                  <ThemedText style={styles.sectionTitle}>
+                    {`Square up in ${visible.length} payment${visible.length === 1 ? '' : 's'}`}
+                  </ThemedText>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="How the plan works"
+                    hitSlop={10}
+                    onPress={() =>
+                      void dialog.alert({
+                        tone: 'info',
+                        icon: 'help-circle-outline',
+                        title: 'Fewest payments',
+                        message:
+                          'Fewer transfers than everyone paying everyone, with the same totals. ' +
+                          'Amounts here will not match Balances, because a payment can ' +
+                          'be routed through somebody else.',
+                        buttonLabel: 'Got it',
+                      })
+                    }
+                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                    <Ionicons name="help-circle-outline" size={20} color={theme.textTertiary} />
+                  </Pressable>
+                </View>
                 {renderSection(visible)}
               </View>
             ) : null}
           </>
           ))}
-
-        <Button
-          title="Payment history"
-          variant="secondary"
-          onPress={() => router.push('/settlements')}
-        />
 
         {(error ?? ledgerError) ? (
           <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
@@ -501,65 +568,50 @@ export default function SettleScreen() {
           </View>
         ) : null}
 
-        {isOwner && periods.data && periods.data.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              MONTHS
-            </ThemedText>
+        {/* Links to other screens, grouped like a settings list: grey icons
+            and chevrons, so nothing here competes with the money above. */}
+        <View style={styles.section}>
+          <SectionTitle title="More" />
 
-            <Card padded={false}>
-              {periods.data.map((p, i) => {
-                const label = `${MONTHS[p.month - 1]} ${p.year}`;
-                const closed = p.status === 'closed';
+          <Card padded={false}>
+            {(() => {
+              const months = isOwner ? (periods.data ?? []) : [];
+              const count = months.length + 1;
 
-                return (
-                  <Pressable
-                    key={p.id}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/month-statement',
-                        params: { year: String(p.year), month: String(p.month) },
-                      })
-                    }
-                    style={({ pressed }) => [
-                      styles.periodRow,
-                      i < (periods.data?.length ?? 0) - 1 && {
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: theme.border,
-                      },
-                      { opacity: pressed ? 0.6 : 1 },
-                    ]}>
-                    <View
-                      style={[
-                        styles.periodIcon,
-                        {
-                          backgroundColor: closed ? theme.backgroundSelected : theme.primarySoft,
-                        },
-                      ]}>
-                      <Ionicons
-                        name={closed ? 'lock-closed' : 'lock-open-outline'}
-                        size={15}
-                        color={closed ? theme.textTertiary : theme.primary}
+              return (
+                <>
+                  <LinkRow
+                    icon="receipt-outline"
+                    title="Payment history"
+                    edge={rowEdge(0, count)}
+                    onPress={() => router.push('/settlements')}
+                  />
+                  {/* Tapping a month opens its statement, where closing has
+                      the context to be a considered decision rather than a
+                      one-tap action next to a list. */}
+                  {months.map((p, i) => {
+                    const closed = p.status === 'closed';
+                    return (
+                      <LinkRow
+                        key={p.id}
+                        icon={closed ? 'lock-closed-outline' : 'lock-open-outline'}
+                        title={`${MONTHS[p.month - 1]} ${p.year}`}
+                        subtitle={closed ? 'Closed — frozen' : 'Open'}
+                        edge={rowEdge(i + 1, count)}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/month-statement',
+                            params: { year: String(p.year), month: String(p.month) },
+                          })
+                        }
                       />
-                    </View>
-
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.body}>{label}</ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        {closed ? 'Closed — frozen' : 'Open'}
-                      </ThemedText>
-                    </View>
-
-                    {/* Tapping opens the statement, where closing has the
-                        context to be a considered decision rather than a
-                        one-tap action next to a list. */}
-                    <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
-                  </Pressable>
-                );
-              })}
-            </Card>
-          </View>
-        ) : null}
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </Card>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -579,25 +631,26 @@ export default function SettleScreen() {
    * different true numbers with nothing explaining the gap. It could also never
    * show WHICH six expenses, only that there were six.
    */
-  function renderPairs(title: string, rows: PairNet[]) {
+  function renderPairs(title: string, rows: PairNet[], withSince: boolean) {
     if (rows.length === 0) return null;
 
     return (
       <View style={styles.section}>
-        <ThemedText themeColor="textTertiary" style={Type.label}>
-          {title}
-        </ThemedText>
-        {squaredOn ? (
-          <ThemedText themeColor="textTertiary" style={Type.micro}>
-            {`Counting from ${squaredOn}, when everyone was last square.`}
-          </ThemedText>
-        ) : null}
+        <SectionTitle
+          title={title}
+          hint={withSince && squaredOn ? `Since ${squaredOn}` : undefined}
+        />
 
-        {rows.map((pair) => {
+        {/* One grouped list, not a card per person: a row is a name and an
+            amount, and a stack of cards made three people look like a page. */}
+        <Card padded={false}>
+        {rows.map((pair, i) => {
           const key = `pair-${pair.memberId}`;
           const isOpen = expanded === key;
           const them = nameOf(pair.memberId);
           const owesMe = pair.netPaise > 0;
+          const bills = pair.lines.filter((l) => l.kind !== 'settlement').length;
+          const paid = pair.lines.length - bills;
 
           // Retroactive, and the reason this card is worth reading at all for
           // an already-settled pair: payments in the ledger get replayed to
@@ -607,83 +660,71 @@ export default function SettleScreen() {
           const notes = routingNotes(pair, them);
 
           return (
-            <Card key={key} style={styles.transfer}>
-              <View style={styles.transferHead}>
-                <Avatar name={them} seed={pair.memberId} size={36} />
+            <View
+              key={key}
+              style={i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }}>
+              {/* The whole row opens the breakdown; the chevron says so. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isOpen }}
+                onPress={() => setExpanded(isOpen ? null : key)}
+                style={({ pressed }) => [
+                  styles.listRow,
+                  pressed && { backgroundColor: theme.backgroundSelected },
+                  pressed && rowEdge(i, isOpen ? rows.length + 1 : rows.length),
+                ]}>
+                {/* Neutral, as in Home's Balances: green means the money, not
+                    the person. */}
+                <Avatar name={them} seed={pair.memberId} size={34} neutral />
 
                 <View style={styles.flex}>
-                  <ThemedText style={Type.body} numberOfLines={1}>
-                    {owesMe ? `${them} owes you` : `You owe ${them}`}
+                  <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>
+                    {them}
                   </ThemedText>
                   <ThemedText themeColor="textTertiary" style={Type.micro}>
-                    {pair.lines.length} thing{pair.lines.length === 1 ? '' : 's'} between you
+                    {bills > 0
+                      ? `${bills} bill${bills === 1 ? '' : 's'}`
+                      : `${paid} payment${paid === 1 ? '' : 's'}`}
                   </ThemedText>
                 </View>
 
+                {/* Green for money coming to you, plain for money going out:
+                    the sign already says which, and red on every debt made an
+                    ordinary balance look like an error. */}
                 <ThemedText
-                  style={[
-                    styles.transferAmount,
-                    { color: owesMe ? theme.primary : theme.negative },
-                  ]}>
+                  style={[styles.rowAmount, { color: owesMe ? theme.positive : theme.text }]}
+                  accessibilityLabel={
+                    owesMe
+                      ? `${them} owes you ${formatPaise(pair.netPaise)}`
+                      : `You owe ${them} ${formatPaise(-pair.netPaise)}`
+                  }>
+                  {owesMe ? '+ ' : '− '}
                   {formatPaise(Math.abs(pair.netPaise))}
                 </ThemedText>
-              </View>
+                <Ionicons
+                  name={isOpen ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={theme.textTertiary}
+                />
+              </Pressable>
 
-              {/* The action, above the breakdown.
-                  `auto` lands anybody who owes money on this tab by default,
-                  and it had nothing to tap at all -- a screen called Settle up,
-                  opened by the person who came to pay, offering only "View
-                  all" and "Download".
-                  It routes to the plan rather than recording the pairwise
-                  amount directly. The plan is the app's answer to "who pays
-                  whom": paying everyone individually is more transfers for the
-                  same money, and a second payment path would need its own copy
-                  of the netting arithmetic in SQL to guard the direction, which
-                  is the drift migrations 0020 and 0024 both exist to undo. */}
-              {notes.length > 0 ? (
-                <View style={[styles.why, { backgroundColor: theme.backgroundSunken }]}>
+              {isOpen ? (
+                <View style={[styles.why, styles.rowBody, { backgroundColor: theme.backgroundSunken }]}>
+                  {/* The explanations, first: why there is no "Settle this"
+                      when you come out ahead overall, and any routing that
+                      makes this pair look unsettled. */}
+                  {!owesMe && !iPayInPlan ? (
+                    <ThemedText themeColor="textSecondary" style={Type.micro}>
+                      You come out ahead overall, so the plan settles this by paying you less — not
+                      by you paying {them}.
+                    </ThemedText>
+                  ) : null}
                   {notes.map((note) => (
                     <ThemedText key={note} themeColor="textSecondary" style={Type.micro}>
                       {note}
                     </ThemedText>
                   ))}
-                </View>
-              ) : null}
 
-              {!owesMe ? (
-                iPayInPlan ? (
-                  <>
-                    <Button title="Settle this" onPress={() => show('plan')} />
-                    <ThemedText
-                      themeColor="textTertiary"
-                      style={[Type.micro, styles.centered]}>
-                      Opens the plan, which may route your payment through somebody else —
-                      fewer transfers, same totals.
-                    </ThemedText>
-                  </>
-                ) : (
-                  <ThemedText themeColor="textTertiary" style={[Type.micro, styles.centered]}>
-                    Across everybody you come out ahead, so the plan settles this by paying you
-                    less rather than by you paying {them}.
-                  </ThemedText>
-                )
-              ) : null}
-
-              <Pressable onPress={() => setExpanded(isOpen ? null : key)} hitSlop={6}>
-                <View style={styles.whyToggle}>
-                  <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
-                    {isOpen ? 'Hide the list' : 'What is this made of?'}
-                  </ThemedText>
-                  <Ionicons
-                    name={isOpen ? 'chevron-up' : 'chevron-down'}
-                    size={13}
-                    color={theme.primary}
-                  />
-                </View>
-              </Pressable>
-
-              {isOpen ? (
-                <View style={[styles.why, { backgroundColor: theme.backgroundSunken }]}>
                   {/* The three most recent, not all of them. A pair with forty
                       shared expenses turned one card into a screen of its own,
                       and the point of this list is "roughly why", not the
@@ -708,7 +749,7 @@ export default function SettleScreen() {
                         style={[
                           Type.caption,
                           styles.semi,
-                          { color: l.deltaPaise >= 0 ? theme.primary : theme.negative },
+                          { color: l.deltaPaise >= 0 ? theme.positive : theme.text },
                         ]}>
                         {l.deltaPaise >= 0 ? '+' : '−'}
                         {formatPaise(Math.abs(l.deltaPaise))}
@@ -735,9 +776,14 @@ export default function SettleScreen() {
                       things" read as a sentence rather than a button, and the
                       count is already on this card twice. */}
                   <View style={styles.pairActions}>
-                    <Button
+                    <PillButton
+                      title={exporting === pair.memberId ? 'Saving…' : 'Download'}
+                      tone="neutral"
+                      loading={exporting === pair.memberId}
+                      onPress={() => void downloadPair(pair)}
+                    />
+                    <PillButton
                       title="View all"
-                      style={styles.flex}
                       // The object form rather than a template literal: it is
                       // expo-router's documented way to pass a dynamic segment,
                       // and it does not depend on how the typed-routes
@@ -746,19 +792,13 @@ export default function SettleScreen() {
                         router.push({ pathname: '/pair/[id]', params: { id: pair.memberId } })
                       }
                     />
-                    <Button
-                      title={exporting === pair.memberId ? 'Saving…' : 'Download'}
-                      variant="secondary"
-                      style={styles.flex}
-                      loading={exporting === pair.memberId}
-                      onPress={() => void downloadPair(pair)}
-                    />
                   </View>
                 </View>
               ) : null}
-            </Card>
+            </View>
           );
         })}
+        </Card>
       </View>
     );
   }
@@ -781,15 +821,11 @@ export default function SettleScreen() {
         // Greyed out and unpressable, saying who it is now waiting on. The
         // payee's version names the payer instead, because for them the next
         // move is theirs, at the top of this screen.
+        // No paragraph under it: the button's own words say the state, and
+        // for the payee the confirm card at the top of this screen is the
+        // next step, with its own buttons.
         title: kind === 'owed' ? `${nameOf(t.from)} says they paid` : `Waiting for ${nameOf(t.to)}`,
-        variant: 'secondary' as const,
         disabled: true,
-        note:
-          kind === 'owed'
-            ? 'Confirm it at the top of this screen once it lands.'
-            : kind === 'owe'
-              ? `Sent. Balances change once ${nameOf(t.to)} confirms it arrived.`
-              : `Recorded. Balances change once ${nameOf(t.to)} confirms it arrived.`,
       };
     }
 
@@ -800,21 +836,37 @@ export default function SettleScreen() {
           : kind === 'owe'
             ? 'I have paid this'
             : 'Record this payment',
-      // Filled green: this is the one thing to do on the card. It was the same
-      // muted grey as the disabled state above, which left opacity as the only
-      // difference between "do this" and "already done".
-      variant: 'primary' as const,
+      // Green: this is the one thing to do on the card. It was once the same
+      // muted grey as the disabled state above, which left opacity as the
+      // only difference between "do this" and "already done" -- PillButton
+      // keeps the two apart by colour as well.
       disabled: false,
-      note: null as string | null,
     };
   }
 
   function renderSection(rows: Transfer[]) {
     if (rows.length === 0) return null;
 
+    // Your own payments first and apart: an owner sees the whole household's
+    // plan, and the one or two that need you were lost among the rest. A
+    // display grouping only -- the plan itself is untouched. Labels only when
+    // there are two groups; a member only ever sees their own.
+    const groups = [
+      { label: 'Yours', items: rows.filter(mine) },
+      { label: 'Others', items: rows.filter((t) => !mine(t)) },
+    ].filter((g) => g.items.length > 0);
+
     return (
       <>
-          {rows.map((t) => {
+        {groups.map((g) => (
+          <View key={g.label} style={styles.section}>
+            {groups.length > 1 ? (
+              <ThemedText themeColor="textTertiary" style={Type.caption}>
+                {g.label}
+              </ThemedText>
+            ) : null}
+            <Card padded={false}>
+          {g.items.map((t, i) => {
               const key = `${t.from}-${t.to}`;
               const kind: TransferKind =
                 t.to === member?.id ? 'owed' : t.from === member?.id ? 'owe' : 'other';
@@ -853,52 +905,60 @@ export default function SettleScreen() {
                   ? nameList(iOwe.filter((p) => p.memberId !== t.to).map((p) => nameOf(p.memberId)))
                   : 'somebody else';
 
+              // Green icon on your own payments, grey on everybody else's.
+              const yours = kind !== 'other';
+
               return (
-                <Card key={key} style={styles.transfer}>
+                <View
+                  key={key}
+                  style={[
+                    styles.planRow,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                  ]}>
                   <View style={styles.transferHead}>
                     {/* One icon for the transaction, not two faces. Two
                         avatars plus an arrow read as a relationship between
                         people; the row is about a single payment, and the
                         names already say who is involved. */}
-                    <View style={[styles.transferIcon, { backgroundColor: theme.primarySoft }]}>
-                      <Ionicons name="arrow-forward" size={16} color={theme.primary} />
+                    <View
+                      style={[
+                        styles.roundIcon,
+                        { backgroundColor: yours ? theme.primarySoft : theme.backgroundSelected },
+                      ]}>
+                      <Ionicons
+                        name={kind === 'owed' ? 'arrow-down' : kind === 'owe' ? 'arrow-up' : 'arrow-forward'}
+                        size={16}
+                        color={yours ? theme.brandInk : theme.textSecondary}
+                      />
                     </View>
 
                     <View style={styles.flex}>
-                      <ThemedText style={Type.body} numberOfLines={1}>
-                        {nameOf(t.from)} → {nameOf(t.to)}
+                      {/* "Mani pays you", not "Mani → Lee": your own name in
+                          a list is the one you read past. */}
+                      <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>
+                        {kind === 'owed'
+                          ? `${nameOf(t.from)} pays you`
+                          : kind === 'owe'
+                            ? `You pay ${nameOf(t.to)}`
+                            : `${nameOf(t.from)} → ${nameOf(t.to)}`}
                       </ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        {routed ? 'Part of this is passing through' : 'Settles both of them'}
-                      </ThemedText>
+                      {/* Only when it matters: an ordinary payment needs no
+                          caption, a routed one gets two words and its
+                          details behind "Show details". */}
+                      {routed ? (
+                        <ThemedText themeColor="textTertiary" style={Type.micro}>
+                          Partly passing through
+                        </ThemedText>
+                      ) : null}
                     </View>
 
-                    <ThemedText style={styles.transferAmount}>
+                    {/* Green only for money coming to you, as on Balances. */}
+                    <ThemedText
+                      style={[styles.rowAmount, kind === 'owed' && { color: theme.positive }]}>
+                      {kind === 'owed' ? '+ ' : ''}
                       {formatPaise(t.amountPaise)}
                     </ThemedText>
                   </View>
-
-                  {/* Collapsed by default: the amount and the button are what
-                      most people need, and three cards each carrying a
-                      paragraph pushed the buttons off the screen. */}
-                  {routed ? (
-                    <Pressable
-                      onPress={() => setPlanOpen(planOpen === key ? null : key)}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: planOpen === key }}>
-                      <View style={styles.whyToggle}>
-                        <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
-                          {planOpen === key ? 'Hide details' : 'Show details'}
-                        </ThemedText>
-                        <Ionicons
-                          name={planOpen === key ? 'chevron-up' : 'chevron-down'}
-                          size={13}
-                          color={theme.primary}
-                        />
-                      </View>
-                    </Pressable>
-                  ) : null}
 
                   {routed && planOpen === key ? (
                     <View style={[styles.why, { backgroundColor: theme.backgroundSunken }]}>
@@ -948,24 +1008,46 @@ export default function SettleScreen() {
                       -- greyed out, in the same place, with different words --
                       because a button that turns into a notice reads as the
                       button having disappeared. */}
-                  <Button
-                    title={action.title}
-                    variant={action.variant}
-                    disabled={action.disabled}
-                    onPress={action.disabled ? undefined : () => confirmPaid(t, kind)}
-                    loading={paying(t)}
-                  />
-
-                  {action.note ? (
-                    <ThemedText
-                      themeColor="textTertiary"
-                      style={[Type.micro, styles.centered, styles.noteUnderButton]}>
-                      {action.note}
-                    </ThemedText>
-                  ) : null}
-                </Card>
+                  {/* A small pill at the right, not a full-width solid button:
+                      three of those down the plan made every row shout, and
+                      the one that mattered looked like the rest. The details
+                      toggle shares its line, only when something is routed --
+                      collapsed, because a paragraph on every row pushed the
+                      buttons off the screen. */}
+                  <View style={styles.planFoot}>
+                    {routed ? (
+                      <Pressable
+                        onPress={() => setPlanOpen(planOpen === key ? null : key)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: planOpen === key }}
+                        style={styles.whyToggle}>
+                        <ThemedText style={[Type.micro, { color: theme.brandInk }]}>
+                          {planOpen === key ? 'Hide details' : 'Show details'}
+                        </ThemedText>
+                        <Ionicons
+                          name={planOpen === key ? 'chevron-up' : 'chevron-down'}
+                          size={13}
+                          color={theme.brandInk}
+                        />
+                      </Pressable>
+                    ) : (
+                      <View />
+                    )}
+                    <PillButton
+                      title={action.title}
+                      disabled={action.disabled}
+                      loading={paying(t)}
+                      tone={yours ? 'primary' : 'neutral'}
+                      onPress={() => confirmPaid(t, kind)}
+                    />
+                  </View>
+                </View>
               );
             })}
+            </Card>
+          </View>
+        ))}
       </>
     );
   }
@@ -1025,6 +1107,140 @@ function routingNotes(pair: PairNet, them: string): string[] {
   return out;
 }
 
+/**
+ * The one button on this screen: a small, soft pill. Green for the thing to
+ * do, grey for the alternative beside it, and grey with muted words once it
+ * is already sent and waiting -- same place and shape, so a sent payment
+ * reads as a status rather than a vanished button.
+ *
+ * Deliberately quiet: no outline, medium weight, compact. The screen used
+ * full-width solid buttons, which made every row shout.
+ */
+function PillButton({
+  title,
+  onPress,
+  disabled = false,
+  loading = false,
+  tone = 'primary',
+  onTint = false,
+}: {
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  tone?: 'primary' | 'neutral';
+  /** Sits on a pale green card, where a pale green pill would vanish. */
+  onTint?: boolean;
+}) {
+  const theme = useTheme();
+  const live = tone === 'primary' ? theme.brandInk : theme.text;
+  const ink = disabled ? theme.textTertiary : live;
+  const soft = tone === 'primary' ? theme.primarySoft : theme.backgroundSelected;
+  const fill = onTint ? theme.backgroundElement : soft;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled, busy: loading }}
+      disabled={disabled || loading}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.pill,
+        {
+          backgroundColor: disabled ? theme.backgroundSelected : theme.backgroundElement,
+          opacity: pressed ? 0.7 : 1,
+        },
+        !disabled && { backgroundColor: fill },
+      ]}>
+      {loading ? (
+        <ActivityIndicator size="small" color={ink} />
+      ) : (
+        <ThemedText style={[styles.pillText, { color: ink }]} numberOfLines={1}>
+          {title}
+        </ThemedText>
+      )}
+    </Pressable>
+  );
+}
+
+/**
+ * A section heading: sentence case at heading size, with an optional one-line
+ * hint. These were spaced capitals at caption size (Type.label), which both
+ * read as quiet as the hints under them and clipped their last letter on
+ * Android ("YESTERDA") -- the same fix History and Home already had.
+ */
+function SectionTitle({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <View>
+      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
+      {hint ? (
+        <ThemedText themeColor="textTertiary" style={Type.micro}>
+          {hint}
+        </ThemedText>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Rounds a pressed row's outer corners to its card's, so the tint does not
+ * poke square corners out of the first and last rows.
+ */
+function rowEdge(index: number, count: number) {
+  return {
+    ...(index === 0 && { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg }),
+    ...(index === count - 1 && {
+      borderBottomLeftRadius: Radius.lg,
+      borderBottomRightRadius: Radius.lg,
+    }),
+  };
+}
+
+/** A row that opens another screen: grey icon, title, chevron. */
+function LinkRow({
+  icon,
+  title,
+  subtitle,
+  edge,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  edge: ReturnType<typeof rowEdge>;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.periodRow,
+        edge.borderTopLeftRadius === undefined && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: theme.border,
+        },
+        pressed && [{ backgroundColor: theme.backgroundSelected }, edge],
+      ]}>
+      <View style={[styles.periodIcon, { backgroundColor: theme.backgroundSelected }]}>
+        <Ionicons name={icon} size={16} color={theme.textSecondary} />
+      </View>
+      <View style={styles.flex}>
+        <ThemedText style={Type.body}>{title}</ThemedText>
+        {subtitle ? (
+          <ThemedText themeColor="textTertiary" style={Type.micro}>
+            {subtitle}
+          </ThemedText>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+    </Pressable>
+  );
+}
+
 function EmptyView({
   icon,
   text,
@@ -1048,10 +1264,11 @@ function EmptyView({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
+  content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
   semi: { fontWeight: '700' },
+  medium: { fontWeight: '600' },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
   emptyIcon: {
@@ -1064,7 +1281,59 @@ const styles = StyleSheet.create({
   },
 
   section: { gap: Spacing.two },
-  transfer: { gap: Spacing.three },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+
+  summary: {
+    borderRadius: Radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three + Spacing.one,
+    gap: Spacing.one,
+  },
+  summaryValue: { fontSize: 30, lineHeight: 38, fontWeight: '700', letterSpacing: -1 },
+  summarySplit: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: Spacing.two,
+    paddingTop: Spacing.two + Spacing.one,
+  },
+  summaryDivider: { width: StyleSheet.hairlineWidth },
+  summaryRight: { paddingLeft: Spacing.three },
+  summaryPart: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  summaryAction: { flexDirection: 'row', marginTop: Spacing.one },
+
+  // One row of a grouped list (Balances, the plan).
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + Spacing.one,
+  },
+  rowAmount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  rowBody: { marginHorizontal: Spacing.three, marginBottom: Spacing.three },
+  planRow: { padding: Spacing.three, gap: Spacing.two },
+  roundIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pill: {
+    minHeight: 32,
+    paddingHorizontal: Spacing.three - 2,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillText: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  // A row of pills, pushed to the right of the card.
+  pillRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  // 16 inside, not the Card default 24: these cards are mostly one row.
+  transfer: { gap: Spacing.two + Spacing.one, padding: Spacing.three },
   transferHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   transferIcon: {
     width: 36,
@@ -1075,9 +1344,6 @@ const styles = StyleSheet.create({
   },
   transferAmount: { fontSize: 17, fontWeight: '700', letterSpacing: -0.4 },
   reviewRow: { flexDirection: 'row', gap: Spacing.two },
-  // Card gap is Spacing.three, which reads as a separate block rather than a
-  // caption belonging to the button above it.
-  noteUnderButton: { marginTop: -Spacing.two },
 
   whyToggle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   why: { borderRadius: Radius.sm, padding: Spacing.three, gap: Spacing.two },
@@ -1088,7 +1354,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   // One expense in the "what is this made of" list.
-  pairActions: { flexDirection: 'row', gap: Spacing.two },
+  pairActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two },
   lineRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   whyTotal: {
     flexDirection: 'row',
