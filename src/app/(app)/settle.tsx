@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -12,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
+import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -19,6 +22,13 @@ import { committed, rejected } from '@/lib/haptics';
 import { exportPairStatement } from '@/lib/backup';
 import { dayOf, formatRange, todayIso } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
+import {
+  canPayByUpi,
+  listPayApps,
+  openPayApp,
+  pasteableAmount,
+  type PayApp,
+} from '@/lib/pay-apps';
 import {
   useBalances,
   usePairwiseLedger,
@@ -303,6 +313,58 @@ export default function SettleScreen() {
     if (ok) markPaid.mutate(t);
   }
 
+  /**
+   * Pay: the phone's own UPI apps, one tap from the payment you owe.
+   *
+   * Roomly opens the app and copies the amount; who to pay is picked inside
+   * the app, since Roomly keeps no UPI IDs. Whether the money moved cannot be
+   * read back, so coming back to Roomly asks -- and a yes records it exactly
+   * as "I have paid this" does, still for the payee to confirm.
+   */
+  const upi = canPayByUpi();
+  const [payFor, setPayFor] = useState<Transfer | null>(null);
+  const [payApps, setPayApps] = useState<PayApp[] | null>(null);
+  // Set when an app is opened, cleared the moment Roomly is back in front.
+  const awayFor = useRef<Transfer | null>(null);
+
+  function startPay(t: Transfer) {
+    setPayFor(t);
+    setPayApps(null);
+    void listPayApps().then(setPayApps);
+  }
+
+  async function payWith(t: Transfer, app: PayApp) {
+    await Clipboard.setStringAsync(pasteableAmount(t.amountPaise));
+    setPayFor(null);
+    awayFor.current = t;
+    if (!openPayApp(app.packageName)) {
+      awayFor.current = null;
+      dialog.toast({ message: `Could not open ${app.label}` });
+    }
+  }
+
+  async function askIfPaid(t: Transfer) {
+    const ok = await dialog.confirm({
+      tone: 'success',
+      icon: 'cash-outline',
+      title: `Did you pay ${nameOf(t.to)} ${formatPaise(t.amountPaise)}?`,
+      message: `${nameOf(t.to)} will be asked to confirm it arrived.`,
+      confirmLabel: 'Yes, I paid',
+      cancelLabel: 'Not yet',
+    });
+    if (ok) markPaid.mutate(t);
+  }
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !awayFor.current) return;
+      const t = awayFor.current;
+      awayFor.current = null;
+      void askIfPaid(t);
+    });
+    return () => sub.remove();
+  });
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Settle up" />
@@ -327,32 +389,33 @@ export default function SettleScreen() {
                   ? 'Overall, you owe'
                   : 'You’re all square'}
             </ThemedText>
-            <ThemedText
-              style={[
-                styles.summaryValue,
-                {
-                  color:
-                    myBalance > 0
-                      ? theme.balancePositive
-                      : myBalance < 0
-                        ? theme.balanceNegative
-                        : theme.onBalance,
-                },
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}>
-              {formatPaise(Math.abs(myBalance))}
-            </ThemedText>
-            {/* The way to act, on the card a debtor reads first. Only when the
-                plan actually asks you to pay: pairwise nets SUM to your
-                balance, so you can owe one person and still have nothing to
-                pay, and then this would open a plan with nothing of yours. */}
-            {view !== 'plan' && iPayInPlan ? (
-              <View style={styles.summaryAction}>
+            <View style={styles.summaryAction}>
+              <ThemedText
+                style={[
+                  styles.summaryValue,
+                  styles.flex,
+                  {
+                    color:
+                      myBalance > 0
+                        ? theme.balancePositive
+                        : myBalance < 0
+                          ? theme.balanceNegative
+                          : theme.onBalance,
+                  },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}>
+                {formatPaise(Math.abs(myBalance))}
+              </ThemedText>
+              {/* The way to act, beside the amount it settles. Only when the
+                  plan actually asks you to pay: pairwise nets SUM to your
+                  balance, so you can owe one person and still have nothing to
+                  pay, and then this would open a plan with nothing of yours. */}
+              {view !== 'plan' && iPayInPlan ? (
                 <PillButton title="Settle up" onTint onPress={() => show('plan')} />
-              </View>
-            ) : null}
+              ) : null}
+            </View>
             {/* Only with lists to sum: when they are withheld for drift, two
                 zeros here would contradict the figure above. */}
             {pairs.rows.length > 0 ? (
@@ -613,6 +676,62 @@ export default function SettleScreen() {
           </Card>
         </View>
       </ScrollView>
+
+      <Sheet visible={payFor != null} title="Pay with" onClose={() => setPayFor(null)}>
+        {payFor ? (
+          <>
+            <View style={styles.payAmount}>
+              <ThemedText themeColor="textSecondary" style={Type.caption}>
+                {nameOf(payFor.to)}
+              </ThemedText>
+              <ThemedText style={styles.payAmountText}>{formatPaise(payFor.amountPaise)}</ThemedText>
+            </View>
+
+            {payApps == null ? (
+              <ActivityIndicator color={theme.textSecondary} />
+            ) : payApps.length === 0 ? (
+              <ThemedText themeColor="textSecondary" style={[Type.body, { textAlign: 'center' }]}>
+                No UPI apps on this phone.
+              </ThemedText>
+            ) : (
+              <View style={styles.payGrid}>
+                {payApps.map((app) => (
+                  <Pressable
+                    key={app.packageName}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Pay with ${app.label}`}
+                    onPress={() => void payWith(payFor, app)}
+                    style={({ pressed }) => [styles.payTile, { opacity: pressed ? 0.6 : 1 }]}>
+                    {app.icon ? (
+                      <Image source={{ uri: app.icon }} style={styles.payIcon} contentFit="contain" />
+                    ) : (
+                      <View
+                        style={[
+                          styles.payIcon,
+                          styles.payIconBlank,
+                          { backgroundColor: theme.backgroundSelected },
+                        ]}>
+                        <Ionicons name="wallet-outline" size={22} color={theme.textSecondary} />
+                      </View>
+                    )}
+                    <ThemedText style={styles.payLabel} numberOfLines={1}>
+                      {app.label}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {/* Blue: information, not a warning. */}
+            <View style={[styles.payNote, { backgroundColor: theme.infoSoft }]}>
+              <Ionicons name="copy-outline" size={15} color={theme.info} />
+              <ThemedText style={[Type.micro, { color: theme.info, flex: 1 }]}>
+                The amount is copied when you pick an app
+              </ThemedText>
+            </View>
+          </>
+        ) : null}
+      </Sheet>
     </SafeAreaView>
   );
 
@@ -1038,13 +1157,23 @@ export default function SettleScreen() {
                     ) : (
                       <View />
                     )}
-                    <PillButton
-                      title={action.title}
-                      disabled={action.disabled}
-                      loading={paying(t)}
-                      tone={yours ? 'primary' : 'neutral'}
-                      onPress={() => confirmPaid(t, kind)}
-                    />
+                    {/* Pay leads when it is offered -- it is the thing to do
+                        -- and "I have paid this" steps back to grey beside
+                        it, for money already sent some other way. */}
+                    <View style={styles.pillRow}>
+                      {upi && kind === 'owe' && !action.disabled ? (
+                        <PillButton title="Pay" icon="wallet-outline" onPress={() => startPay(t)} />
+                      ) : null}
+                      <PillButton
+                        title={action.title}
+                        disabled={action.disabled}
+                        loading={paying(t)}
+                        tone={
+                          yours && !(upi && kind === 'owe' && !action.disabled) ? 'primary' : 'neutral'
+                        }
+                        onPress={() => confirmPaid(t, kind)}
+                      />
+                    </View>
                   </View>
                 </View>
               );
@@ -1123,6 +1252,7 @@ function routingNotes(pair: PairNet, them: string): string[] {
 function PillButton({
   title,
   onPress,
+  icon,
   disabled = false,
   loading = false,
   tone = 'primary',
@@ -1130,6 +1260,7 @@ function PillButton({
 }: {
   title: string;
   onPress: () => void;
+  icon?: keyof typeof Ionicons.glyphMap;
   disabled?: boolean;
   loading?: boolean;
   tone?: 'primary' | 'neutral';
@@ -1160,9 +1291,12 @@ function PillButton({
       {loading ? (
         <ActivityIndicator size="small" color={ink} />
       ) : (
-        <ThemedText style={[styles.pillText, { color: ink }]} numberOfLines={1}>
-          {title}
-        </ThemedText>
+        <View style={styles.pillInner}>
+          {icon ? <Ionicons name={icon} size={15} color={ink} /> : null}
+          <ThemedText style={[styles.pillText, { color: ink }]} numberOfLines={1}>
+            {title}
+          </ThemedText>
+        </View>
       )}
     </Pressable>
   );
@@ -1304,7 +1438,8 @@ const styles = StyleSheet.create({
   summaryDivider: { width: StyleSheet.hairlineWidth },
   summaryRight: { paddingLeft: Spacing.three },
   summaryPart: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
-  summaryAction: { flexDirection: 'row', marginTop: Spacing.one },
+  // The amount on the left, Settle up on the right of it.
+  summaryAction: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
 
   // One row of a grouped list (Balances, the plan).
   listRow: {
@@ -1333,6 +1468,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pillText: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  pillInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+
+  payAmount: { alignItems: 'center', gap: 2 },
+  payAmountText: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.6 },
+  // Four to a row, like a phone's own app drawer.
+  payGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: Spacing.three },
+  payTile: { width: '25%', alignItems: 'center', gap: Spacing.one + 2 },
+  payIcon: { width: 52, height: 52, borderRadius: 14 },
+  payIconBlank: { alignItems: 'center', justifyContent: 'center' },
+  payLabel: { fontSize: 12, lineHeight: 16, textAlign: 'center', paddingHorizontal: 2 },
+  payNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
   // A row of pills, pushed to the right of the card.
   pillRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },

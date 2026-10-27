@@ -697,6 +697,23 @@ check(
     !/calculator/i.test(read('src', 'app', '(app)', '(tabs)', 'more.tsx')),
   'a calculator screen or a link to it is back'
 );
+// Pay: the phone's own UPI apps, from modules/upi-apps.
+check(
+  'the UPI apps module is optional, so older APKs do not crash',
+  /requireOptionalNativeModule<\w+>\('RoomlyUpiApps'\)/.test(read('src', 'lib', 'pay-apps.ts')),
+  'pay-apps.ts requires the native module outright; an EAS update would crash APKs built without it'
+);
+check(
+  'Pay only appears in builds that have the module',
+  /upi && kind === 'owe'/.test(read('src', 'app', '(app)', 'settle.tsx')),
+  'the Pay pill is not gated on canPayByUpi()'
+);
+check(
+  'the APK asks only for UPI apps, not every installed app',
+  /android:scheme="upi"/.test(read('modules', 'upi-apps', 'android', 'src', 'main', 'AndroidManifest.xml')) &&
+    !/QUERY_ALL_PACKAGES/.test(read('modules', 'upi-apps', 'android', 'src', 'main', 'AndroidManifest.xml')),
+  'the manifest is missing the upi <queries> entry, or asks for QUERY_ALL_PACKAGES'
+);
 check(
   'the recurring form does not swallow the first tap',
   /keyboardShouldPersistTaps/.test(read('src', 'app', '(app)', 'recurring.tsx')),

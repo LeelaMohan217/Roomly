@@ -1,0 +1,6 @@
+{
+  "name": "upi-apps",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lists the installed apps that can pay by UPI, and opens one. Android only."
+}

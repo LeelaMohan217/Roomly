@@ -170,16 +170,16 @@ export const Colors = {
     brandInk: '#3ECF8E',
 
     // A dark green in dark mode: bright green on a near-black page would
-    // glare. The amount is the bright green again (6.1:1), and "you owe" a
-    // light red, since #F87171 was 4.4:1 on this green.
+    // glare. The amount is white either way, as in light mode: the light red
+    // read as pink on this green, and the label above says which way it is.
     balanceCard: '#0F3D2E',
     balanceEdge: '#1B5A44',
     onBalance: '#FFFFFF',
     onBalanceMuted: '#A7F3D0',
     balanceRing: 'rgba(255,255,255,0.08)',
     balanceRule: 'rgba(255,255,255,0.16)',
-    balancePositive: '#3ECF8E',
-    balanceNegative: '#FCA5A5',
+    balancePositive: '#FFFFFF',
+    balanceNegative: '#FFFFFF',
 
     // Deep green and deep olive, with pale ink (12:1+) and brighter icons.
     houseCard: '#10281F',

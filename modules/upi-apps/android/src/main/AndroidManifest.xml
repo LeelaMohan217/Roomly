@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android 11+ hides other apps unless the APK says which kind it looks
+       for. This asks for exactly one kind: apps that open upi:// links. It
+       does not need (and must not use) the "see every installed app"
+       permission, which Play Store review rejects for an app like this. Merged into the app's manifest. -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <data android:scheme="upi" />
+    </intent>
+  </queries>
+</manifest>
