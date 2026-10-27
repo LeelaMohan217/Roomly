@@ -675,7 +675,7 @@ export default function SettleScreen() {
                 ]}>
                 {/* Neutral, as in Home's Balances: green means the money, not
                     the person. */}
-                <Avatar name={them} seed={pair.memberId} size={34} neutral />
+                <Avatar name={them} seed={pair.memberId} size={34} />
 
                 <View style={styles.flex}>
                   <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>

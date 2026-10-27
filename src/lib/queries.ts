@@ -85,6 +85,39 @@ export function useMembers() {
   });
 }
 
+/**
+ * Member id -> their photo's storage path and public URL, for those who have
+ * one.
+ *
+ * Its own query rather than a column on useMembers: avatar_path arrives with
+ * migration 0037, and a build that asks for a column the database does not
+ * have yet would fail the members list -- and with it nearly every screen. A
+ * failure here just means no photos.
+ */
+export function useMemberPhotos() {
+  return useQuery({
+    queryKey: ['member-photos', 1],
+    queryFn: async (): Promise<Record<string, { path: string; url: string }>> => {
+      const { data, error } = await supabase
+        .from('members')
+        .select('id, avatar_path')
+        .not('avatar_path', 'is', null);
+      if (error) return {};
+
+      const photos: Record<string, { path: string; url: string }> = {};
+      for (const m of data as { id: string; avatar_path: string | null }[]) {
+        if (m.avatar_path) {
+          photos[m.id] = {
+            path: m.avatar_path,
+            url: supabase.storage.from('avatars').getPublicUrl(m.avatar_path).data.publicUrl,
+          };
+        }
+      }
+      return photos;
+    },
+  });
+}
+
 export type SpendSummary = {
   /** Everything the household spent, all members combined. */
   roomMonthPaise: number;

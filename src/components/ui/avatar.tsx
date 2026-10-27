@@ -1,10 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { avatarPairFor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useMembers } from '@/lib/queries';
+import { useMemberPhotos } from '@/lib/queries';
 
 /** "Mohan Nethala" -> "MN", "Ravi" -> "RA". Never more than two glyphs. */
 function initials(name: string): string {
@@ -16,7 +15,7 @@ function initials(name: string): string {
 
 type Props = {
   name: string;
-  /** Stable colour source — the member id, so it never changes on rename. */
+  /** The member id: their photo, when they have one, replaces the initials. */
   seed?: string;
   size?: number;
   ring?: boolean;
@@ -24,19 +23,25 @@ type Props = {
   /** A person glyph instead of initials — for the header, where the avatar
    *  means "you" rather than identifying one of several people. */
   icon?: boolean;
-  /** Overrides the stored colour — for previewing a pick before it is saved. */
-  color?: string | null;
-  /** Pale brand green with green initials, in place of the member's own
-   *  colour -- for lists drawn in the one brand colour, like Home's
-   *  Balances. Everywhere else keeps the colour each member picked. */
+  /** Pale brand green with green initials -- for a picker where green marks
+   *  the choice, like History's "paid by" filter. */
   brand?: boolean;
-  /** Plain grey with dark initials -- for a list where green already means
-   *  something else, like Home's Balances, where it marks money owed to
-   *  you. Everywhere else keeps the colour each member picked. */
-  neutral?: boolean;
   style?: ViewStyle;
 };
 
+/**
+ * A person: their photo, or a plain grey circle with their initials.
+ *
+ * The photo is looked up here rather than threaded through every call site:
+ * useMemberPhotos is one shared cache entry, so every avatar in the app shows
+ * a photo the moment its owner adds one.
+ *
+ * No per-person colour. The six coloured gradients (and the picker that chose
+ * between them) put purple and pink into an app whose colours each mean
+ * something -- green money in, red owed, yellow warnings, blue information --
+ * and a purple circle next to a red amount read as one more signal. The name
+ * beside an avatar is what identifies someone.
+ */
 export function Avatar({
   name,
   seed,
@@ -44,43 +49,15 @@ export function Avatar({
   ring = false,
   ringColor,
   icon = false,
-  color,
   brand = false,
-  neutral = false,
   style,
 }: Props) {
   const theme = useTheme();
-  // Resolved here rather than threaded through eighteen call sites: useMembers
-  // is one shared cache entry, so every avatar in the app honours a colour the
-  // moment its owner picks one, and anyone who has left falls back to the
-  // deterministic colour derived from their id.
-  const members = useMembers();
-  const stored = seed ? members.data?.find((m) => m.id === seed)?.avatarColor : undefined;
-
-  const [from, to] = avatarPairFor(color ?? stored, seed ?? name);
+  const fill = brand ? theme.primarySoft : theme.backgroundSelected;
+  const ink = brand ? theme.brandInk : theme.textSecondary;
   const fontSize = Math.round(size * 0.38);
-
-  // The two flat styles: a solid pale circle with coloured initials.
-  if (brand || neutral) {
-    const fill = brand ? theme.primarySoft : theme.backgroundSelected;
-    const ink = brand ? theme.brandInk : theme.textSecondary;
-    return (
-      <View
-        style={[
-          styles.circle,
-          { width: size, height: size, borderRadius: size / 2, backgroundColor: fill },
-          style,
-        ]}>
-        {icon ? (
-          <Ionicons name="person" size={Math.round(size * 0.52)} color={ink} />
-        ) : (
-          <Text style={[styles.text, { fontSize, color: ink }]} allowFontScaling={false}>
-            {initials(name)}
-          </Text>
-        )}
-      </View>
-    );
-  }
+  const photos = useMemberPhotos();
+  const photo = seed ? photos.data?.[seed]?.url : undefined;
 
   return (
     <View
@@ -89,28 +66,36 @@ export function Avatar({
           padding: 2,
           borderRadius: (size + 4) / 2,
           borderWidth: 1.5,
-          borderColor: ringColor ?? from,
+          borderColor: ringColor ?? theme.border,
         },
         style,
       ]}>
-      <LinearGradient
-        colors={[from, to]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.circle, { width: size, height: size, borderRadius: size / 2 }]}>
-        {icon ? (
-          <Ionicons name="person" size={Math.round(size * 0.52)} color="#FFFFFF" />
+      <View
+        style={[
+          styles.circle,
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: fill },
+        ]}>
+        {photo ? (
+          <Image
+            source={{ uri: photo }}
+            style={{ width: size, height: size, borderRadius: size / 2 }}
+            contentFit="cover"
+            transition={150}
+            accessibilityLabel={`${name}'s photo`}
+          />
+        ) : icon ? (
+          <Ionicons name="person" size={Math.round(size * 0.52)} color={ink} />
         ) : (
-          <Text style={[styles.text, { fontSize }]} allowFontScaling={false}>
+          <Text style={[styles.text, { fontSize, color: ink }]} allowFontScaling={false}>
             {initials(name)}
           </Text>
         )}
-      </LinearGradient>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  text: { color: '#FFFFFF', fontWeight: '700', letterSpacing: 0.3 },
+  text: { fontWeight: '700', letterSpacing: 0.3 },
 });

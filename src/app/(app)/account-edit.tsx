@@ -1,52 +1,37 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AuthField } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
-import { TextField } from '@/components/ui/text-field';
-import { AVATAR_COLORS, Radius, Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { humanError } from '@/lib/errors';
-import { formatPhone, normalizePhone, PHONE_PREFIX, phoneProblem, toTenDigits } from '@/lib/phone';
-import { useMembers, useMyPhone } from '@/lib/queries';
+import { formatPhone } from '@/lib/phone';
+import { canPickPhoto, pickAndUploadPhoto, removePhoto, type PhotoResult } from '@/lib/photo';
+import { useMemberPhotos, useMyPhone } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
 /**
- * Everything about you that you are allowed to change.
+ * Your details, read-only: photo or person glyph, your name, and what you
+ * sign in with.
  *
- * Split into three cards because they fail in three different ways: a name
- * saves instantly, a household rename is owner-only, and an email change is
- * not real until you click a link in your inbox. One combined Save button
- * would have to explain all three outcomes at once.
+ * Rows carry an icon and the value, no label -- an envelope beside an address
+ * says "email" already. The photo is the one thing you can change here:
+ * editing the rest is switched off for now, and the form it had (name,
+ * household, email, phone, password in one sheet) is in git history.
  */
 export default function AccountEditScreen() {
   const theme = useTheme();
   const dialog = useDialog();
   const queryClient = useQueryClient();
-  const { member, session, refresh } = useSession();
-  const members = useMembers();
+  const { member, session } = useSession();
   const isOwner = member?.role === 'owner';
-
-  const me = members.data?.find((m) => m.id === member?.id);
-
-  const [name, setName] = useState(member?.display_name ?? '');
-  const [color, setColor] = useState<string | null>(null);
-  // null means "untouched, show whatever the server says". Seeding this from
-  // inside the query function would be a setState during a fetch.
-  const [houseName, setHouseName] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [phoneTouched, setPhoneTouched] = useState(false);
-  const [password, setPassword] = useState('');
   const myPhone = useMyPhone(session?.user.id);
 
   const household = useQuery({
@@ -63,312 +48,184 @@ export default function AccountEditScreen() {
     },
   });
 
-  // Through an RPC, not a direct update: members_owner_update is owner-only,
-  // so a non-owner renaming themselves would have matched no policy, updated
-  // zero rows and reported success. Silently.
-  const saveProfile = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('update_my_profile', {
-        p_display_name: name.trim(),
-        p_avatar_color: color,
-      });
-      if (error) throw error;
-    },
-    onSuccess: async () => {
-      setColor(null);
-      await refresh();
-      void queryClient.invalidateQueries();
-      dialog.toast({ message: 'Profile saved' });
-    },
-    onError: (e) => void dialog.alert({ tone: 'danger', title: 'Could not save', message: message(e) }),
-  });
+  const photos = useMemberPhotos();
+  const myPhoto = member ? photos.data?.[member.id] : undefined;
+  const pickable = canPickPhoto();
+  const [busy, setBusy] = useState(false);
 
-  const saveHousehold = useMutation({
-    mutationFn: async () => {
-      // .select() so a policy that filters this row shows up as zero rows
-      // instead of a silent success, which is how the delete bug hid.
-      const { data, error } = await supabase
-        .from('households')
-        .update({ name: shownHouseName.trim() })
-        .eq('id', member!.household_id)
-        .select('id');
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error('Only the owner can rename the household.');
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries();
-      dialog.toast({ message: 'Household renamed' });
-    },
-    onError: (e) => void dialog.alert({ tone: 'danger', title: 'Could not rename', message: message(e) }),
-  });
+  async function finish(result: PhotoResult, done: string) {
+    setBusy(false);
+    if (result.kind === 'saved') {
+      void queryClient.invalidateQueries({ queryKey: ['member-photos'] });
+      dialog.toast({ message: done });
+    } else if (result.kind === 'failed') {
+      void dialog.alert({ tone: 'danger', title: 'Could not save the photo', message: result.reason });
+    }
+  }
 
-  const changeEmail = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.auth.updateUser({ email: email.trim() });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      void dialog.alert({
-        tone: 'info',
-        icon: 'mail-unread-outline',
-        title: 'Check your new inbox',
-        message: `We sent a confirmation link to ${email.trim()}. Your sign-in email changes once you open it.`,
-      });
-      setEmail('');
-    },
-    onError: (e) =>
-      void dialog.alert({ tone: 'danger', title: 'Could not change email', message: message(e) }),
-  });
+  async function choosePhoto() {
+    if (!member) return;
+    setBusy(true);
+    await finish(
+      await pickAndUploadPhoto(member.household_id, member.id, myPhoto?.path ?? null),
+      'Photo saved'
+    );
+  }
 
-  const changePhone = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('set_my_phone', { p_phone: normalizePhone(phone) });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setPhone('');
-      setPhoneTouched(false);
-      void queryClient.invalidateQueries({ queryKey: ['my-phone'] });
-      dialog.toast({ message: 'Number saved. You can now sign in with it.' });
-    },
-    onError: (e) =>
-      void dialog.alert({ tone: 'danger', title: 'Could not save the number', message: message(e) }),
-  });
-
-  const changePassword = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      dialog.toast({ message: 'Password changed. Other devices will need the new one.' });
-      setPassword('');
-    },
-    onError: (e) =>
-      void dialog.alert({ tone: 'danger', title: 'Could not change password', message: message(e) }),
-  });
-
-  const trimmedName = name.trim();
-  const nameDirty = trimmedName !== (member?.display_name ?? '') || color !== null;
-  const nameValid = trimmedName.length > 0 && trimmedName.length <= 40;
-
-  const shownHouseName = houseName ?? household.data?.name ?? '';
-  const houseDirty =
-    shownHouseName.trim() !== (household.data?.name ?? '') && shownHouseName.trim() !== '';
-  const emailValid = /^\S+@\S+\.\S+$/.test(email.trim());
-  const passwordShort = password.length > 0 && password.length < 8;
+  async function dropPhoto() {
+    setBusy(true);
+    await finish(await removePhoto(myPhoto?.path ?? null), 'Photo removed');
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Edit your details" />
+      <ScreenHeader title="Your details" />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        {/* ------------------------------- you ------------------------------- */}
-        <Section title="YOU">
-          <Card style={styles.card}>
-            <View style={styles.preview}>
-              <Avatar
-                name={trimmedName || (member?.display_name ?? '?')}
-                seed={member?.id}
-                color={color ?? me?.avatarColor}
-                size={56}
-              />
-              <View style={styles.swatches}>
-                {AVATAR_COLORS.map(([hex]) => {
-                  const active = (color ?? me?.avatarColor)?.toLowerCase() === hex.toLowerCase();
-                  return (
-                    <Pressable
-                      key={hex}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Avatar colour ${hex}`}
-                      onPress={() => setColor(hex)}
-                      style={({ pressed }) => [
-                        styles.swatch,
-                        {
-                          backgroundColor: hex,
-                          borderColor: active ? theme.text : 'transparent',
-                          opacity: pressed ? 0.7 : 1,
-                        },
-                      ]}
-                    />
-                  );
-                })}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Who you are, at a glance. A plain person glyph until photos
+            arrive -- no colour, so nothing here competes with the money
+            colours elsewhere. */}
+        <View style={styles.hero}>
+          {/* Tap the avatar to choose a photo; the camera badge says so. Only
+              in builds that include the picker -- older APKs get the plain
+              avatar, since an update cannot add a native module. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={myPhoto ? 'Change your photo' : 'Add a photo'}
+            disabled={!pickable || busy}
+            onPress={() => void choosePhoto()}
+            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+            <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={84} icon />
+            {pickable ? (
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: theme.primary, borderColor: theme.background },
+                ]}>
+                {busy ? (
+                  <ActivityIndicator size="small" color={theme.onPrimary} />
+                ) : (
+                  <Ionicons name="camera" size={15} color={theme.onPrimary} />
+                )}
               </View>
-            </View>
+            ) : null}
+          </Pressable>
 
-            <TextField
-              label="Name"
-              value={name}
-              onChangeText={setName}
-              placeholder="Your name"
-              autoCapitalize="words"
-              editable={!saveProfile.isPending}
-              hint="This is the name on every expense you add"
-              error={trimmedName.length > 40 ? 'That name is too long' : undefined}
-            />
+          <ThemedText style={styles.heroName} numberOfLines={1}>
+            {member?.display_name}
+          </ThemedText>
 
-            <Button
-              title="Save"
-              onPress={() => saveProfile.mutate()}
-              loading={saveProfile.isPending}
-              disabled={!nameDirty || !nameValid}
-            />
-          </Card>
-        </Section>
-
-        {/* ---------------------------- household ---------------------------- */}
-        {isOwner ? (
-          <Section title="HOUSEHOLD">
-            <Card style={styles.card}>
-              <TextField
-                label="Name"
-                value={shownHouseName}
-                onChangeText={setHouseName}
-                placeholder="Room 302"
-                autoCapitalize="words"
-                editable={!saveHousehold.isPending}
-                hint="Everyone in the household sees this"
-              />
-              <Button
-                title="Rename household"
-                onPress={() => saveHousehold.mutate()}
-                loading={saveHousehold.isPending}
-                disabled={!houseDirty}
-              />
-            </Card>
-          </Section>
-        ) : null}
-
-        {/* ----------------------------- sign-in ----------------------------- */}
-        <Section title="SIGN-IN">
-          <Card style={styles.card}>
-            <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="mail-outline" size={14} color={theme.textTertiary} />
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-                Signed in as {session?.user.email}
+          {pickable && myPhoto ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => void dropPhoto()}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.pill,
+                { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
+              ]}>
+              <ThemedText themeColor="textSecondary" style={styles.pillText}>
+                Remove photo
               </ThemedText>
-            </View>
+            </Pressable>
+          ) : null}
+        </View>
 
-            <TextField
-              label="New email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              editable={!changeEmail.isPending}
-              hint="You confirm the change from a link sent to the new address"
-            />
-            <Button
-              title="Send confirmation"
-              variant="ghost"
-              onPress={() => changeEmail.mutate()}
-              loading={changeEmail.isPending}
-              disabled={!emailValid}
-            />
-          </Card>
-
-          {/* The number this account can sign in with. The one place to add
-              it for accounts made before phone sign-in, and to change it. */}
-          <Card style={styles.card}>
-            <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="call-outline" size={14} color={theme.textTertiary} />
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-                {myPhone.data
-                  ? `Signs in with ${formatPhone(myPhone.data)}`
-                  : 'No phone number yet. Add one to sign in with it.'}
-              </ThemedText>
-            </View>
-
-            <AuthField
-              label={myPhone.data ? 'New phone number' : 'Phone number'}
-              icon="call-outline"
-              prefix={PHONE_PREFIX}
-              value={phone}
-              onChangeText={(v) => setPhone(toTenDigits(v))}
-              onBlur={() => setPhoneTouched(true)}
-              keyboardType="number-pad"
-              autoComplete="tel-national"
-              placeholder="Enter mobile number"
-              editable={!changePhone.isPending}
-              hint={phoneTouched && phone ? (phoneProblem(phone) ?? undefined) : undefined}
-              hintTone={phoneTouched && phone && phoneProblem(phone) ? 'danger' : 'neutral'}
-            />
-            <Button
-              title="Save number"
-              variant="ghost"
-              onPress={() => changePhone.mutate()}
-              loading={changePhone.isPending}
-              disabled={!normalizePhone(phone)}
-            />
-          </Card>
-
-          <Card style={styles.card}>
-            <TextField
-              label="New password"
-              value={password}
-              onChangeText={setPassword}
-              secure
-              autoCapitalize="none"
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-              editable={!changePassword.isPending}
-              error={passwordShort ? 'Use at least 8 characters' : undefined}
-            />
-            <Button
-              title="Change password"
-              variant="ghost"
-              onPress={() => changePassword.mutate()}
-              loading={changePassword.isPending}
-              disabled={password.length < 8}
-            />
-          </Card>
-        </Section>
+        <Card padded={false}>
+          <Detail icon="mail-outline" label="Email" value={session?.user.email ?? ''} first />
+          <Detail
+            icon="call-outline"
+            label="Phone"
+            value={myPhone.data ? formatPhone(myPhone.data) : 'No number added'}
+          />
+          {isOwner ? (
+            <Detail icon="home-outline" label="Household" value={household.data?.name ?? '…'} />
+          ) : null}
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function message(e: unknown): string {
-  return humanError(e);
-}
+/** One detail: its icon and the value. `label` is for screen readers only. */
+function Detail({
+  icon,
+  label,
+  value,
+  first = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  first?: boolean;
+}) {
+  const theme = useTheme();
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={styles.section}>
-      <ThemedText themeColor="textTertiary" style={Type.label}>
-        {title}
+    <View
+      accessible
+      accessibilityLabel={`${label}, ${value}`}
+      style={[
+        styles.row,
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+      ]}>
+      <View style={[styles.rowIcon, { backgroundColor: theme.backgroundSelected }]}>
+        <Ionicons name={icon} size={17} color={theme.text} />
+      </View>
+      <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+        {value}
       </ThemedText>
-      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   content: {
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.six,
     gap: Spacing.four,
   },
-  flex: { flex: 1 },
 
-  section: { gap: Spacing.two },
-  card: { gap: Spacing.three },
+  hero: { alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two },
+  heroName: { fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.4 },
+  // Overlaps the avatar's lower right, ringed in the page colour so it reads
+  // as sitting on top.
+  badge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pill: {
+    minHeight: 30,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillText: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
 
-  preview: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  swatches: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 2 },
-
-  note: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+  },
+  // The same soft square as Account's rows.
+  rowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

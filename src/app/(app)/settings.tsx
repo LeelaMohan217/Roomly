@@ -146,11 +146,11 @@ Running ${buildLabel()}.`;
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* A row, not a centred stack: the identity reads left-to-right in one
             line of sight and costs a third of the height. */}
-        {/* The identity block is the edit affordance. A separate "Edit" row
-            would be a second thing to find for the same job. */}
+        {/* The identity block opens Your details. A separate row would be a
+            second thing to find for the same job. */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Edit your details"
+          accessibilityLabel="Your details"
           onPress={() => router.push('/account-edit')}>
           {/* Pressed is a tint, not a fade: opacity on an elevated card fades
               the Android shadow and the contents separately, leaving a pale
@@ -159,7 +159,7 @@ Running ${buildLabel()}.`;
             <Card
               padded={false}
               style={[styles.profile, pressed && { backgroundColor: theme.backgroundSelected }]}>
-              <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={48} neutral />
+              <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={48} />
 
               {/* The role sits beside the email as plain words, not a coloured
                   pill: green on this screen is kept for things that are on. */}

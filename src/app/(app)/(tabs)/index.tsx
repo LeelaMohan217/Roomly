@@ -640,7 +640,7 @@ export default function HomeScreen() {
                 {/* Neutral, so colour on this card means only the money:
                     green coming back, red owed. The sign says it too, so no
                     "gets back" / "owes the house" caption. */}
-                <Avatar name={b.displayName} seed={b.memberId} size={34} neutral />
+                <Avatar name={b.displayName} seed={b.memberId} size={34} />
                 <ThemedText style={[Type.body, styles.medium, styles.flex]} numberOfLines={1}>
                   {b.displayName}
                 </ThemedText>
