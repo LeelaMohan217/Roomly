@@ -14,6 +14,7 @@ import { Notice } from '@/components/ui/notice';
 import { Spacing } from '@/constants/theme';
 import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
+import { setRecoveryPending, useRecoveryPending, verifyRecovery } from '@/lib/recovery';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
@@ -39,8 +40,11 @@ const MIN_PASSWORD = 8;
 export default function ResetPasswordScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { session, status, refresh } = useSession();
+  const { session, status, refresh, signOut } = useSession();
   const params = useLocalSearchParams<{ code?: string; token_hash?: string; type?: string }>();
+  // A reset link already signed this person in and they have not saved a
+  // password yet -- RootNavigator brings them back here until they do.
+  const recoveryPending = useRecoveryPending();
 
   // No token means there is no reset in progress, whatever the session says.
   //
@@ -50,7 +54,7 @@ export default function ResetPasswordScreen() {
   // be actively wrong: a background token refresh would flip an expired link
   // from "invalid" into a working password-change form.
   const [phase, setPhase] = useState<Phase>(
-    params.code || params.token_hash ? 'verifying' : 'idle'
+    params.code || params.token_hash ? 'verifying' : recoveryPending ? 'ready' : 'idle'
   );
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -70,12 +74,9 @@ export default function ResetPasswordScreen() {
     void (async () => {
       // PKCE sends ?code=…; the older template sends ?token_hash=…&type=recovery.
       // Handle both so a change of email template doesn't silently break this.
-      const result = params.code
-        ? await supabase.auth.exchangeCodeForSession(params.code)
-        : await supabase.auth.verifyOtp({
-            type: 'recovery',
-            token_hash: params.token_hash!,
-          });
+      // Shared, not per screen: a second copy of this screen for the same link
+      // waits for the first one's answer instead of spending the code again.
+      const result = await verifyRecovery({ code: params.code, tokenHash: params.token_hash });
 
       if (result.error) {
         setError(humanError(result.error));
@@ -99,8 +100,19 @@ export default function ResetPasswordScreen() {
       return;
     }
 
+    // Saved: the app stops holding them on this screen.
+    await setRecoveryPending(false);
     await refresh();
     setPhase('saved');
+  }
+
+  // The way off this screen without a new password. Signing out ends the
+  // session the link created, so nobody stays in the app without one.
+  async function cancel() {
+    setBusy(true);
+    await setRecoveryPending(false);
+    await signOut();
+    setBusy(false);
   }
 
   // Where this user is allowed to be right now.
@@ -246,6 +258,12 @@ export default function ResetPasswordScreen() {
 
           <View style={styles.submit}>
             <AuthButton title="Save new password" onPress={save} busy={busy} disabled={!canSave} />
+            <AuthButton
+              variant="secondary"
+              title="Cancel and sign out"
+              onPress={() => void cancel()}
+              disabled={busy}
+            />
           </View>
         </View>
       </KeyboardAwareScrollView>
@@ -263,5 +281,5 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   waiting: { fontSize: 14, lineHeight: 20, fontWeight: '400' },
-  submit: { marginTop: Spacing.one },
+  submit: { marginTop: Spacing.one, gap: Spacing.two },
 });

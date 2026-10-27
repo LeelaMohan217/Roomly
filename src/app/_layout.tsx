@@ -13,6 +13,7 @@ import { DialogProvider } from '@/components/ui/dialog';
 // design tokens reading different hooks is how you get light cards on a dark
 // page.
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { recoveryStarted, setRecoveryPending, useRecoveryPending } from '@/lib/recovery';
 import { SessionProvider, useSession } from '@/lib/session';
 import { SyncProvider } from '@/lib/sync';
 
@@ -74,10 +75,29 @@ function RootNavigator() {
   const pathname = usePathname();
   const url = Linking.useURL();
   const handledUrl = useRef<string | null>(null);
+  const recoveryPending = useRecoveryPending();
+  // The reset flag is read from storage at launch; until it is known the app
+  // cannot tell whether to land on the new-password form.
+  const booting = status === 'loading' || recoveryPending === null;
 
   useEffect(() => {
-    if (status !== 'loading') void SplashScreen.hideAsync();
-  }, [status]);
+    if (!booting) void SplashScreen.hideAsync();
+  }, [booting]);
+
+  /**
+   * A reset link signed this person in and they have not chosen a password
+   * yet: keep them on "Choose a new password" -- after Back, after a restart,
+   * from anywhere -- until they save one or sign out.
+   *
+   * Signed out with the flag still set means it is stale (the session ended
+   * some other way), so it is dropped -- but never while reset-password is
+   * showing, which is where a link is verified before the session arrives.
+   */
+  useEffect(() => {
+    if (booting || !recoveryPending || pathname === '/reset-password') return;
+    if (status === 'signedOut') void setRecoveryPending(false);
+    else router.replace('/reset-password');
+  }, [booting, recoveryPending, status, pathname, router]);
 
   /**
    * The password-reset link, delivered by hand.
@@ -95,7 +115,7 @@ function RootNavigator() {
    * "This link didn't work".
    */
   useEffect(() => {
-    if (status === 'loading' || !url || handledUrl.current === url) return;
+    if (booting || !url || handledUrl.current === url) return;
 
     const link = Linking.parse(url);
     // roomly:///reset-password puts it in the path; roomly://reset-password
@@ -109,19 +129,22 @@ function RootNavigator() {
     if (!code && !tokenHash) return;
 
     handledUrl.current = url;
-    if (pathname === '/reset-password') return;
+    // Already on it, or the router's own copy of the screen has started
+    // verifying -- in which case opening another would only be a second
+    // screen waiting on the same answer.
+    if (pathname === '/reset-password' || recoveryStarted({ code, tokenHash })) return;
 
     router.replace({
       pathname: '/reset-password',
       params: code ? { code } : { token_hash: tokenHash!, type: 'recovery' },
     });
-  }, [status, url, pathname, router]);
+  }, [booting, url, pathname, router]);
 
   // While the session is still being worked out, the brand screen -- the
   // same green and wordmark as the native splash -- rather than nothing. The
   // native splash is hidden the moment this has drawn underneath it, so the
   // wait looks like one screen, then sign in or home.
-  if (status === 'loading') {
+  if (booting) {
     return <BrandSplash onLayout={() => void SplashScreen.hideAsync()} />;
   }
 

@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { clear as clearOutbox } from '@/lib/outbox';
+import { setRecoveryPending } from '@/lib/recovery';
 import { supabase } from '@/lib/supabase';
 
 export type MemberRow = {
@@ -310,6 +311,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    // A half-finished password reset belonged to that session too.
+    await setRecoveryPending(false);
     setMember(null);
     setPending(null);
     setUnreachable(false);
