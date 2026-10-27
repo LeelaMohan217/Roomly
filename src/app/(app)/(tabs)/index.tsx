@@ -147,10 +147,11 @@ function BalanceCard({
  *
  * Two greens, one per card -- mint for the household, a soft lime for you --
  * so the pair stays on-brand yet reads as two different things; each tone
- * carries its own darker ink from the theme. No month on the label: the big
- * figure is plainly this month's, and the footnote names its own ("Sept
- * ₹68,825"). Whole rupees here (formatWholeRupees): it's a glance at a
- * month's spending. History has the exact figures.
+ * carries its own darker ink from the theme. The label names the month ("House
+ * spent · Oct") and the footnote says "Last month": without them a cold
+ * reader could not tell what either figure was. Whole rupees here
+ * (formatWholeRupees): it's a glance at a month's spending. History has the
+ * exact figures.
  */
 function SmallCard({
   tone,
@@ -161,10 +162,10 @@ function SmallCard({
 }: {
   tone: 'house' | 'share';
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  /** Whose money: "Household", "Your share". */
+  /** What and when: "House spent · Oct", "Your share · Oct". */
   label: string;
   value?: string;
-  /** Last month's figure: "Sept ₹68,825". */
+  /** Last month's figure: "Last month ₹68,825". */
   compare?: string;
 }) {
   const theme = useTheme();
@@ -392,11 +393,8 @@ export default function HomeScreen() {
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = (member?.display_name ?? '').trim().split(/\s+/)[0] || 'there';
-  // Short ("Sept"): the small cards' footnote is half a screen wide.
-  const prevMonthShort = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(
-    'en-IN',
-    { month: 'short' }
-  );
+  // Short ("Oct"): the small cards are half a screen wide.
+  const monthShort = now.toLocaleDateString('en-IN', { month: 'short' });
 
   // Not hand-memoized: React Compiler is enabled (app.json), and it could not
   // preserve a useMemo whose deps are rebuilt every render -- it reported
@@ -452,25 +450,28 @@ export default function HomeScreen() {
           />
 
           <View style={styles.smallCards}>
+            {/* Each label says what the number is and when: someone shown
+                the cards cold read "Household ₹40,969" and "Sept ₹68,825"
+                and could not tell what either meant. */}
             <SmallCard
               tone="house"
               icon="home-outline"
-              label="Household"
+              label={`House spent · ${monthShort}`}
               value={spend.data ? formatWholeRupees(spend.data.roomMonthPaise) : undefined}
               compare={
                 spend.data
-                  ? `${prevMonthShort} ${formatWholeRupees(spend.data.roomPrevMonthFullPaise)}`
+                  ? `Last month ${formatWholeRupees(spend.data.roomPrevMonthFullPaise)}`
                   : undefined
               }
             />
             <SmallCard
               tone="share"
               icon="account-outline"
-              label="Your share"
+              label={`Your share · ${monthShort}`}
               value={spend.data ? formatWholeRupees(spend.data.myMonthPaise) : undefined}
               compare={
                 spend.data
-                  ? `${prevMonthShort} ${formatWholeRupees(spend.data.myPrevMonthFullPaise)}`
+                  ? `Last month ${formatWholeRupees(spend.data.myPrevMonthFullPaise)}`
                   : undefined
               }
             />
