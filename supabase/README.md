@@ -23,6 +23,8 @@ the SQL Editor can roll back silently.
 | 0034 | Lock function grants | Every function closed to clients except an explicit allowlist; new functions start closed |
 | 0035 | Phone sign-in | Phone number + password as a second way to sign in, no SMS. The only two functions open to `anon` |
 | 0036 | Set my phone | An existing account adds or changes its own phone number |
+| 0037 | Member photos | `avatar_path`, the public `avatars` bucket limited to your own folder, `set_my_photo` |
+| 0038 | Query indexes | Indexes matching the app's list queries and `member_balance()`; safe to re-run |
 
 ## Adding a function
 
