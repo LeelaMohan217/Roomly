@@ -688,11 +688,10 @@ export default function SettleScreen() {
                   </ThemedText>
                 </View>
 
-                {/* Green for money coming to you, plain for money going out:
-                    the sign already says which, and red on every debt made an
-                    ordinary balance look like an error. */}
+                {/* Green for money coming to you, red for money you owe --
+                    the same two colours every balance in the app uses. */}
                 <ThemedText
-                  style={[styles.rowAmount, { color: owesMe ? theme.positive : theme.text }]}
+                  style={[styles.rowAmount, { color: owesMe ? theme.positive : theme.negative }]}
                   accessibilityLabel={
                     owesMe
                       ? `${them} owes you ${formatPaise(pair.netPaise)}`
@@ -749,7 +748,7 @@ export default function SettleScreen() {
                         style={[
                           Type.caption,
                           styles.semi,
-                          { color: l.deltaPaise >= 0 ? theme.positive : theme.text },
+                          { color: l.deltaPaise >= 0 ? theme.positive : theme.negative },
                         ]}>
                         {l.deltaPaise >= 0 ? '+' : '−'}
                         {formatPaise(Math.abs(l.deltaPaise))}
@@ -952,10 +951,15 @@ export default function SettleScreen() {
                       ) : null}
                     </View>
 
-                    {/* Green only for money coming to you, as on Balances. */}
+                    {/* Green coming to you, red going out, plain between
+                        two other people -- as on Balances. */}
                     <ThemedText
-                      style={[styles.rowAmount, kind === 'owed' && { color: theme.positive }]}>
-                      {kind === 'owed' ? '+ ' : ''}
+                      style={[
+                        styles.rowAmount,
+                        kind === 'owed' && { color: theme.positive },
+                        kind === 'owe' && { color: theme.negative },
+                      ]}>
+                      {kind === 'owed' ? '+ ' : kind === 'owe' ? '− ' : ''}
                       {formatPaise(t.amountPaise)}
                     </ThemedText>
                   </View>

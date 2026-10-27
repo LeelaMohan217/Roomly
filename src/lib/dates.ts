@@ -28,6 +28,17 @@ export function addDays(iso: string, delta: number): string {
   return isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
+/** "Today", "Yesterday", else "25 Oct" -- for lists of recent expenses. */
+export function dayLabel(iso: string): string {
+  const today = todayIso();
+  if (iso === today) return 'Today';
+  if (iso === addDays(today, -1)) return 'Yesterday';
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
 /** Inclusive day count: the 5th to the 7th is 3 days. */
 export function daysBetween(startIso: string, endIso: string): number {
   const a = new Date(`${startIso}T00:00:00`).getTime();

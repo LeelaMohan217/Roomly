@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addDays, formatRange, todayIso } from '@/lib/dates';
+import { dayLabel, formatRange } from '@/lib/dates';
 import { activeFilterCount, useHistoryFilters } from '@/lib/history-filters';
 import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
@@ -21,16 +21,6 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** "Today", "Yesterday", else "25 Oct" -- the heading over one day's list. */
-function dayLabel(iso: string): string {
-  const today = todayIso();
-  if (iso === today) return 'Today';
-  if (iso === addDays(today, -1)) return 'Yesterday';
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
 
 /**
  * Every expense, newest first, grouped by month under the month's total.

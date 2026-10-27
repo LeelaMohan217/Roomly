@@ -25,7 +25,7 @@ import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { todayIso } from '@/lib/dates';
+import { dayLabel, todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
 import { iconFor } from '@/lib/icons';
 import { formatPaise, formatWholeRupees } from '@/lib/money';
@@ -513,33 +513,26 @@ export default function HomeScreen() {
         />
         </Appear>
 
+        {/* Notes, one line each, coloured by what they are: yellow for
+            something to keep in mind, never green, which means money in. */}
         {awayToday.length > 0 ? (
-          <Pressable onPress={() => router.push('/away')}>
-            <Card padded={false} style={[styles.banner, { backgroundColor: theme.warningSoft }]}>
-              <Ionicons name="airplane-outline" size={16} color={theme.warning} />
-              <ThemedText themeColor="textSecondary" style={[Type.caption, styles.flex]}>
-                <ThemedText style={[Type.caption, styles.semi]}>
-                  {awayToday.map((m) => m.displayName).join(', ')}
-                </ThemedText>{' '}
-                away — day-to-day costs split without them
-              </ThemedText>
-            </Card>
-          </Pressable>
+          <Note
+            tone="warning"
+            icon="airplane-outline"
+            text={`${awayToday.map((m) => m.displayName).join(', ')} ${awayToday.length === 1 ? 'is' : 'are'} away`}
+            onPress={() => router.push('/away')}
+          />
         ) : null}
 
         {/* Varying bills can't be auto-posted, so they surface here rather
             than silently not happening. */}
         {dueForAmount > 0 ? (
-          <Pressable onPress={() => router.push('/recurring')}>
-            <Card padded={false} style={[styles.banner, { backgroundColor: theme.primarySoft }]}>
-              <Ionicons name="repeat" size={16} color={theme.brandInk} />
-              <ThemedText style={[Type.caption, styles.flex]}>
-                {dueForAmount} recurring bill{dueForAmount === 1 ? '' : 's'} need
-                {dueForAmount === 1 ? 's' : ''} an amount
-              </ThemedText>
-              <Ionicons name="chevron-forward" size={15} color={theme.brandInk} />
-            </Card>
-          </Pressable>
+          <Note
+            tone="warning"
+            icon="repeat"
+            text={`${dueForAmount} bill${dueForAmount === 1 ? '' : 's'} need${dueForAmount === 1 ? 's' : ''} an amount`}
+            onPress={() => router.push('/recurring')}
+          />
         ) : null}
 
         {isOwner && approvalCount > 0 ? (
@@ -644,24 +637,21 @@ export default function HomeScreen() {
                     borderBottomColor: theme.border,
                   },
                 ]}>
-                {/* Neutral, so green on this card means only one thing: the
-                    "+" amount of money coming back. */}
-                <Avatar name={b.displayName} seed={b.memberId} size={36} neutral />
-                <View style={styles.flex}>
-                  <ThemedText style={Type.body} numberOfLines={1}>
-                    {b.displayName}
-                  </ThemedText>
-                  <ThemedText themeColor="textTertiary" style={Type.micro}>
-                    {b.balancePaise > 0
-                      ? 'gets back'
-                      : b.balancePaise < 0
-                        ? 'owes the house'
-                        : 'settled up'}
-                  </ThemedText>
-                </View>
+                {/* Neutral, so colour on this card means only the money:
+                    green coming back, red owed. The sign says it too, so no
+                    "gets back" / "owes the house" caption. */}
+                <Avatar name={b.displayName} seed={b.memberId} size={34} neutral />
+                <ThemedText style={[Type.body, styles.medium, styles.flex]} numberOfLines={1}>
+                  {b.displayName}
+                </ThemedText>
                 <ThemedText
+                  accessibilityLabel={
+                    b.balancePaise > 0
+                      ? `${b.displayName} gets back ${formatPaise(b.balancePaise)}`
+                      : `${b.displayName} owes the house ${formatPaise(-b.balancePaise)}`
+                  }
                   style={[
-                    Type.amount,
+                    styles.amount,
                     {
                       color:
                         b.balancePaise > 0
@@ -671,7 +661,7 @@ export default function HomeScreen() {
                             : theme.textTertiary,
                     },
                   ]}>
-                  {`${b.balancePaise > 0 ? '+' : '−'}${formatPaise(Math.abs(b.balancePaise))}`}
+                  {`${b.balancePaise > 0 ? '+ ' : '− '}${formatPaise(Math.abs(b.balancePaise))}`}
                 </ThemedText>
               </View>
             ))}
@@ -692,23 +682,22 @@ export default function HomeScreen() {
           }>
           {/* Loading is not empty: "Nothing logged yet" used to show for the
               moment before the list arrived, in a household full of expenses. */}
-          {/* One card per expense, with a gap between, rather than rows
-              ruled off inside a single card: each expense is a thing you can
-              tap, and a card of its own reads as one. */}
+          {/* One grouped list, ruled between rows, as on History: six cards
+              stacked with gaps made Recent the longest thing on the page. */}
           {!expenses.data && pending.length === 0 ? (
-            <View style={styles.cardList}>
+            <Card padded={false}>
               {[0, 1, 2].map((i) => (
-                <Card key={i} padded={false}>
-                  <RowSkeleton last />
-                </Card>
+                <RowSkeleton key={i} last={i === 2} />
               ))}
-            </View>
+            </Card>
           ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
-            <View style={styles.cardList}>
+            <Card padded={false}>
               {/* Queued entries sit at the top marked as sending, so what you
                   just typed is visibly there rather than seeming lost. */}
-              {pending.map((p) => (
-                <Card key={p.id} padded={false} style={styles.row}>
+              {pending.map((p, i) => (
+                <View
+                  key={p.id}
+                  style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
                   <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
                     <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
                   </View>
@@ -729,41 +718,51 @@ export default function HomeScreen() {
                       </ThemedText>
                     </View>
                   </View>
-                  <ThemedText themeColor="textTertiary" style={Type.amount}>
+                  <ThemedText themeColor="textTertiary" style={styles.amount}>
                     {formatPaise(p.totalPaise)}
                   </ThemedText>
-                </Card>
+                </View>
               ))}
 
-              {expenses.data?.map((e) => (
-                <Pressable
-                  key={e.id}
-                  onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}>
-                  {/* Pressed is a tint, not a fade: lowering opacity on a card
-                      with Android elevation fades the shadow and the contents
-                      separately, leaving a pale band across a grey card. */}
-                  {({ pressed }) => (
-                    <Card
-                      padded={false}
-                      style={[styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
-                      <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                        <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
-                      </View>
-                      <View style={styles.flex}>
-                        <ThemedText style={Type.body} numberOfLines={1}>
-                          {e.description || e.categoryName}
-                        </ThemedText>
-                        <ThemedText themeColor="textTertiary" style={Type.micro}>
-                          {e.paidByName} · {e.participantCount} way
-                          {e.participantCount === 1 ? '' : 's'}
-                        </ThemedText>
-                      </View>
-                      <ThemedText style={Type.amount}>{formatPaise(e.totalPaise)}</ThemedText>
-                    </Card>
-                  )}
-                </Pressable>
-              ))}
-            </View>
+              {expenses.data?.map((e, i, all) => {
+                const index = pending.length + i;
+                const count = pending.length + all.length;
+                return (
+                  <Pressable
+                    key={e.id}
+                    onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
+                    // Pressed is a tint, not a fade: lowering opacity under a
+                    // card with Android elevation leaves a pale band. On the
+                    // first and last rows it follows the card's corners.
+                    style={({ pressed }) => [
+                      styles.row,
+                      index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                      pressed && { backgroundColor: theme.backgroundSelected },
+                      pressed && index === 0 && styles.rowFirst,
+                      pressed && index === count - 1 && styles.rowLast,
+                    ]}>
+                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
+                    </View>
+                    <View style={styles.flex}>
+                      <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>
+                        {e.description || e.categoryName}
+                      </ThemedText>
+                      <ThemedText themeColor="textTertiary" style={Type.micro}>
+                        {e.paidByName} · {e.participantCount} way
+                        {e.participantCount === 1 ? '' : 's'}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.amountCol}>
+                      <ThemedText style={styles.amount}>{formatPaise(e.totalPaise)}</ThemedText>
+                      <ThemedText themeColor="textTertiary" style={Type.micro}>
+                        {dayLabel(e.expenseDate)}
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Card>
           ) : (
             <Card style={styles.empty}>
               <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
@@ -812,6 +811,40 @@ function Section({
       </View>
       {children}
     </View>
+  );
+}
+
+/**
+ * A one-line note that opens a screen. Its colour says what kind it is --
+ * yellow to keep in mind, blue for plain information -- so the words can
+ * stay short.
+ */
+function Note({
+  tone,
+  icon,
+  text,
+  onPress,
+}: {
+  tone: 'warning' | 'info';
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const ink = tone === 'warning' ? theme.warning : theme.info;
+  const soft = tone === 'warning' ? theme.warningSoft : theme.infoSoft;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.note, { backgroundColor: soft, opacity: pressed ? 0.7 : 1 }]}>
+      <Ionicons name={icon} size={16} color={ink} />
+      <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: ink }]} numberOfLines={1}>
+        {text}
+      </ThemedText>
+      <Ionicons name="chevron-forward" size={14} color={ink} />
+    </Pressable>
   );
 }
 
@@ -880,8 +913,6 @@ const styles = StyleSheet.create({
   smallFootSkeleton: { height: 18, justifyContent: 'center' },
   rowSkeletonText: { gap: 6 },
 
-  banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },
-
   section: { gap: Spacing.two },
   sectionHead: {
     flexDirection: 'row',
@@ -907,18 +938,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + Spacing.one,
   },
-  // Recent's separate cards, a small gap apart.
-  cardList: { gap: Spacing.two },
-  tile: {
-    width: 38,
-    height: 38,
+  // A pressed tint follows the card's corners on its first and last rows.
+  rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
+  rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  medium: { fontWeight: '600' },
+  amount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  amountCol: { alignItems: 'flex-end' },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
     borderRadius: Radius.md,
+  },
+  tile: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileGlyph: { fontSize: 18 },
+  tileGlyph: { fontSize: 16 },
   lineIcon: {
     width: 36,
     height: 36,

@@ -80,8 +80,8 @@ export const Colors = {
     // Home's big balance card, in brand green. Deeper than primary on
     // purpose: on #087F5B the pale label measured 4.41:1, under the 4.5 a
     // small label needs; here white is 6.5:1 and the label 5.8:1. On a green
-    // card the amount can't be green, so "owed to you" is white and "you
-    // owe" a pale red (4.9:1).
+    // card the amount can't be green, so it is white either way: a pale red
+    // read as a washed-out pink, and the label above already says which way.
     balanceCard: '#066B4C',
     balanceEdge: '#066B4C',
     onBalance: '#FFFFFF',
@@ -89,7 +89,7 @@ export const Colors = {
     balanceRing: 'rgba(255,255,255,0.12)',
     balanceRule: 'rgba(255,255,255,0.2)',
     balancePositive: '#FFFFFF',
-    balanceNegative: '#FFD5D5',
+    balanceNegative: '#FFFFFF',
 
     // Home's two small cards, two greens so they stay on-brand yet read as
     // different things: mint for the household, a soft lime for you. Each
