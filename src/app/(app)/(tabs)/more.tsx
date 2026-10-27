@@ -14,82 +14,46 @@ type Row = {
   href: Href;
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  hint: string;
-  tint: 'primary' | 'plain';
 };
 
+/**
+ * Everything not on a tab, grouped like a settings list: a heading per group,
+ * an icon and a name per row, no line of explanation under each. The names
+ * are the ones the screens they open use, so the row says enough.
+ */
 export default function MoreScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { member } = useSession();
   const isOwner = member?.role === 'owner';
 
-  // Owners get one door into everything they administer, rather than the
-  // same four links scattered across three screens.
-  const rows: Row[] = [
-    ...(isOwner
-      ? ([
-          {
-            href: '/owner',
-            icon: 'construct',
-            label: 'Owner tools',
-            hint: 'People, categories and monthly bills',
-            tint: 'primary',
-          },
-        ] as Row[])
-      : ([
-          {
-            href: '/household',
-            icon: 'people',
-            label: 'Household',
-            hint: 'Who lives here',
-            tint: 'plain',
-          },
-        ] as Row[])),
+  const groups: { title: string; rows: Row[] }[] = [
     {
-      href: '/settle',
-      icon: 'swap-horizontal',
-      label: 'Settle up',
-      hint: 'Who pays whom, and closing the month',
-      tint: 'plain',
+      title: 'Household',
+      rows: [
+        // Owners get one door into everything they administer, rather than
+        // the same four links scattered across three screens.
+        isOwner
+          ? { href: '/owner', icon: 'construct-outline', label: 'Owner tools' }
+          : { href: '/household', icon: 'people-outline', label: 'Household' },
+        { href: '/settle', icon: 'swap-horizontal-outline', label: 'Settle up' },
+        { href: '/away', icon: 'airplane-outline', label: 'Away calendar' },
+        // "Bills", matching the Home button that opens the same screen.
+        { href: '/recurring', icon: 'calendar-outline', label: 'Bills' },
+      ],
     },
     {
-      href: '/away',
-      icon: 'airplane',
-      label: 'Away calendar',
-      hint: 'Mark a trip so day-to-day costs split without you',
-      tint: 'plain',
+      title: 'Tools',
+      rows: [
+        // Out of the tab bar to make room for Add in the middle, but still
+        // one tap from here -- "Use in an expense" carries its total into Add.
+        { href: '/calculator', icon: 'calculator-outline', label: 'Calculator' },
+        { href: '/edit-history', icon: 'document-text-outline', label: 'Edit history' },
+      ],
     },
     {
-      href: '/recurring',
-      // "Bills", matching the Home button that opens the same screen.
-      icon: 'calendar',
-      label: 'Bills',
-      hint: 'Rent, wifi and other bills that post themselves each month',
-      tint: 'plain',
-    },
-    {
-      // Out of the tab bar to make room for Add in the middle, but still one
-      // tap from here -- "Use in an expense" carries its total into Add.
-      href: '/calculator',
-      icon: 'calculator',
-      label: 'Calculator',
-      hint: 'Work out an amount, then use it in an expense',
-      tint: 'plain',
-    },
-    {
-      href: '/edit-history',
-      icon: 'document-text',
-      label: 'Edit history',
-      hint: 'Every change to an expense or payment, and who made it',
-      tint: 'plain',
-    },
-    {
-      href: '/settings',
-      icon: 'person-circle',
-      label: 'Account',
-      hint: 'Your profile and sign out',
-      tint: 'plain',
+      title: 'You',
+      rows: [{ href: '/settings', icon: 'person-circle-outline', label: 'Account' }],
     },
   ];
 
@@ -98,45 +62,36 @@ export default function MoreScreen() {
       <AppBar title="More" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Card padded={false}>
-          {rows.map((r, i) => (
-            <Pressable
-              key={r.label}
-              onPress={() => router.push(r.href)}
-              style={({ pressed }) => [
-                styles.row,
-                i < rows.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: theme.border,
-                },
-                { opacity: pressed ? 0.6 : 1 },
-              ]}>
-              <View
-                style={[
-                  styles.tile,
-                  {
-                    backgroundColor:
-                      r.tint === 'primary' ? theme.primarySoft : theme.backgroundSelected,
-                  },
-                ]}>
-                <Ionicons
-                  name={r.icon}
-                  size={19}
-                  color={r.tint === 'primary' ? theme.primary : theme.textSecondary}
-                />
-              </View>
-
-              <View style={styles.rowText}>
-                <ThemedText style={Type.body}>{r.label}</ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  {r.hint}
-                </ThemedText>
-              </View>
-
-              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-            </Pressable>
-          ))}
-        </Card>
+        {groups.map((g) => (
+          <View key={g.title} style={styles.group}>
+            <ThemedText style={styles.groupTitle}>{g.title}</ThemedText>
+            <Card padded={false}>
+              {g.rows.map((r, i) => (
+                <Pressable
+                  key={r.label}
+                  accessibilityRole="button"
+                  onPress={() => router.push(r.href)}
+                  // A tint, not a fade, following the card's corners on the
+                  // first and last rows.
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                    pressed && { backgroundColor: theme.backgroundSelected },
+                    pressed && i === 0 && styles.rowFirst,
+                    pressed && i === g.rows.length - 1 && styles.rowLast,
+                  ]}>
+                  <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                    <Ionicons name={r.icon} size={17} color={theme.text} />
+                  </View>
+                  <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+                    {r.label}
+                  </ThemedText>
+                  <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+                </Pressable>
+              ))}
+            </Card>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -144,20 +99,31 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
+  group: { gap: Spacing.two },
+  groupTitle: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    paddingLeft: Spacing.half,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 2,
   },
+  rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
+  rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  // The same soft square as Account's rows.
   tile: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowText: { flex: 1, gap: 1 },
 });

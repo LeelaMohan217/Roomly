@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Children, cloneElement, isValidElement, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useUpdates } from 'expo-updates';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -156,89 +156,74 @@ Running ${buildLabel()}.`;
               the Android shadow and the contents separately, leaving a pale
               band across a grey card. */}
           {({ pressed }) => (
-          <Card style={[styles.profile, pressed && { backgroundColor: theme.backgroundSelected }]}>
-            <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={52} />
+            <Card
+              padded={false}
+              style={[styles.profile, pressed && { backgroundColor: theme.backgroundSelected }]}>
+              <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={48} neutral />
 
-          <View style={styles.identity}>
-            <View style={styles.nameRow}>
-              <ThemedText style={styles.name} numberOfLines={1}>
-                {member?.display_name}
-              </ThemedText>
-              <View
-                style={[
-                  styles.rolePill,
-                  { backgroundColor: isOwner ? theme.primarySoft : theme.backgroundSelected },
-                ]}>
-                <ThemedText
-                  style={[
-                    Type.micro,
-                    styles.roleText,
-                    { color: isOwner ? theme.primary : theme.textSecondary },
-                  ]}>
-                  {isOwner ? 'Owner' : 'Member'}
+              {/* The role sits beside the email as plain words, not a coloured
+                  pill: green on this screen is kept for things that are on. */}
+              <View style={styles.identity}>
+                <ThemedText style={styles.name} numberOfLines={1}>
+                  {member?.display_name}
+                </ThemedText>
+                <ThemedText themeColor="textTertiary" style={Type.caption} numberOfLines={1}>
+                  {isOwner ? 'Owner' : 'Member'} · {session?.user.email}
                 </ThemedText>
               </View>
-            </View>
 
-              <ThemedText themeColor="textTertiary" style={Type.caption} numberOfLines={1}>
-                {session?.user.email}
-              </ThemedText>
-            </View>
-
-            <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-          </Card>
+              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+            </Card>
           )}
         </Pressable>
 
-        {/* Account is who you are, not a second navigation menu. Recurring,
-            Away and Settle live in More and Owner tools — repeating them here
-            was three ways to reach the same screen. */}
-        {/* Informational, not a link. Owner tools and Household both live in
-            More, and listing them here as well made three ways to reach one
-            screen -- which is what this screen's own comment already said
-            about Recurring, Away and Settle. */}
-        <Group title="HOUSEHOLD">
+        {/* Account is who you are, not a second navigation menu. Owner tools,
+            Household, Recurring, Away and Settle all live in More; listing
+            them here as well made three ways to reach one screen. */}
+        <Group title="Household">
           <Row
             icon="home-outline"
             label={household.data?.name ?? '…'}
             value={`${members.data?.length ?? 0} people`}
-            last
           />
+          <Row icon="cash-outline" label="Currency" value={household.data?.currency ?? 'INR'} />
         </Group>
 
-        {/* Its own group, not tucked under ABOUT: the free tier has no
-            point-in-time recovery, so this file is the only thing standing
-            between a mistake and a lost ledger. */}
-        <Group title="YOUR DATA">
+        {/* Its own group: the free tier has no point-in-time recovery, so this
+            file is the only thing standing between a mistake and a lost
+            ledger. */}
+        <Group title="Your data">
           <Row
             icon="download-outline"
             label={exporting ? 'Preparing…' : 'Export a backup'}
             value="CSV"
             onPress={exporting ? undefined : () => void saveBackup()}
-            last
           />
         </Group>
 
-        <Group title="ABOUT">
+        <Group title="App">
           {/* Registration is silent by design, so this is the only place that
-              distinguishes "push is off" from "push is quietly broken". */}
+              distinguishes "push is off" from "push is quietly broken". The
+              explanation is a tap away rather than a line under every row. */}
           <Row
             icon="notifications-outline"
             label="Notifications"
             value={PUSH_LABELS[push].value}
-            hint={PUSH_LABELS[push].hint}
+            valueTone={push === 'on' ? 'positive' : push === 'blocked' ? 'warning' : undefined}
+            onPress={() =>
+              void dialog.alert({
+                tone: push === 'on' ? 'success' : push === 'blocked' ? 'warning' : 'info',
+                icon: 'notifications-outline',
+                title: `Notifications ${PUSH_LABELS[push].value.toLowerCase()}`,
+                message: PUSH_LABELS[push].hint,
+              })
+            }
           />
-          <Row icon="cash-outline" label="Currency" value={household.data?.currency ?? 'INR'} />
 
           {/* The real identity, not a hardcoded string. Every APK built in one
               afternoon used to report "1.0.0", which made "is your build the
               one with the fix?" unanswerable. */}
-          <Row
-            icon="information-circle-outline"
-            label="Version"
-            value={buildLabel()}
-            last={state === 'disabled'}
-          />
+          <Row icon="information-circle-outline" label="Version" value={buildLabel()} />
 
           {state !== 'disabled' ? (
             <Row
@@ -246,90 +231,106 @@ Running ${buildLabel()}.`;
               label={checking ? 'Checking…' : 'Check for updates'}
               value={tag ? `update ${tag}` : 'installed build'}
               onPress={checking ? undefined : () => void lookForUpdate()}
-              last
             />
           ) : null}
         </Group>
 
-        <Pressable
-          onPress={confirmSignOut}
-          style={({ pressed }) => [
-            styles.signOut,
-            { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-          ]}>
-          <Ionicons name="log-out-outline" size={18} color={theme.danger} />
-          <ThemedText style={[Type.body, { color: theme.danger, fontWeight: '600' }]}>
-            Sign out
-          </ThemedText>
-        </Pressable>
+        {/* A row like the rest, in red because it is the one thing here that
+            ends something; alone in its group so it is never tapped by
+            accident on the way to another row. */}
+        <Card padded={false}>
+          <Row icon="log-out-outline" label="Sign out" tone="danger" onPress={confirmSignOut} />
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+/**
+ * A heading and one white card of rows. Sentence case at heading size: the
+ * spaced capitals these were (Type.label) read as quiet as the values and
+ * clipped their last letter on Android.
+ */
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  const rows = Children.toArray(children).filter(isValidElement<RowPosition>);
+
   return (
     <View style={styles.group}>
-      <ThemedText themeColor="textTertiary" style={Type.label}>
-        {title}
-      </ThemedText>
-      <Card padded={false}>{children}</Card>
+      <ThemedText style={styles.groupTitle}>{title}</ThemedText>
+      <Card padded={false}>
+        {rows.map((row, i) => cloneElement(row, { first: i === 0, last: i === rows.length - 1 }))}
+      </Card>
     </View>
   );
 }
+
+/** Where a row sits in its card, for the divider and the pressed corners. */
+type RowPosition = { first?: boolean; last?: boolean };
 
 function Row({
   icon,
   label,
   value,
-  hint,
+  valueTone,
+  tone,
   onPress,
-  last = false,
-}: {
+  first = true,
+  last = true,
+}: RowPosition & {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value?: string;
-  /** A second line under the label. push.ts writes one for every state and
-   *  nothing rendered it, so "Blocked" appeared with no explanation. */
-  hint?: string;
+  /** Colours the value by what it means: green on, yellow needs attention. */
+  valueTone?: 'positive' | 'warning';
+  tone?: 'danger';
   onPress?: () => void;
-  last?: boolean;
 }) {
   const theme = useTheme();
+  const ink = tone === 'danger' ? theme.danger : theme.text;
+  const valueInk =
+    valueTone === 'positive' ? theme.positive : valueTone === 'warning' ? theme.warning : theme.textTertiary;
 
   return (
     <Pressable
+      accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress}
+      // A tint, not a fade, as on the other lists; it follows the card's
+      // corners on the first and last rows.
       style={({ pressed }) => [
         styles.row,
-        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
-        { opacity: pressed && onPress ? 0.6 : 1 },
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+        pressed && onPress && { backgroundColor: theme.backgroundSelected },
+        pressed && onPress && first && styles.rowFirst,
+        pressed && onPress && last && styles.rowLast,
       ]}>
-      <View style={[styles.rowIcon, { backgroundColor: theme.backgroundSelected }]}>
-        <Ionicons name={icon} size={16} color={theme.textSecondary} />
+      <View
+        style={[
+          styles.rowIcon,
+          { backgroundColor: tone === 'danger' ? theme.dangerSoft : theme.backgroundSelected },
+        ]}>
+        <Ionicons name={icon} size={17} color={tone === 'danger' ? theme.danger : theme.text} />
       </View>
 
       {/* The label never wraps to make room for the value — the value is the
           secondary information, so it truncates first. */}
       <View style={styles.rowLabel}>
-        <ThemedText style={Type.body} numberOfLines={1}>
+        <ThemedText style={[Type.body, { color: ink }]} numberOfLines={1}>
           {label}
         </ThemedText>
-        {hint ? (
-          <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={2}>
-            {hint}
-          </ThemedText>
-        ) : null}
       </View>
 
       {value ? (
-        <ThemedText themeColor="textTertiary" style={[Type.caption, styles.rowValue]} numberOfLines={1}>
+        <ThemedText style={[Type.caption, styles.rowValue, { color: valueInk }]} numberOfLines={1}>
           {value}
         </ThemedText>
-      ) : null}
+      ) : (
+        <View style={styles.flex} />
+      )}
 
-      {onPress ? <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} /> : null}
+      {onPress && tone !== 'danger' ? (
+        <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+      ) : null}
     </Pressable>
   );
 }
@@ -338,29 +339,40 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
 
-  profile: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  identity: { flex: 1, gap: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  name: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3, flexShrink: 1 },
-  rolePill: {
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
+  flex: { flex: 1 },
+  profile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
   },
-  roleText: { fontWeight: '700' },
+  identity: { flex: 1, gap: 2 },
+  name: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
 
   group: { gap: Spacing.two },
+  groupTitle: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    paddingLeft: Spacing.half,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
+    paddingVertical: Spacing.two + 2,
   },
+  rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
+  rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  // A soft square, as in the reference: rounder than a chip, not a circle,
+  // so these read as settings rather than as people or expenses.
   rowIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.sm,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -370,14 +382,4 @@ const styles = StyleSheet.create({
   // just yields once there is none left.
   rowLabel: { flexShrink: 1 },
   rowValue: { flex: 1, textAlign: 'right' },
-
-  signOut: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: Spacing.three,
-  },
 });
