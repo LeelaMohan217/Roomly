@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExpenseForm, type ExpenseFormValues } from '@/components/expense-form';
 import { ThemedText } from '@/components/themed-text';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
 import { committed, rejected } from '@/lib/haptics';
@@ -68,12 +68,22 @@ export default function AddExpenseScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+        {/* An ✕ rather than the word Cancel: the same round button as the
+            back button on every other screen. */}
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.side}>
-            <ThemedText themeColor="textSecondary" style={Type.body}>
-              Cancel
-            </ThemedText>
-          </Pressable>
+          <View style={styles.side}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              onPress={() => router.back()}
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.close,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+              ]}>
+              <Ionicons name="close" size={20} color={theme.text} />
+            </Pressable>
+          </View>
           <ThemedText style={Type.headline}>New expense</ThemedText>
           <View style={styles.side} />
         </View>
@@ -81,11 +91,12 @@ export default function AddExpenseScreen() {
         <KeyboardAwareScrollView
           contentContainerStyle={styles.content}
          >
+          {/* One grey line. */}
           {!online ? (
-            <View style={[styles.offline, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="cloud-offline-outline" size={15} color={theme.textTertiary} />
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-                You&apos;re offline. Save it anyway — it sends itself when you reconnect.
+            <View style={styles.offline}>
+              <Ionicons name="cloud-offline-outline" size={14} color={theme.textTertiary} />
+              <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
+                Offline · it sends itself when you reconnect
               </ThemedText>
             </View>
           ) : null}
@@ -115,12 +126,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   side: { width: 56 },
+  close: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: { padding: Spacing.four, paddingTop: 0, gap: Spacing.four, paddingBottom: Spacing.six },
   offline: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.two,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
   },
 });

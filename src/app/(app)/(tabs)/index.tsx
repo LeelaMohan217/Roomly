@@ -682,64 +682,62 @@ export default function HomeScreen() {
           }>
           {/* Loading is not empty: "Nothing logged yet" used to show for the
               moment before the list arrived, in a household full of expenses. */}
-          {/* One grouped list, ruled between rows, as on History: six cards
-              stacked with gaps made Recent the longest thing on the page. */}
+          {/* One card per expense, each standing on its own -- unlike
+              History's grouped days. Home shows six at most, so the gaps do
+              not make it long, and a card apiece reads as six separate things
+              that happened rather than one list. */}
           {!expenses.data && pending.length === 0 ? (
-            <Card padded={false}>
+            <View style={styles.recentList}>
               {[0, 1, 2].map((i) => (
-                <RowSkeleton key={i} last={i === 2} />
+                <Card key={i} padded={false}>
+                  <RowSkeleton last />
+                </Card>
               ))}
-            </Card>
+            </View>
           ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
-            <Card padded={false}>
+            <View style={styles.recentList}>
               {/* Queued entries sit at the top marked as sending, so what you
                   just typed is visibly there rather than seeming lost. */}
-              {pending.map((p, i) => (
-                <View
-                  key={p.id}
-                  style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
-                  <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                    <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
-                  </View>
-                  <View style={styles.flex}>
-                    <ThemedText style={Type.body} numberOfLines={1}>
-                      {p.description || p.categoryName}
-                    </ThemedText>
-                    <View style={styles.pendingRow}>
-                      <Ionicons
-                        name={p.blocked ? 'alert-circle' : 'cloud-upload-outline'}
-                        size={11}
-                        color={p.blocked ? theme.danger : theme.textTertiary}
-                      />
-                      <ThemedText
-                        themeColor={p.blocked ? 'text' : 'textTertiary'}
-                        style={[Type.micro, p.blocked && { color: theme.danger }]}>
-                        {p.blocked ? 'not saved' : 'sending…'}
-                      </ThemedText>
+              {pending.map((p) => (
+                <Card key={p.id} padded={false}>
+                  <View style={styles.row}>
+                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
                     </View>
+                    <View style={styles.flex}>
+                      <ThemedText style={Type.body} numberOfLines={1}>
+                        {p.description || p.categoryName}
+                      </ThemedText>
+                      <View style={styles.pendingRow}>
+                        <Ionicons
+                          name={p.blocked ? 'alert-circle' : 'cloud-upload-outline'}
+                          size={11}
+                          color={p.blocked ? theme.danger : theme.textTertiary}
+                        />
+                        <ThemedText
+                          themeColor={p.blocked ? 'text' : 'textTertiary'}
+                          style={[Type.micro, p.blocked && { color: theme.danger }]}>
+                          {p.blocked ? 'not saved' : 'sending…'}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <ThemedText themeColor="textTertiary" style={styles.amount}>
+                      {formatPaise(p.totalPaise)}
+                    </ThemedText>
                   </View>
-                  <ThemedText themeColor="textTertiary" style={styles.amount}>
-                    {formatPaise(p.totalPaise)}
-                  </ThemedText>
-                </View>
+                </Card>
               ))}
 
-              {expenses.data?.map((e, i, all) => {
-                const index = pending.length + i;
-                const count = pending.length + all.length;
-                return (
+              {expenses.data?.map((e) => (
+                <Card key={e.id} padded={false}>
                   <Pressable
-                    key={e.id}
                     onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
                     // Pressed is a tint, not a fade: lowering opacity under a
-                    // card with Android elevation leaves a pale band. On the
-                    // first and last rows it follows the card's corners.
+                    // card with Android elevation leaves a pale band. It
+                    // follows the card's corners.
                     style={({ pressed }) => [
                       styles.row,
-                      index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-                      pressed && { backgroundColor: theme.backgroundSelected },
-                      pressed && index === 0 && styles.rowFirst,
-                      pressed && index === count - 1 && styles.rowLast,
+                      pressed && [styles.rowPressed, { backgroundColor: theme.backgroundSelected }],
                     ]}>
                     <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
                       <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
@@ -760,9 +758,9 @@ export default function HomeScreen() {
                       </ThemedText>
                     </View>
                   </Pressable>
-                );
-              })}
-            </Card>
+                </Card>
+              ))}
+            </View>
           ) : (
             <Card style={styles.empty}>
               <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
@@ -940,9 +938,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + Spacing.one,
   },
-  // A pressed tint follows the card's corners on its first and last rows.
-  rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
-  rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  // A pressed tint follows the card's corners.
+  rowPressed: { borderRadius: Radius.lg },
+  recentList: { gap: Spacing.two },
   medium: { fontWeight: '600' },
   amount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
   amountCol: { alignItems: 'flex-end' },

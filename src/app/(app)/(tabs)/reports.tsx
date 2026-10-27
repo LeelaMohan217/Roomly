@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import { useMonthlyTotals, type CategoryTotal } from '@/lib/queries';
 
@@ -55,11 +54,30 @@ export default function ReportsScreen() {
   const previousTotal = sum(forMonth(prev.getFullYear(), prev.getMonth() + 1));
   const delta = currentTotal - previousTotal;
 
-  const palette = [theme.chart1, theme.chart2, theme.chart3, theme.chart4, theme.chart5, theme.chart6];
+  const palette = [theme.chart1, theme.chart2, theme.chart3, theme.chart4, theme.chart5];
 
-  const slices: Slice[] = current
-    .slice(0, 6)
-    .map((r, i) => ({ key: r.categoryId, value: r.totalPaise, color: palette[i % palette.length] }));
+  // The five biggest categories get a colour each; everything after them
+  // shares one grey slice, so the ring always adds up to the total and every
+  // row in the list below has a dot that matches something in it.
+  const colorAt = (i: number) => (i < palette.length ? palette[i] : theme.textTertiary);
+  const rest = current.slice(palette.length);
+  const slices: Slice[] = [
+    ...current
+      .slice(0, palette.length)
+      .map((r, i) => ({ key: r.categoryId, value: r.totalPaise, color: colorAt(i) })),
+    ...(rest.length > 0
+      ? [{ key: 'rest', value: sum(rest), color: theme.textTertiary }]
+      : []),
+  ];
+
+  // Flexible spending in brand green -- the part anyone can change -- and the
+  // committed kinds in quieter tones.
+  const kindColor: Record<CategoryTotal['kind'], string> = {
+    consumption: theme.primary,
+    bulk: theme.chart3,
+    asset: theme.chart5,
+    fixed: theme.textTertiary,
+  };
 
   // Not hand-memoized: React Compiler is enabled (app.json), and it could not
   // preserve a useMemo whose deps are rebuilt every render -- it reported
@@ -103,44 +121,52 @@ export default function ReportsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.monthNav}>
           <NavButton icon="chevron-back" onPress={() => step(-1)} label="Previous month" />
-          <ThemedText style={Type.headline}>
+          <ThemedText style={styles.monthTitle}>
             {MONTHS[month - 1]} {year}
           </ThemedText>
-          <NavButton icon="chevron-forward" onPress={() => step(1)} label="Next month" />
+          <NavButton
+            icon="chevron-forward"
+            onPress={() => step(1)}
+            label="Next month"
+            disabled={atLatest}
+          />
         </View>
 
         <Card>
-          <ThemedText themeColor="textTertiary" style={Type.micro}>
-            Total spent
+          <ThemedText themeColor="textTertiary" style={Type.caption}>
+            Spent
           </ThemedText>
-          <ThemedText style={Type.display} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatPaise(currentTotal)}</ThemedText>
-
-          {previousTotal > 0 ? (
-            <View style={styles.deltaRow}>
+          {/* The change beside the amount it qualifies: red when the house
+              spent more than last month, green when less. Last month's own
+              figure is the bar beside this one in the chart below. */}
+          <View style={styles.totalRow}>
+            <ThemedText
+              style={[styles.total, styles.flex]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}>
+              {formatPaise(currentTotal)}
+            </ThemedText>
+            {previousTotal > 0 && delta !== 0 ? (
               <View
+                accessible
+                accessibilityLabel={`${formatPaise(Math.abs(delta))} ${delta > 0 ? 'more' : 'less'} than ${MONTHS[prev.getMonth()]}`}
                 style={[
                   styles.deltaPill,
-                  { backgroundColor: delta > 0 ? theme.dangerSoft : theme.primarySoft },
+                  { backgroundColor: delta > 0 ? theme.dangerSoft : theme.successSoft },
                 ]}>
                 <Ionicons
                   name={delta > 0 ? 'trending-up' : 'trending-down'}
-                  size={12}
-                  color={delta > 0 ? theme.danger : theme.primary}
+                  size={13}
+                  color={delta > 0 ? theme.danger : theme.success}
                 />
                 <ThemedText
-                  style={[Type.micro, { color: delta > 0 ? theme.danger : theme.primary, fontWeight: '700' }]}>
+                  style={[styles.deltaText, { color: delta > 0 ? theme.danger : theme.success }]}>
                   {formatPaise(Math.abs(delta))}
                 </ThemedText>
               </View>
-              <ThemedText themeColor="textTertiary" style={Type.micro}>
-                vs {SHORT[prev.getMonth()]} ({formatPaise(previousTotal)})
-              </ThemedText>
-            </View>
-          ) : (
-            <ThemedText themeColor="textTertiary" style={[Type.micro, styles.deltaRow]}>
-              Nothing recorded the month before
-            </ThemedText>
-          )}
+            ) : null}
+          </View>
 
           <View style={styles.chartBlock}>
             <BarChart
@@ -168,100 +194,67 @@ export default function ReportsScreen() {
           </Card>
         ) : current.length === 0 ? null : (
           <>
-            <Section title="WHERE IT WENT">
-              <Card style={styles.donutCard}>
-                <DonutChart
-                  data={slices}
-                  size={132}
-                  thickness={13}
-                  caption="Total"
-                  value={formatPaise(currentTotal)}
-                />
-                <View style={styles.legend}>
-                  {current.slice(0, 5).map((c, i) => (
-                    <View key={c.categoryId} style={styles.legendRow}>
-                      <View style={[styles.dot, { backgroundColor: palette[i % palette.length] }]} />
-                      <ThemedText
-                        themeColor="textSecondary"
-                        style={[Type.caption, styles.flex]}
-                        numberOfLines={1}>
-                        {c.categoryName}
-                      </ThemedText>
-                      <ThemedText style={Type.caption}>
-                        {Math.round((c.totalPaise / currentTotal) * 100)}%
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-              </Card>
-            </Section>
-
-            <Section title="BY CATEGORY">
+            {/* The donut and the list are one thing: each row's dot is its
+                slice. They used to be a donut with a legend AND a separate
+                "By category" list, which named every category twice. */}
+            <Section title="Where it went">
               <Card padded={false}>
+                <View style={styles.donutWrap}>
+                  <DonutChart
+                    data={slices}
+                    size={140}
+                    thickness={14}
+                    caption="Total"
+                    value={formatPaise(currentTotal)}
+                  />
+                </View>
                 {current.map((c, i) => (
                   <View
                     key={c.categoryId}
-                    style={[
-                      styles.row,
-                      i < current.length - 1 && {
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: theme.border,
-                      },
-                    ]}>
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(c.icon)}</ThemedText>
-                    </View>
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.body} numberOfLines={1}>
-                        {c.categoryName}
-                      </ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        {c.expenseCount} entr{c.expenseCount === 1 ? 'y' : 'ies'}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={Type.amount}>{formatPaise(c.totalPaise)}</ThemedText>
+                    accessible
+                    accessibilityLabel={`${c.categoryName}, ${share(c.totalPaise)} percent, ${formatPaise(c.totalPaise)}`}
+                    style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
+                    <View style={[styles.dot, { backgroundColor: colorAt(i) }]} />
+                    <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+                      {c.categoryName}
+                    </ThemedText>
+                    <ThemedText themeColor="textTertiary" style={[Type.caption, styles.percent]}>
+                      {share(c.totalPaise)}%
+                    </ThemedText>
+                    <ThemedText style={[Type.amount, styles.amount]}>{formatPaise(c.totalPaise)}</ThemedText>
                   </View>
                 ))}
               </Card>
             </Section>
 
             {/* Rent and wifi aren't going down whatever you decide, so this is
-                the only split that can change anyone's behaviour. */}
-            <Section title="FIXED VS FLEXIBLE">
-              <Card padded={false}>
-                {byKind.map(([kind, amount], i) => (
-                  <View
-                    key={kind}
-                    style={[
-                      styles.row,
-                      i < byKind.length - 1 && {
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: theme.border,
-                      },
-                    ]}>
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.body}>{KIND_LABEL[kind]}</ThemedText>
-                      <View style={styles.trackRow}>
-                        <View style={[styles.track, { backgroundColor: theme.chartTrack }]}>
-                          <View
-                            style={[
-                              styles.fill,
-                              {
-                                backgroundColor:
-                                  kind === 'consumption' ? theme.primary : theme.textTertiary,
-                                width: `${share(amount)}%`,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <ThemedText themeColor="textTertiary" style={Type.micro}>
-                          {share(amount)}%
-                        </ThemedText>
-                      </View>
+                the only split that can change anyone's behaviour. One bar for
+                the whole month, cut by kind, instead of a bar on every row. */}
+            <Section title="Fixed vs flexible">
+              <Card style={styles.kindCard}>
+                <View style={[styles.kindBar, { backgroundColor: theme.chartTrack }]}>
+                  {byKind.map(([kind, amount]) => (
+                    <View
+                      key={kind}
+                      style={{ width: `${share(amount)}%`, backgroundColor: kindColor[kind] }}
+                    />
+                  ))}
+                </View>
+                <View style={styles.kindLegend}>
+                  {byKind.map(([kind, amount]) => (
+                    <View
+                      key={kind}
+                      accessible
+                      accessibilityLabel={`${KIND_LABEL[kind]}, ${formatPaise(amount)}`}
+                      style={styles.kindItem}>
+                      <View style={[styles.dot, { backgroundColor: kindColor[kind] }]} />
+                      <ThemedText themeColor="textSecondary" style={Type.caption}>
+                        {KIND_LABEL[kind]}
+                      </ThemedText>
+                      <ThemedText style={[Type.caption, styles.medium]}>{formatPaise(amount)}</ThemedText>
                     </View>
-                    <ThemedText style={Type.amount}>{formatPaise(amount)}</ThemedText>
-                  </View>
-                ))}
+                  ))}
+                </View>
               </Card>
             </Section>
           </>
@@ -271,41 +264,41 @@ export default function ReportsScreen() {
   );
 }
 
+/** A round arrow button. Greyed at the latest month, where there is no next. */
 function NavButton({
   icon,
   onPress,
   label,
+  disabled = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   label: string;
+  disabled?: boolean;
 }) {
   const theme = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       hitSlop={14}
       style={({ pressed }) => [
         styles.navButton,
-        {
-          backgroundColor: theme.backgroundElement,
-          borderColor: theme.border,
-          opacity: pressed ? 0.6 : 1,
-        },
+        { backgroundColor: theme.backgroundSelected, opacity: disabled ? 0.4 : pressed ? 0.6 : 1 },
       ]}>
-      <Ionicons name={icon} size={17} color={theme.textSecondary} />
+      <Ionicons name={icon} size={17} color={theme.text} />
     </Pressable>
   );
 }
 
+/** Sentence case at heading size, as on Home, History and Settle up. */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <ThemedText themeColor="textTertiary" style={[Type.label, styles.sectionTitle]}>
-        {title}
-      </ThemedText>
+      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
       {children}
     </View>
   );
@@ -316,55 +309,53 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
+  medium: { fontWeight: '600' },
 
-  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // Arrows close to the month they change, not pushed to the screen edges.
+  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.four },
+  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3, minWidth: 150, textAlign: 'center' },
   navButton: {
     width: 34,
     height: 34,
-    borderRadius: Radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  deltaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.two },
+  totalRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  total: { fontSize: 30, lineHeight: 38, fontWeight: '700', letterSpacing: -1 },
   deltaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 3,
+    paddingHorizontal: Spacing.two + 2,
+    paddingVertical: 4,
   },
+  deltaText: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   chartBlock: { marginTop: Spacing.four },
 
   section: { gap: Spacing.two },
-  sectionTitle: { paddingLeft: Spacing.half },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
 
-  donutCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four },
-  legend: { flex: 1, gap: Spacing.two },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  dot: { width: 7, height: 7, borderRadius: 4 },
+  donutWrap: { alignItems: 'center', paddingVertical: Spacing.four },
+  dot: { width: 9, height: 9, borderRadius: 5 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
-  tile: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileGlyph: { fontSize: 18 },
+  // Fixed widths, so the percentages and amounts line up down the list.
+  percent: { width: 40, textAlign: 'right' },
+  amount: { minWidth: 84, textAlign: 'right' },
 
-  trackRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: 5 },
-  track: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
-  fill: { height: 4, borderRadius: 2 },
+  kindCard: { gap: Spacing.three },
+  kindBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden' },
+  kindLegend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.four, rowGap: Spacing.two },
+  kindItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
 });

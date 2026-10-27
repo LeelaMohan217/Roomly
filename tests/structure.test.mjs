@@ -674,7 +674,7 @@ check(
 check(
   'bills that were never entered are chased',
   /overdue/.test(read('src', 'lib', 'queries.ts')) &&
-    /NEVER ENTERED/.test(read('src', 'app', '(app)', 'recurring.tsx')),
+    /Missed · /.test(read('src', 'app', '(app)', 'recurring.tsx')),
   'useRecurring looks only at the current month, so a missed bill disappears silently'
 );
 check(

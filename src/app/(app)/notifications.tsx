@@ -11,48 +11,54 @@ import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { dayLabel, dayOf } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useNotifications, type AppNotification } from '@/lib/queries';
 import { supabase } from '@/lib/supabase';
 
-/** Wording lives here, not in SQL — money formatting has one home. */
-function describe(n: AppNotification): { title: string; detail: string } {
+/**
+ * Wording lives here, not in SQL — money formatting has one home.
+ *
+ * The amount is returned on its own, for the right-hand column where every
+ * other list in the app puts money; `needsYou` marks the one notification
+ * that is a request rather than news.
+ */
+function describe(n: AppNotification): { title: string; amount: string; needsYou?: boolean } {
   const who = n.actorName ?? 'Someone';
   const amount = n.amountPaise !== null ? formatPaise(n.amountPaise) : '';
 
   switch (n.kind) {
     case 'expense_added':
-      return { title: `${who} added ${n.subject}`, detail: amount };
+      return { title: `${who} added ${n.subject}`, amount };
     case 'expense_changed':
-      return { title: `${who} changed ${n.subject}`, detail: `now ${amount}` };
+      return { title: `${who} changed ${n.subject}`, amount };
     case 'expense_deleted':
-      return { title: `${who} deleted ${n.subject}`, detail: amount };
+      return { title: `${who} deleted ${n.subject}`, amount };
     case 'settlement': {
       const [from, to] = (n.subject ?? '').split(' -> ');
-      return { title: `${from} paid ${to}`, detail: amount };
+      return { title: `${from} paid ${to}`, amount };
     }
     case 'settlement_pending': {
       const [from, to] = (n.subject ?? '').split(' -> ');
-      // The one notification that is a request rather than news.
-      return { title: `${from} says they paid ${to}`, detail: `${amount} - needs confirming` };
+      return { title: `${from} says they paid ${to}`, amount, needsYou: true };
     }
     case 'settlement_rejected': {
       const [from, to] = (n.subject ?? '').split(' -> ');
-      return { title: `${from} to ${to} was not confirmed`, detail: amount };
+      return { title: `${from} to ${to} was not confirmed`, amount };
     }
     case 'member_added':
-      return { title: `${who} added ${n.subject}`, detail: 'new housemate' };
+      return { title: `${who} added ${n.subject}`, amount: '' };
     case 'member_joined':
-      return { title: `${n.subject} joined`, detail: 'claimed their account' };
+      return { title: `${n.subject} joined`, amount: '' };
     case 'ownership_transferred':
-      return { title: `${n.subject} is now the owner`, detail: 'handed over' };
+      return { title: `${n.subject} is now the owner`, amount: '' };
     default:
       // The kinds are a CHECK constraint in Postgres (0019:75-81), not a type
       // the client controls, so a migration can add one this build has never
       // heard of. Without this the switch returned undefined, the caller
       // destructured it, and the whole Activity screen crashed on a
       // notification it simply did not need to render.
-      return { title: n.subject ?? 'Something changed', detail: '' };
+      return { title: n.subject ?? 'Something changed', amount: '' };
   }
 }
 
@@ -61,15 +67,32 @@ function describe(n: AppNotification): { title: string; detail: string } {
 const FALLBACK_ICON: keyof typeof Ionicons.glyphMap = 'ellipse-outline';
 
 const ICONS: Record<AppNotification['kind'], keyof typeof Ionicons.glyphMap> = {
-  expense_added: 'add-circle',
-  expense_changed: 'create',
-  expense_deleted: 'trash',
+  expense_added: 'add',
+  expense_changed: 'pencil',
+  expense_deleted: 'trash-outline',
   settlement: 'swap-horizontal',
-  settlement_pending: 'hourglass',
-  settlement_rejected: 'close-circle',
-  member_added: 'person-add',
-  member_joined: 'happy',
-  ownership_transferred: 'key',
+  settlement_pending: 'hourglass-outline',
+  settlement_rejected: 'close',
+  member_added: 'person-add-outline',
+  member_joined: 'person-outline',
+  ownership_transferred: 'key-outline',
+};
+
+/**
+ * The app's colours, by what the notification means: green added or paid,
+ * blue a change or a person, red deleted or refused, yellow waiting on you.
+ */
+type Tint = 'success' | 'info' | 'danger' | 'warning' | 'neutral';
+const TINTS: Record<AppNotification['kind'], Tint> = {
+  expense_added: 'success',
+  expense_changed: 'info',
+  expense_deleted: 'danger',
+  settlement: 'success',
+  settlement_pending: 'warning',
+  settlement_rejected: 'danger',
+  member_added: 'info',
+  member_joined: 'info',
+  ownership_transferred: 'info',
 };
 
 function relative(iso: string): string {
@@ -108,13 +131,33 @@ export default function NotificationsScreen() {
 
   const items = notifications.data ?? [];
 
+  // One group per day, newest first, as History lays out expenses.
+  const days: { day: string; items: AppNotification[] }[] = [];
+  for (const n of items) {
+    const day = dayOf(n.createdAt);
+    const last = days[days.length - 1];
+    if (last && last.day === day) last.items.push(n);
+    else days.push({ day, items: [n] });
+  }
+
+  const tint = (t: Tint) =>
+    t === 'success'
+      ? { soft: theme.successSoft, ink: theme.success }
+      : t === 'info'
+        ? { soft: theme.infoSoft, ink: theme.info }
+        : t === 'danger'
+          ? { soft: theme.dangerSoft, ink: theme.danger }
+          : t === 'warning'
+            ? { soft: theme.warningSoft, ink: theme.warning }
+            : { soft: theme.backgroundSelected, ink: theme.textSecondary };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Activity" subtitle="What everyone has been doing" />
+      <ScreenHeader title="Activity" />
 
       <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
+        data={days}
+        keyExtractor={(d) => d.day}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshing={notifications.isFetching}
@@ -132,58 +175,73 @@ export default function NotificationsScreen() {
             </Card>
           )
         }
-        renderItem={({ item, index }) => {
-          const { title, detail } = describe(item);
-          const last = index === items.length - 1;
-          const tappable = item.kind.startsWith('expense') && item.entityId;
+        renderItem={({ item: group }) => (
+          <View style={styles.day}>
+            <ThemedText style={styles.dayTitle}>{dayLabel(group.day)}</ThemedText>
+            <Card padded={false}>
+              {group.items.map((item, index) => {
+                const { title, amount, needsYou } = describe(item);
+                const tappable = item.kind.startsWith('expense') && item.entityId;
+                const { soft, ink } = tint(TINTS[item.kind] ?? 'neutral');
 
-          return (
-            <Pressable
-              disabled={!tappable}
-              onPress={() =>
-                router.push({ pathname: '/expense/[id]', params: { id: item.entityId! } })
-              }
-              style={({ pressed }) => [
-                styles.row,
-                {
-                  backgroundColor: item.unread ? theme.primarySoft : theme.backgroundElement,
-                  borderColor: theme.border,
-                  opacity: pressed && tappable ? 0.6 : 1,
-                },
-                index === 0 && styles.first,
-                last && styles.last,
-                !last && { borderBottomWidth: 0 },
-              ]}>
-              <View
-                style={[
-                  styles.tile,
-                  {
-                    backgroundColor: item.unread ? theme.backgroundElement : theme.backgroundSelected,
-                  },
-                ]}>
-                <Ionicons
-                  name={(ICONS[item.kind] ?? FALLBACK_ICON)}
-                  size={16}
-                  color={item.unread ? theme.primary : theme.textSecondary}
-                />
-              </View>
+                return (
+                  <Pressable
+                    key={item.id}
+                    disabled={!tappable}
+                    onPress={() =>
+                      router.push({ pathname: '/expense/[id]', params: { id: item.entityId! } })
+                    }
+                    accessibilityLabel={
+                      `${item.unread ? 'New. ' : ''}${title}` +
+                      `${amount ? `, ${amount}` : ''}${needsYou ? ', needs confirming' : ''}` +
+                      `, ${relative(item.createdAt)}`
+                    }
+                    style={({ pressed }) => [
+                      styles.row,
+                      index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                      { opacity: pressed && tappable ? 0.6 : 1 },
+                    ]}>
+                    <View style={[styles.tile, { backgroundColor: soft }]}>
+                      <Ionicons name={ICONS[item.kind] ?? FALLBACK_ICON} size={16} color={ink} />
+                    </View>
 
-              <View style={styles.flex}>
-                <ThemedText style={Type.body} numberOfLines={2}>
-                  {title}
-                </ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  {detail ? `${detail} · ` : ''}
-                  {relative(item.createdAt)}
-                </ThemedText>
-              </View>
+                    <View style={styles.flex}>
+                      {/* Unread: a bolder title and a dot. The whole row used
+                          to turn green, which here means money. */}
+                      <ThemedText style={[Type.body, item.unread && styles.unread]} numberOfLines={2}>
+                        {title}
+                      </ThemedText>
+                      <View style={styles.subRow}>
+                        <ThemedText themeColor="textTertiary" style={Type.micro}>
+                          {relative(item.createdAt)}
+                        </ThemedText>
+                        {needsYou ? (
+                          <View style={[styles.tag, { backgroundColor: theme.warningSoft }]}>
+                            <ThemedText style={[styles.tagText, { color: theme.warning }]}>
+                              Needs confirming
+                            </ThemedText>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
 
-              {item.unread ? (
-                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-              ) : null}
-            </Pressable>
-          );
-        }}
+                    {amount ? (
+                      <ThemedText
+                        themeColor={item.kind === 'expense_deleted' ? 'textTertiary' : 'text'}
+                        style={Type.amount}>
+                        {amount}
+                      </ThemedText>
+                    ) : null}
+
+                    {item.unread ? (
+                      <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </Card>
+          </View>
+        )}
       />
     </SafeAreaView>
   );
@@ -191,28 +249,32 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six },
+  content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
+  unread: { fontWeight: '700' },
 
+  day: { gap: Spacing.two },
+  // Sentence case at heading size, as on History.
+  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
+    paddingVertical: Spacing.two + 4,
   },
-  first: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
-  last: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
   tile: {
     width: 34,
     height: 34,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dot: { width: 7, height: 7, borderRadius: 4 },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
   emptyIcon: {

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExpenseForm, type ExpenseFormValues } from '@/components/expense-form';
@@ -12,7 +12,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useDialog } from '@/components/ui/dialog';
+import { useDialog, type Tone } from '@/components/ui/dialog';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -198,14 +198,40 @@ export default function ExpenseDetailScreen() {
   }
 
   const excluded = (members.data ?? []).filter((m) => !e.splits.some((s) => s.memberId === m.id));
+  const actionable = !e.voidedAt && !locked && !pendingOnThis;
+
+  // Each notice is one line; the full story is a tap away, in a popup, so the
+  // expense itself stays at the top of the screen.
+  const explain = (tone: Tone, icon: keyof typeof Ionicons.glyphMap, title: string, message: string) =>
+    void dialog.alert({ tone, icon, title, message });
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+        {/* Edit and delete live in the header as icons: two full-width buttons
+            at the bottom were the loudest thing on a screen you mostly read.
+            A member outside the edit window gets the same icons, which send a
+            request instead -- the labels say so to a screen reader, and the
+            confirm popup says so to everyone. */}
         <ScreenHeader
           title={editing ? 'Edit expense' : 'Expense'}
           action={
             editing ? (
               <Button title="Cancel" variant="ghost" onPress={() => setEditing(false)} />
+            ) : actionable ? (
+              <View style={styles.headerIcons}>
+                <HeaderIcon
+                  icon="pencil-outline"
+                  label={canEditNow ? 'Edit' : 'Request a change'}
+                  onPress={() => setEditing(true)}
+                />
+                <HeaderIcon
+                  icon="trash-outline"
+                  label={canEditNow ? 'Delete' : 'Request delete'}
+                  danger
+                  busy={remove.isPending}
+                  onPress={confirmRemove}
+                />
+              </View>
             ) : undefined
           }
         />
@@ -230,134 +256,136 @@ export default function ExpenseDetailScreen() {
             />
           ) : (
             <>
-              <Card style={styles.hero}>
+              {/* The expense itself, on the page rather than in a card: it is
+                  the whole point of the screen, and a box around it only
+                  added an edge. */}
+              <View style={styles.hero}>
                 <View style={[styles.heroTile, { backgroundColor: theme.backgroundSelected }]}>
                   <ThemedText allowFontScaling={false} style={styles.heroGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
                 </View>
-                <ThemedText style={Type.display} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatPaise(e.totalPaise)}</ThemedText>
-                <ThemedText style={Type.body}>{e.description || e.categoryName}</ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
+                <ThemedText
+                  style={[styles.heroAmount, e.voidedAt ? { color: theme.textTertiary } : null]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}>
+                  {formatPaise(e.totalPaise)}
+                </ThemedText>
+                <ThemedText style={[Type.body, styles.centered]}>{e.description || e.categoryName}</ThemedText>
+                <ThemedText themeColor="textTertiary" style={Type.caption}>
                   {e.categoryName} · {formatRange(e.expenseDate, e.expenseDate)}
                 </ThemedText>
-              </Card>
+              </View>
 
               {e.voidedAt ? (
-                <Notice
+                <Note
                   tone="danger"
                   icon="trash-outline"
-                  title="Deleted"
-                  body={`It no longer counts towards anyone's balance.${e.voidReason ? ` Reason: ${e.voidReason}` : ''}`}
+                  text="Deleted"
+                  onPress={() =>
+                    explain(
+                      'danger',
+                      'trash-outline',
+                      'Deleted',
+                      `It no longer counts towards anyone's balance.${e.voidReason ? ` Reason: ${e.voidReason}` : ''}`
+                    )
+                  }
                 />
               ) : null}
 
               {locked ? (
-                <Notice
+                <Note
                   tone="neutral"
                   icon="lock-closed-outline"
-                  title="This month is closed"
-                  body="Settled months are frozen. If this genuinely needs correcting, the owner can reopen the month from its statement — Settle up, then the month, then Reopen."
+                  text="This month is closed"
+                  onPress={() =>
+                    explain(
+                      'info',
+                      'lock-closed-outline',
+                      'This month is closed',
+                      'Settled months are frozen. If this genuinely needs correcting, the owner can reopen the month from its statement — Settle up, then the month, then Reopen.'
+                    )
+                  }
                 />
               ) : null}
 
               {pendingOnThis ? (
-                <Notice
-                  tone="primary"
+                <Note
+                  tone="warning"
                   icon="time-outline"
-                  title="Change awaiting approval"
-                  body={`${pendingOnThis.requestedByName} asked to ${
-                    pendingOnThis.kind === 'void' ? 'delete this' : 'change this'
-                  }. The figures below are still the ones that count until the owner approves.`}
+                  text={`${pendingOnThis.requestedByName} asked to ${
+                    pendingOnThis.kind === 'void' ? 'delete' : 'change'
+                  } this`}
+                  onPress={() =>
+                    explain(
+                      'warning',
+                      'time-outline',
+                      'Waiting for the owner',
+                      'The figures here are still the ones that count until the owner approves.'
+                    )
+                  }
                 />
               ) : null}
 
-              <Section title={`SPLIT BETWEEN (${e.splits.length})`}>
+              <View style={styles.section}>
+                <ThemedText style={styles.sectionTitle}>Split between {e.splits.length}</ThemedText>
                 <Card padded={false}>
                   {e.splits.map((s, i) => (
                     <View
                       key={s.memberId}
+                      accessible
+                      accessibilityLabel={`${nameOf(s.memberId)}${s.memberId === e.paidBy ? ', paid' : ''}, ${formatPaise(s.amountPaise)}`}
                       style={[
                         styles.row,
-                        (i < e.splits.length - 1 || excluded.length > 0) && {
-                          borderBottomWidth: StyleSheet.hairlineWidth,
-                          borderBottomColor: theme.border,
-                        },
+                        i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                       ]}>
-                      <Avatar name={nameOf(s.memberId)} seed={s.memberId} size={36} />
-                      <View style={styles.flex}>
-                        <ThemedText style={Type.body}>{nameOf(s.memberId)}</ThemedText>
+                      <Avatar name={nameOf(s.memberId)} seed={s.memberId} size={32} />
+                      <View style={[styles.flex, styles.nameRow]}>
+                        <ThemedText style={Type.body} numberOfLines={1}>
+                          {nameOf(s.memberId)}
+                        </ThemedText>
+                        {/* Green: this person's money went out for everyone. */}
                         {s.memberId === e.paidBy ? (
-                          <ThemedText style={[Type.micro, { color: theme.primary }]}>
-                            paid for this
-                          </ThemedText>
+                          <View style={[styles.tag, { backgroundColor: theme.primarySoft }]}>
+                            <ThemedText style={[styles.tagText, { color: theme.brandInk }]}>Paid</ThemedText>
+                          </View>
                         ) : null}
                       </View>
                       <ThemedText style={Type.amount}>{formatPaise(s.amountPaise)}</ThemedText>
                     </View>
                   ))}
-
-                  {excluded.map((m, i) => (
-                    <View
-                      key={m.id}
-                      style={[
-                        styles.row,
-                        i < excluded.length - 1 && {
-                          borderBottomWidth: StyleSheet.hairlineWidth,
-                          borderBottomColor: theme.border,
-                        },
-                      ]}>
-                      <Avatar name={m.displayName} seed={m.id} size={36} style={styles.dim} />
-                      <View style={styles.flex}>
-                        <ThemedText
-                          themeColor="textTertiary"
-                          style={[Type.body, styles.struck]}>
-                          {m.displayName}
-                        </ThemedText>
-                      </View>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        not included
-                      </ThemedText>
-                    </View>
-                  ))}
                 </Card>
-              </Section>
+                {/* One quiet line rather than a struck-through row each. */}
+                {excluded.length > 0 ? (
+                  <ThemedText themeColor="textTertiary" style={[Type.caption, styles.aside]}>
+                    Not in this: {excluded.map((m) => m.displayName).join(', ')}
+                  </ThemedText>
+                ) : null}
+                {/* The payer is a housemate outside the split -- paid for the
+                    others, owes nothing of it. Said here, since no row above
+                    carries the tag. */}
+                {!e.splits.some((s) => s.memberId === e.paidBy) ? (
+                  <ThemedText themeColor="textTertiary" style={[Type.caption, styles.aside]}>
+                    Paid by {e.paidByName}
+                  </ThemedText>
+                ) : null}
+              </View>
 
-              <Section title="DETAILS">
-                <Card padded={false}>
-                  <Detail label="Paid by" value={e.paidByName} />
-                  <Detail label="Added by" value={e.createdByName} />
-                  <Detail
-                    label="Added on"
-                    value={new Date(e.createdAt).toLocaleString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                    last
-                  />
-                </Card>
-              </Section>
-
-              {error ? (
-                <Notice tone="danger" icon="alert-circle-outline" title="Error" body={error} />
-              ) : null}
-
-              {!e.voidedAt && !locked && !pendingOnThis ? (
-                <View style={styles.actions}>
-                  <Button
-                    title={canEditNow ? 'Edit' : 'Request a change'}
-                    onPress={() => setEditing(true)}
-                    style={styles.flex}
-                  />
-                  <Button
-                    title={canEditNow ? 'Delete' : 'Request delete'}
-                    variant="danger"
-                    onPress={confirmRemove}
-                    loading={remove.isPending}
-                    style={styles.flex}
-                  />
+              <Card padded={false}>
+                <View
+                  accessible
+                  accessibilityLabel={`Added by ${e.createdByName}, ${addedOn(e.createdAt)}`}
+                  style={styles.row}>
+                  <Ionicons name="person-add-outline" size={17} color={theme.textSecondary} />
+                  <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+                    Added by {e.createdByName}
+                  </ThemedText>
+                  <ThemedText themeColor="textTertiary" style={Type.caption}>
+                    {addedOn(e.createdAt)}
+                  </ThemedText>
                 </View>
-              ) : null}
+              </Card>
+
+              {error ? <Note tone="danger" icon="alert-circle-outline" text={error} /> : null}
 
               {e.voidedAt && canEditNow && !locked ? (
                 <Button
@@ -374,63 +402,85 @@ export default function ExpenseDetailScreen() {
   );
 }
 
-function Notice({
+/** "25 Oct, 9:14 pm" -- when the expense was entered, not the day it is for. */
+function addedOn(iso: string): string {
+  return new Date(iso).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * One tinted line, Home's notice: red deleted or failed, yellow waiting on
+ * someone, grey for a closed month. Tappable when there is more to say.
+ */
+function Note({
   tone,
   icon,
-  title,
-  body,
+  text,
+  onPress,
 }: {
-  tone: 'danger' | 'primary' | 'neutral';
+  tone: 'danger' | 'warning' | 'neutral';
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  body: string;
+  text: string;
+  onPress?: () => void;
 }) {
   const theme = useTheme();
-  const bg =
-    tone === 'danger'
-      ? theme.dangerSoft
-      : tone === 'primary'
-        ? theme.primarySoft
-        : theme.backgroundSunken;
-  const fg = tone === 'danger' ? theme.danger : tone === 'primary' ? theme.primary : theme.text;
+  const soft =
+    tone === 'danger' ? theme.dangerSoft : tone === 'warning' ? theme.warningSoft : theme.backgroundSunken;
+  const ink =
+    tone === 'danger' ? theme.danger : tone === 'warning' ? theme.warning : theme.textSecondary;
 
   return (
-    <View style={[styles.notice, { backgroundColor: bg }]}>
-      <Ionicons name={icon} size={16} color={fg} />
-      <View style={styles.flex}>
-        <ThemedText style={[Type.caption, styles.semi, { color: fg }]}>{title}</ThemedText>
-        <ThemedText themeColor="textSecondary" style={Type.micro}>
-          {body}
-        </ThemedText>
-      </View>
-    </View>
+    <Pressable
+      accessibilityRole={onPress ? 'button' : 'text'}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.note, { backgroundColor: soft, opacity: pressed ? 0.7 : 1 }]}>
+      <Ionicons name={icon} size={16} color={ink} />
+      <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: ink }]}>{text}</ThemedText>
+      {onPress ? <Ionicons name="chevron-forward" size={14} color={ink} /> : null}
+    </Pressable>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <ThemedText themeColor="textTertiary" style={Type.label}>
-        {title}
-      </ThemedText>
-      {children}
-    </View>
-  );
-}
-
-function Detail({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+/** A round icon button for the header, the same size as the back button. */
+function HeaderIcon({
+  icon,
+  label,
+  onPress,
+  danger = false,
+  busy = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  busy?: boolean;
+}) {
   const theme = useTheme();
+  const ink = danger ? theme.danger : theme.text;
+
   return (
-    <View
-      style={[
-        styles.row,
-        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ busy }}
+      disabled={busy}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.headerIcon,
+        {
+          backgroundColor: danger ? theme.dangerSoft : theme.backgroundElement,
+          borderColor: danger ? theme.dangerSoft : theme.border,
+          opacity: pressed ? 0.7 : 1,
+        },
       ]}>
-      <ThemedText themeColor="textSecondary" style={[Type.body, styles.flex]}>
-        {label}
-      </ThemedText>
-      <ThemedText style={Type.body}>{value}</ThemedText>
-    </View>
+      {busy ? <ActivityIndicator size="small" color={ink} /> : <Ionicons name={icon} size={18} color={ink} />}
+    </Pressable>
   );
 }
 
@@ -439,35 +489,52 @@ const styles = StyleSheet.create({
   centeredFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
-  semi: { fontWeight: '700' },
-  dim: { opacity: 0.4 },
-  struck: { textDecorationLine: 'line-through' },
+  medium: { fontWeight: '600' },
+  centered: { textAlign: 'center' },
 
-  hero: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.five },
+  headerIcons: { flexDirection: 'row', gap: Spacing.two },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  hero: { alignItems: 'center', gap: Spacing.one, paddingTop: Spacing.two, paddingBottom: Spacing.two },
   heroTile: {
-    width: 56,
-    height: 56,
+    width: 52,
+    height: 52,
     borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.two,
   },
-  heroGlyph: { fontSize: 26 },
+  heroGlyph: { fontSize: 24 },
+  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
 
-  notice: {
+  note: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
     borderRadius: Radius.md,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
   },
 
   section: { gap: Spacing.two },
+  // Sentence case at heading size, as on Settle up and History.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  aside: { paddingHorizontal: Spacing.one },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
-  actions: { flexDirection: 'row', gap: Spacing.two },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
 });

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -20,10 +20,7 @@ import { useRecurring, type Recurring } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function ordinal(n: number): string {
   if (n >= 11 && n <= 13) return `${n}th`;
@@ -115,146 +112,71 @@ export default function RecurringScreen() {
         // keyboard, so every varying bill took two taps. Every other form in
         // the app already sets it.
         keyboardShouldPersistTaps="handled">
+        {/* On the page, not in a card -- as on Expense details. */}
         {monthlyTotal > 0 ? (
-          <Card>
-            <ThemedText themeColor="textTertiary" style={Type.micro}>
-              Fixed every month
+          <View style={styles.hero}>
+            <ThemedText themeColor="textSecondary" style={Type.caption}>
+              Every month
             </ThemedText>
-            <ThemedText style={Type.display} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatPaise(monthlyTotal)}</ThemedText>
-            <ThemedText themeColor="textTertiary" style={Type.micro}>
-              Posted automatically — you never type these again
+            <ThemedText style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              {formatPaise(monthlyTotal)}
             </ThemedText>
-          </Card>
-        ) : null}
-
-        {missed.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              NEVER ENTERED ({missed.length})
+            <ThemedText themeColor="textTertiary" style={Type.caption}>
+              {rules.length} bill{rules.length === 1 ? '' : 's'}
             </ThemedText>
-            <ThemedText themeColor="textTertiary" style={Type.micro}>
-              These fell due and no amount was ever put in, so they are missing from those
-              months. Enter them now and they post on the day they were due.
-            </ThemedText>
-
-            {missed.map((m) => {
-              const key = `${m.rule.id}-${m.year}-${m.month}`;
-              const typed = amounts[key] ?? '';
-              const paise = m.rule.mode === 'confirm' ? parseAmount(typed) : m.rule.amountPaise;
-
-              return (
-                <Card key={key} style={styles.confirmCard}>
-                  <View style={styles.rowHead}>
-                    <View style={[styles.tile, { backgroundColor: theme.warningSoft }]}>
-                      <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(m.rule.categoryIcon)}</ThemedText>
-                    </View>
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.body}>
-                        {m.rule.description || m.rule.categoryName}
-                      </ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        {MONTHS[m.month - 1]} {m.year} · was due {formatRange(m.dueDate, m.dueDate)}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  {m.rule.mode === 'confirm' ? (
-                    <View
-                      style={[
-                        styles.amountBox,
-                        { backgroundColor: theme.backgroundSunken, borderColor: theme.border },
-                      ]}>
-                      <ThemedText themeColor="textTertiary" style={styles.currency}>
-                        ₹
-                      </ThemedText>
-                      <TextInput
-                        value={typed}
-                        onChangeText={(t) => setAmounts((a) => ({ ...a, [key]: t }))}
-                        placeholder={`${MONTHS[m.month - 1]}'s bill`}
-                        placeholderTextColor={theme.textTertiary}
-                        keyboardType="decimal-pad"
-                        style={[styles.amountInput, { color: theme.text }]}
-                      />
-                    </View>
-                  ) : null}
-
-                  <Button
-                    title={paise ? `Post ${formatPaise(paise)}` : 'Post'}
-                    onPress={() =>
-                      post.mutate({ id: m.rule.id, amountPaise: paise, dueDate: m.dueDate })
-                    }
-                    loading={post.isPending && post.variables?.dueDate === m.dueDate}
-                    disabled={!paise}
-                  />
-                </Card>
-              );
-            })}
           </View>
         ) : null}
 
-        {needsConfirming.length > 0 ? (
+        {/* Everything waiting on an amount, in one list: bills from earlier
+            months that were never entered first (oldest first), then this
+            month's. A missed bill says so with a yellow tag, and still posts
+            on the day it fell due. */}
+        {missed.length + needsConfirming.length > 0 ? (
           <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              NEEDS AN AMOUNT ({needsConfirming.length})
-            </ThemedText>
-
-            {needsConfirming.map((r) => {
-              const typed = amounts[r.id] ?? '';
-              const paise = parseAmount(typed);
-
-              return (
-                <Card key={r.id} style={styles.confirmCard}>
-                  <View style={styles.rowHead}>
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(r.categoryIcon)}</ThemedText>
-                    </View>
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.body}>
-                        {r.description || r.categoryName}
-                      </ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        Due {ordinal(r.dayOfMonth)} · {r.paidByName} pays
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  {/* The amount varies, so it's asked for rather than guessed. */}
-                  <View
-                    style={[
-                      styles.amountBox,
-                      { backgroundColor: theme.backgroundSunken, borderColor: theme.border },
-                    ]}>
-                    <ThemedText themeColor="textTertiary" style={styles.currency}>
-                      ₹
-                    </ThemedText>
-                    <TextInput
-                      value={typed}
-                      onChangeText={(t) => setAmounts((a) => ({ ...a, [r.id]: t }))}
-                      placeholder="This month's bill"
-                      placeholderTextColor={theme.textTertiary}
-                      keyboardType="decimal-pad"
-                      style={[styles.amountInput, { color: theme.text }]}
-                    />
-                  </View>
-
-                  <Button
-                    title={paise ? `Post ${formatPaise(paise)}` : 'Post'}
-                    onPress={() => post.mutate({ id: r.id, amountPaise: paise })}
-                    loading={post.isPending && post.variables?.id === r.id}
-                    disabled={!paise}
+            <ThemedText style={styles.sectionTitle}>Needs an amount</ThemedText>
+            <Card padded={false}>
+              {missed.map((m, i) => {
+                const key = `${m.rule.id}-${m.year}-${m.month}`;
+                const typed = amounts[key] ?? '';
+                return (
+                  <PostRow
+                    key={key}
+                    first={i === 0}
+                    rule={m.rule}
+                    sub={`Due ${formatRange(m.dueDate, m.dueDate)} · ${m.rule.paidByName} pays`}
+                    tag={`Missed · ${SHORT[m.month - 1]}`}
+                    typed={typed}
+                    onType={(t) => setAmounts((a) => ({ ...a, [key]: t }))}
+                    paise={m.rule.mode === 'confirm' ? parseAmount(typed) : m.rule.amountPaise}
+                    loading={post.isPending && post.variables?.dueDate === m.dueDate}
+                    onPost={(paise) => post.mutate({ id: m.rule.id, amountPaise: paise, dueDate: m.dueDate })}
                   />
-                </Card>
-              );
-            })}
+                );
+              })}
+              {needsConfirming.map((r, i) => {
+                const typed = amounts[r.id] ?? '';
+                return (
+                  <PostRow
+                    key={r.id}
+                    first={missed.length === 0 && i === 0}
+                    rule={r}
+                    sub={`Due ${ordinal(r.dayOfMonth)} · ${r.paidByName} pays`}
+                    typed={typed}
+                    onType={(t) => setAmounts((a) => ({ ...a, [r.id]: t }))}
+                    paise={parseAmount(typed)}
+                    loading={post.isPending && post.variables?.id === r.id && !post.variables?.dueDate}
+                    onPost={(paise) => post.mutate({ id: r.id, amountPaise: paise })}
+                  />
+                );
+              })}
+            </Card>
           </View>
         ) : null}
 
         {error ? <Notice tone="danger" message={error} /> : null}
 
         <View style={styles.section}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            EVERY MONTH
-          </ThemedText>
+          <ThemedText style={styles.sectionTitle}>Every month</ThemedText>
 
           {rules.length > 0 ? (
             <Card padded={false}>
@@ -320,42 +242,139 @@ function RuleRow({
 
       <View style={styles.flex}>
         <View style={styles.nameRow}>
-          <ThemedText style={Type.body} numberOfLines={1}>
+          <ThemedText style={[Type.body, styles.shrink]} numberOfLines={1}>
             {rule.description || rule.categoryName}
           </ThemedText>
+          {/* Grey paused; blue "varies" -- information, not a warning. */}
           {!rule.isActive ? (
-            <View style={[styles.pill, { backgroundColor: theme.backgroundSelected }]}>
-              <ThemedText themeColor="textTertiary" style={Type.micro}>
-                paused
-              </ThemedText>
-            </View>
+            <Tag text="Paused" />
           ) : rule.mode === 'confirm' ? (
-            <View style={[styles.pill, { backgroundColor: theme.warningSoft }]}>
-              <ThemedText style={[Type.micro, { color: theme.warning }]}>varies</ThemedText>
-            </View>
+            <Tag text="Varies" tone="info" />
           ) : null}
         </View>
 
         <ThemedText themeColor="textTertiary" style={Type.micro}>
-          {ordinal(rule.dayOfMonth)} of the month · {rule.paidByName}
-          {rule.postedThisMonth ? ' · posted' : ''}
+          {ordinal(rule.dayOfMonth)} · {rule.paidByName}
         </ThemedText>
       </View>
 
-      {rule.amountPaise ? (
-        <ThemedText style={Type.amount}>{formatPaise(rule.amountPaise)}</ThemedText>
-      ) : (
-        <ThemedText themeColor="textTertiary" style={Type.micro}>
-          varies
-        </ThemedText>
-      )}
+      {rule.amountPaise ? <ThemedText style={Type.amount}>{formatPaise(rule.amountPaise)}</ThemedText> : null}
 
+      {/* Green tick: posted this month. */}
       {rule.postedThisMonth ? (
-        <Ionicons name="checkmark-circle" size={17} color={theme.primary} />
+        <Ionicons name="checkmark-circle" size={17} color={theme.primary} accessibilityLabel="Posted this month" />
       ) : onPress ? (
         <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
       ) : null}
     </Pressable>
+  );
+}
+
+/**
+ * A bill waiting on an amount: what it is, then a small amount box and a
+ * green Post pill on one line. A fixed-amount bill that was missed has
+ * nothing to type, so it shows the pill alone, with the amount on it.
+ */
+function PostRow({
+  rule,
+  sub,
+  tag,
+  typed,
+  onType,
+  paise,
+  loading,
+  onPost,
+  first,
+}: {
+  rule: Recurring;
+  sub: string;
+  tag?: string;
+  typed: string;
+  onType: (t: string) => void;
+  paise: number | null;
+  loading: boolean;
+  onPost: (paise: number) => void;
+  first: boolean;
+}) {
+  const theme = useTheme();
+  // The amount varies, so it's asked for rather than guessed.
+  const asks = rule.mode === 'confirm';
+
+  return (
+    <View
+      style={[
+        styles.postRow,
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+      ]}>
+      <View style={styles.rowHead}>
+        <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+          <ThemedText allowFontScaling={false} style={styles.glyph}>
+            {iconFor(rule.categoryIcon)}
+          </ThemedText>
+        </View>
+        <View style={styles.flex}>
+          <View style={styles.nameRow}>
+            <ThemedText style={[Type.body, styles.shrink]} numberOfLines={1}>
+              {rule.description || rule.categoryName}
+            </ThemedText>
+            {tag ? <Tag text={tag} tone="warning" /> : null}
+          </View>
+          <ThemedText themeColor="textTertiary" style={Type.micro}>
+            {sub}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={styles.postLine}>
+        {asks ? (
+          <View style={[styles.amountBox, { backgroundColor: theme.backgroundSunken, borderColor: theme.border }]}>
+            <ThemedText themeColor="textTertiary" style={styles.currency}>
+              ₹
+            </ThemedText>
+            <TextInput
+              value={typed}
+              onChangeText={onType}
+              placeholder="Amount"
+              placeholderTextColor={theme.textTertiary}
+              keyboardType="decimal-pad"
+              accessibilityLabel={`Amount for ${rule.description || rule.categoryName}`}
+              style={[styles.amountInput, { color: theme.text }]}
+            />
+          </View>
+        ) : (
+          <View style={styles.flex} />
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !paise, busy: loading }}
+          disabled={!paise || loading}
+          onPress={() => paise && onPost(paise)}
+          style={({ pressed }) => [
+            styles.postPill,
+            { backgroundColor: paise ? theme.primarySoft : theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
+          ]}>
+          {loading ? (
+            <ActivityIndicator size="small" color={theme.brandInk} />
+          ) : (
+            <ThemedText style={[styles.postText, { color: paise ? theme.brandInk : theme.textTertiary }]}>
+              {!asks && paise ? `Post ${formatPaise(paise)}` : 'Post'}
+            </ThemedText>
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/** A small pill beside a name. */
+function Tag({ text, tone = 'neutral' }: { text: string; tone?: 'neutral' | 'info' | 'warning' }) {
+  const theme = useTheme();
+  const soft = tone === 'info' ? theme.infoSoft : tone === 'warning' ? theme.warningSoft : theme.backgroundSelected;
+  const ink = tone === 'info' ? theme.info : tone === 'warning' ? theme.warning : theme.textSecondary;
+  return (
+    <View style={[styles.pill, { backgroundColor: soft }]}>
+      <ThemedText style={[styles.pillText, { color: ink }]}>{text}</ThemedText>
+    </View>
   );
 }
 
@@ -365,39 +384,58 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
 
+  // Round, like the other header icons.
   addButton: {
-    width: 34,
-    height: 34,
-    borderRadius: Radius.sm,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
+  shrink: { flexShrink: 1 },
+
+  hero: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
+  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
+
   section: { gap: Spacing.two },
-  confirmCard: { gap: Spacing.three },
+  // Sentence case at heading size, as on Settle up and History.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
   rowHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
 
+  postRow: { gap: Spacing.two + 2, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
+  postLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   amountBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
     borderRadius: Radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
-    minHeight: 52,
+    minHeight: 40,
   },
-  currency: { fontSize: 19, fontWeight: '600' },
-  amountInput: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', padding: 0 },
+  currency: { fontSize: 15, fontWeight: '600' },
+  amountInput: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '600', padding: 0 },
+  postPill: {
+    minHeight: 36,
+    paddingHorizontal: Spacing.three + 2,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postText: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  pillText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
   tile: {
     width: 38,
     height: 38,

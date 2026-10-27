@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
-import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, formatRange, todayIso } from '@/lib/dates';
@@ -19,6 +18,11 @@ import { iconFor } from '@/lib/icons';
 import { formatPaise, parseAmount } from '@/lib/money';
 import { useAwayPeriods, useCategories, useMembers, useSuggestions } from '@/lib/queries';
 import { assertBalanced, defaultParticipants, isPresent, splitEqually, type Split } from '@/lib/split';
+
+// The amount input's width per typed character at fontSize 40, plus room for
+// the caret -- see amountInput below.
+const AMOUNT_DIGIT = 24;
+const AMOUNT_PAD = 10;
 
 export type ExpenseFormValues = {
   amountPaise: number;
@@ -147,11 +151,9 @@ export function ExpenseForm({
   return (
     <>
       {/* Amount is the only field that always needs thought, so it gets the
-          screen's one large number and opens focused. */}
-      <Card style={styles.amountCard}>
-        <ThemedText themeColor="textTertiary" style={Type.label}>
-          AMOUNT
-        </ThemedText>
+          screen's one large number and opens focused -- on the page, centred,
+          without a box or a label: the ₹ says what it is. */}
+      <View style={styles.amountBlock}>
         <View style={styles.amountRow}>
           <ThemedText themeColor="textTertiary" style={styles.currency}>
             ₹
@@ -162,13 +164,19 @@ export function ExpenseForm({
             placeholder="0"
             placeholderTextColor={theme.textTertiary}
             keyboardType="decimal-pad"
+            accessibilityLabel="Amount"
             // Rs 99,99,999.99 is more than any household expense, and without
             // a cap a mis-keyed run of digits parsed fine here and failed only
             // at the server.
             maxLength={12}
             autoFocus={autoFocusAmount}
             editable={!busy}
-            style={[styles.amountInput, { color: theme.text }]}
+            // Sized to what is typed, so the ₹ and the digits stay centred
+            // together; a flexed input would leave the ₹ stranded at the left.
+            style={[
+              styles.amountInput,
+              { color: theme.text, width: AMOUNT_DIGIT * Math.max(amount.length, 1) + AMOUNT_PAD },
+            ]}
           />
         </View>
 
@@ -201,30 +209,103 @@ export function ExpenseForm({
             ))}
           </ScrollView>
         ) : null}
+      </View>
+
+      {/* What, what for and when: one grouped list with an icon a row, in
+          place of three labelled fields. */}
+      <Card padded={false}>
+        <Select
+          bare
+          icon="apps-outline"
+          label="Category"
+          placeholder="Category"
+          value={categoryId}
+          options={categoryOptions}
+          onChange={setCategoryId}
+          disabled={busy}
+        />
+
+        <View style={[styles.detailRow, { borderTopColor: theme.border }]}>
+          <View style={[styles.detailIcon, { backgroundColor: theme.backgroundSelected }]}>
+            <Ionicons name="create-outline" size={16} color={theme.textSecondary} />
+          </View>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder="What for (optional)"
+            placeholderTextColor={theme.textTertiary}
+            accessibilityLabel="What for"
+            maxLength={120}
+            editable={!busy}
+            style={[Type.body, styles.detailInput, { color: theme.text }]}
+          />
+        </View>
+
+        {/* Today, Yesterday, and — the part that was missing — any other day.
+            The third segment used to be a plain View rather than a Pressable,
+            and only appeared at all when editing a record that already had
+            another date. So there was NO date picker: on a shared-expense app,
+            where people routinely log a receipt days later, nothing dated
+            before yesterday could ever be entered. */}
+        <View style={[styles.detailRow, { borderTopColor: theme.border }]}>
+          <View style={[styles.detailIcon, { backgroundColor: theme.backgroundSelected }]}>
+            <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
+          </View>
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="When"
+            style={[styles.segment, styles.flex, { backgroundColor: theme.backgroundSunken }]}>
+            {[
+              { key: today, label: 'Today' },
+              { key: yesterday, label: 'Yesterday' },
+            ].map((opt) => {
+              const selected = date === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  onPress={() => setDate(opt.key)}
+                  disabled={busy}
+                  style={[
+                    styles.segmentItem,
+                    selected && { backgroundColor: theme.backgroundElement },
+                  ]}>
+                  <ThemedText
+                    themeColor={selected ? 'text' : 'textSecondary'}
+                    style={[Type.caption, selected && styles.semi]}>
+                    {opt.label}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ checked: isOtherDay }}
+              onPress={() => {
+                const [y, m] = date.split('-').map(Number);
+                setPickerMonth({ year: y, month: m });
+                setPickingDate(true);
+              }}
+              disabled={busy}
+              style={[
+                styles.segmentItem,
+                isOtherDay && { backgroundColor: theme.backgroundElement },
+              ]}>
+              <ThemedText
+                themeColor={isOtherDay ? 'text' : 'textSecondary'}
+                style={[Type.caption, isOtherDay && styles.semi]}
+                numberOfLines={1}>
+                {isOtherDay ? formatRange(date, date) : 'Pick a day'}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
       </Card>
 
-      <Select
-        label="Category"
-        placeholder="Choose a category"
-        value={categoryId}
-        options={categoryOptions}
-        onChange={setCategoryId}
-        disabled={busy}
-      />
-
-      <TextField
-        label="What for"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Optional — milk, vegetables…"
-        maxLength={120}
-        editable={!busy}
-      />
-
       <View style={styles.field}>
-        <ThemedText themeColor="textTertiary" style={Type.label}>
-          PAID BY
-        </ThemedText>
+        <ThemedText style={styles.sectionTitle}>Paid by</ThemedText>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -258,60 +339,6 @@ export function ExpenseForm({
         </ScrollView>
       </View>
 
-      {/* Today, Yesterday, and — the part that was missing — any other day.
-          The third segment used to be a plain View rather than a Pressable, and
-          only appeared at all when editing a record that already had another
-          date. So there was NO date picker: on a shared-expense app, where
-          people routinely log a receipt days later, nothing dated before
-          yesterday could ever be entered. */}
-      <View style={styles.field}>
-        <ThemedText themeColor="textTertiary" style={Type.label}>
-          WHEN
-        </ThemedText>
-        <View style={[styles.segment, { backgroundColor: theme.backgroundSunken }]}>
-          {[
-            { key: today, label: 'Today' },
-            { key: yesterday, label: 'Yesterday' },
-          ].map((opt) => {
-            const selected = date === opt.key;
-            return (
-              <Pressable
-                key={opt.key}
-                onPress={() => setDate(opt.key)}
-                disabled={busy}
-                style={[
-                  styles.segmentItem,
-                  selected && { backgroundColor: theme.backgroundElement },
-                ]}>
-                <ThemedText
-                  themeColor={selected ? 'text' : 'textSecondary'}
-                  style={[Type.caption, selected && styles.semi]}>
-                  {opt.label}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-
-          <Pressable
-            onPress={() => {
-              const [y, m] = date.split('-').map(Number);
-              setPickerMonth({ year: y, month: m });
-              setPickingDate(true);
-            }}
-            disabled={busy}
-            style={[
-              styles.segmentItem,
-              isOtherDay && { backgroundColor: theme.backgroundElement },
-            ]}>
-            <ThemedText
-              themeColor={isOtherDay ? 'text' : 'textSecondary'}
-              style={[Type.caption, isOtherDay && styles.semi]}>
-              {isOtherDay ? formatRange(date, date) : 'Pick a day'}
-            </ThemedText>
-          </Pressable>
-        </View>
-      </View>
-
       <Sheet
         visible={pickingDate}
         title="When was this?"
@@ -332,10 +359,8 @@ export function ExpenseForm({
 
       <View style={styles.field}>
         <View style={styles.splitHead}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            SPLIT BETWEEN
-          </ThemedText>
-          <ThemedText themeColor="textTertiary" style={Type.micro}>
+          <ThemedText style={styles.sectionTitle}>Split between</ThemedText>
+          <ThemedText themeColor="textTertiary" style={Type.caption}>
             {participants.length} of {members.data?.length ?? 0}
           </ThemedText>
         </View>
@@ -351,12 +376,11 @@ export function ExpenseForm({
                 key={m.id}
                 onPress={() => toggleParticipant(m.id)}
                 disabled={busy}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: included }}
                 style={({ pressed }) => [
                   styles.splitRow,
-                  i < (members.data?.length ?? 0) - 1 && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: theme.border,
-                  },
+                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                   { opacity: pressed ? 0.6 : 1 },
                 ]}>
                 <Avatar
@@ -443,22 +467,36 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.4 },
   struck: { textDecorationLine: 'line-through' },
 
-  amountCard: { gap: Spacing.two },
-  amountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  currency: { fontSize: 26, fontWeight: '600' },
-  // minWidth 0 is load-bearing on web: an <input> has an intrinsic width and
-  // CSS min-width defaults to auto, so `flex: 1` alone won't let it shrink and
-  // it pushes the whole screen sideways. React Native defaults min-width to 0,
-  // which is why this only shows up in the browser.
+  amountBlock: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.two },
+  amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
+  currency: { fontSize: 28, fontWeight: '600' },
+  // An explicit width (set inline from the digit count), not flex: on web an
+  // <input> has an intrinsic width and CSS min-width defaults to auto, so a
+  // flexed input pushed the whole screen sideways. minWidth 0 keeps that true.
   amountInput: {
-    flex: 1,
     minWidth: 0,
-    fontSize: 34,
+    maxWidth: 280,
+    fontSize: 40,
     fontWeight: '700',
     letterSpacing: -1,
     padding: 0,
   },
-  chipRow: { gap: Spacing.two, paddingTop: Spacing.two },
+  // Centred while they fit; scrollable once they don't.
+  chipRow: { gap: Spacing.two, flexGrow: 1, justifyContent: 'center' },
+
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  detailIcon: { width: 34, height: 34, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
+  // minWidth 0 for the same web reason as the amount input.
+  detailInput: { flex: 1, minWidth: 0, paddingVertical: Spacing.one },
+  // Sentence case at heading size, as on the redesigned screens.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
   chip: {
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,

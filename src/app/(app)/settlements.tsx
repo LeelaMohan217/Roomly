@@ -111,7 +111,7 @@ export default function SettlementsScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Payments" subtitle="Money that actually moved" />
+      <ScreenHeader title="Payments" />
 
       <SectionList
         sections={sections}
@@ -123,16 +123,23 @@ export default function SettlementsScreen() {
         onRefresh={() => void settlements.refetch()}
         ListHeaderComponent={
           <>
+            {/* On the page, not in a card -- as on Expense details. */}
             {live.length > 0 ? (
-              <Card style={styles.hero}>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  Settled between you so far
+              <View style={styles.hero}>
+                <ThemedText themeColor="textSecondary" style={Type.caption}>
+                  Settled so far
                 </ThemedText>
-                <ThemedText style={Type.display}>{formatPaise(totalSettled)}</ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  {live.length} payment{live.length === 1 ? '' : 's'} recorded
+                <ThemedText
+                  style={styles.heroAmount}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}>
+                  {formatPaise(totalSettled)}
                 </ThemedText>
-              </Card>
+                <ThemedText themeColor="textTertiary" style={Type.caption}>
+                  {live.length} payment{live.length === 1 ? '' : 's'}
+                </ThemedText>
+              </View>
             ) : null}
 
             {error ? <Notice tone="danger" message={error} /> : null}
@@ -154,12 +161,9 @@ export default function SettlementsScreen() {
         }
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            {/* Sentence case at caption size, as on History: spaced capitals
-                clipped the final letter on Android. */}
-            <ThemedText themeColor="textSecondary" style={Type.caption}>
-              {section.title}
-            </ThemedText>
-            <ThemedText themeColor="textTertiary" style={Type.micro}>
+            {/* Sentence case at heading size, as on History. */}
+            <ThemedText style={styles.sectionTitle}>{section.title}</ThemedText>
+            <ThemedText themeColor="textTertiary" style={Type.caption}>
               {formatPaise(section.total)}
             </ThemedText>
           </View>
@@ -168,63 +172,89 @@ export default function SettlementsScreen() {
           const voided = !!item.voidedAt;
           const last = index === section.data.length - 1;
           const routed = routedById.get(item.id);
+          const day = new Date(`${item.settledOn}T00:00:00`).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+          });
+          // Undo is the owner's, and lives behind a tap on the row rather
+          // than a small cross on every one of them.
+          const undoable = isOwner && !voided;
 
           return (
-            <View
-              style={[
+            <Pressable
+              disabled={!undoable}
+              onPress={() => confirmUndo(item)}
+              accessibilityRole={undoable ? 'button' : 'text'}
+              accessibilityHint={undoable ? 'Opens undo' : undefined}
+              accessibilityLabel={
+                `${item.fromName} paid ${item.toName}, ${formatPaise(item.amountPaise)}, ${day}` +
+                (voided ? ', undone, no longer counted' : `, recorded by ${item.recordedByName}`) +
+                (routed && !voided
+                  ? `. ${formatPaise(routed.directPaise)} settled up, ${formatPaise(routed.routedPaise)} routed onward`
+                  : '')
+              }
+              style={({ pressed }) => [
                 styles.row,
                 {
                   backgroundColor: theme.backgroundElement,
                   borderColor: theme.border,
-                  opacity: voided ? 0.45 : 1,
+                  opacity: pressed ? 0.7 : 1,
                 },
                 index === 0 && styles.first,
                 last && styles.last,
                 !last && { borderBottomWidth: 0 },
               ]}>
-              <View style={styles.pair}>
-                <Avatar name={item.fromName} seed={item.fromMember} size={30} />
-                <Ionicons name="arrow-forward" size={12} color={theme.textTertiary} />
-                <Avatar name={item.toName} seed={item.toMember} size={30} />
+              {/* Payer over payee, overlapping: who to whom at a glance. */}
+              <View style={[styles.pair, voided && styles.faded]}>
+                <Avatar name={item.fromName} seed={item.fromMember} size={30} ring ringColor={theme.backgroundElement} />
+                <Avatar
+                  name={item.toName}
+                  seed={item.toMember}
+                  size={30}
+                  ring
+                  ringColor={theme.backgroundElement}
+                  style={styles.overlap}
+                />
               </View>
 
               <View style={styles.flex}>
-                <ThemedText style={[Type.body, voided && styles.struck]} numberOfLines={1}>
-                  {item.fromName} paid {item.toName}
+                <ThemedText
+                  themeColor={voided ? 'textTertiary' : 'text'}
+                  style={Type.body}
+                  numberOfLines={1}>
+                  {item.fromName} → {item.toName}
                 </ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  {voided
-                    ? 'undone — no longer counted'
-                    : `${new Date(`${item.settledOn}T00:00:00`).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                      })} · recorded by ${item.recordedByName}`}
-                </ThemedText>
-
-                {/* The figure on the right is what left somebody's bank, and
-                    on a plan payment that is not the same as what it settled
-                    between these two. Saying so here means nobody has to find
-                    Settle up to learn it. */}
-                {routed && !voided ? (
-                  <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={2}>
-                    {formatPaise(routed.directPaise)} settled up ·{' '}
-                    <ThemedText style={[Type.micro, { color: theme.warning }]}>
-                      {formatPaise(routed.routedPaise)} routed onward
-                    </ThemedText>
+                <View style={styles.subRow}>
+                  <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
+                    {/* The date alone beside a tag: there is room for one or
+                        the other, and the tag is the one that explains the
+                        amount. */}
+                    {voided || (routed && !voided) ? day : `${day} · by ${item.recordedByName}`}
                   </ThemedText>
-                ) : null}
+                  {voided ? (
+                    <View style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText themeColor="textSecondary" style={styles.tagText}>
+                        Undone
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                  {/* The figure on the right is what left somebody's bank, and
+                      on a plan payment that is not the same as what it
+                      settled between these two. Yellow, as on Person details. */}
+                  {routed && !voided ? (
+                    <View style={[styles.tag, { backgroundColor: theme.warningSoft }]}>
+                      <ThemedText style={[styles.tagText, { color: theme.warning }]}>
+                        {formatPaise(routed.routedPaise)} onward
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </View>
               </View>
 
-              <ThemedText style={[Type.amount, voided && styles.struck]}>
+              <ThemedText themeColor={voided ? 'textTertiary' : 'text'} style={Type.amount}>
                 {formatPaise(item.amountPaise)}
               </ThemedText>
-
-              {isOwner && !voided ? (
-                <Pressable onPress={() => confirmUndo(item)} hitSlop={14}>
-                  <Ionicons name="close-circle-outline" size={18} color={theme.textTertiary} />
-                </Pressable>
-              ) : null}
-            </View>
+            </Pressable>
           );
         }}
       />
@@ -234,21 +264,28 @@ export default function SettlementsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.one },
+  // No gap: a month's rows join into one grouped card (first/last round the
+  // corners), and the section header carries the space between months.
+  content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
-  struck: { textDecorationLine: 'line-through' },
+  faded: { opacity: 0.45 },
 
-  hero: { alignItems: 'center', gap: Spacing.one, marginBottom: Spacing.two },
+  hero: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
+  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
 
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
     paddingTop: Spacing.four,
     paddingBottom: Spacing.two,
-    paddingHorizontal: Spacing.half,
   },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  overlap: { marginLeft: -10 },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -259,7 +296,7 @@ const styles = StyleSheet.create({
   },
   first: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
   last: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
-  pair: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  pair: { flexDirection: 'row', alignItems: 'center' },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
   emptyIcon: {

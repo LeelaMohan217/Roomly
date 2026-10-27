@@ -8,7 +8,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { Sheet } from '@/components/ui/sheet';
@@ -112,145 +111,109 @@ export default function OwnerScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Owner tools" subtitle="You manage the vocabulary" />
+      <ScreenHeader title="Owner tools" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* navigate(), not push(). Pushing a tab route onto this Stack does not
             crash — the stack does declare (tabs) — it stacks a SECOND copy of
             the whole tab shell, so Android back then returns to Owner tools
             from Home. The comment further down this file already says to use
-            navigate for exactly this reason. */}
+            navigate for exactly this reason.
+            Yellow, one line: it is waiting on you, not an error. */}
         {pending > 0 ? (
-          <Pressable onPress={() => router.navigate('/')}>
-            <Card style={[styles.alert, { backgroundColor: theme.dangerSoft }]}>
-              <Ionicons name="alert-circle" size={20} color={theme.danger} />
-              <View style={styles.flex}>
-                <ThemedText style={[Type.body, styles.semi]}>
-                  {pending} thing{pending === 1 ? '' : 's'} waiting on you
-                </ThemedText>
-                <ThemedText themeColor="textSecondary" style={Type.micro}>
-                  Approvals sit on the Home screen — tap to review
-                </ThemedText>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.danger} />
-            </Card>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Approvals are on Home"
+            onPress={() => router.navigate('/')}
+            style={({ pressed }) => [
+              styles.alert,
+              { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
+            ]}>
+            <Ionicons name="alert-circle-outline" size={16} color={theme.warning} />
+            <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
+              {pending} thing{pending === 1 ? '' : 's'} waiting on you
+            </ThemedText>
+            <Ionicons name="chevron-forward" size={14} color={theme.warning} />
           </Pressable>
         ) : null}
 
         <View style={styles.section}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            THE HOUSEHOLD
-          </ThemedText>
-
+          <ThemedText style={styles.sectionTitle}>Household</ThemedText>
           <Card padded={false}>
             <Row
-              icon="people"
-              tint
+              icon="people-outline"
               label="Roommates"
               value={`${members.data?.length ?? 0}`}
-              hint={
-                placeholders > 0
-                  ? `${placeholders} still to claim their account`
-                  : 'Everyone has joined'
-              }
+              a11y={placeholders > 0 ? `${placeholders} still to claim their account` : undefined}
               href="/household"
+              first
             />
-            <Row
-              icon="pricetags"
-              tint
-              label="Categories"
-              value={`${liveCategories}`}
-              hint="Names, icons, and how each one splits"
-              href="/categories"
-            />
-            <Row
-              icon="repeat"
-              tint
-              label="Recurring bills"
-              value={`${activeRecurring}`}
-              hint="Rent, wifi and the maid, posted automatically"
-              href="/recurring"
-            />
-            <Row
-              icon="calendar"
-              label="Away calendar"
-              hint="You can mark trips for anyone"
-              href="/away"
-              last
-            />
+            <Row icon="pricetags-outline" label="Categories" value={`${liveCategories}`} href="/categories" />
+            <Row icon="repeat-outline" label="Bills" value={`${activeRecurring}`} href="/recurring" />
+            <Row icon="airplane-outline" label="Away" href="/away" />
           </Card>
         </View>
 
         <View style={styles.section}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            THE MONEY
-          </ThemedText>
-
+          <ThemedText style={styles.sectionTitle}>Money</ThemedText>
           <Card padded={false}>
             <Row
               icon="swap-horizontal"
               label="Settle up"
               value={openMonths > 0 ? `${openMonths} open` : undefined}
-              hint="Who pays whom, and closing a month"
               href="/settle"
+              first
             />
-            <Row
-              icon="stats-chart"
-              label="Reports"
-              hint="Where the money went, month by month"
-              href="/reports"
-            />
-            <Row
-              icon="document-text"
-              label="Edit history"
-              hint="Every change, and who made it"
-              href="/edit-history"
-              last
-            />
+            <Row icon="stats-chart-outline" label="Reports" href="/reports" />
+            <Row icon="document-text-outline" label="Edit history" href="/edit-history" />
           </Card>
         </View>
 
         <View style={styles.section}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            IF YOU ARE AWAY
-          </ThemedText>
-
-          <Card style={styles.handOver}>
-            <ThemedText themeColor="textSecondary" style={Type.caption}>
-              Somebody has to be able to confirm payments and add housemates while you are not
-              around. Hand ownership over and take it back when you return.
-            </ThemedText>
-            <Button
-              title="Hand over ownership"
-              variant="ghost"
-              onPress={() => setHandOver(true)}
+          <ThemedText style={styles.sectionTitle}>If you&apos;re away</ThemedText>
+          <Card padded={false}>
+            {/* Greyed, and saying why, when there is nobody to hand it to. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: candidates.length === 0 }}
               disabled={candidates.length === 0}
-            />
-            {candidates.length === 0 ? (
-              <ThemedText themeColor="textTertiary" style={Type.micro}>
-                Nobody else has claimed their account yet, so there is no one to hand it to.
-              </ThemedText>
-            ) : null}
+              onPress={() => setHandOver(true)}
+              style={({ pressed }) => [
+                styles.row,
+                { opacity: candidates.length === 0 ? 0.5 : pressed ? 0.6 : 1 },
+              ]}>
+              <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                <Ionicons name="key-outline" size={17} color={theme.text} />
+              </View>
+              <ThemedText style={[Type.body, styles.flex]}>Hand over ownership</ThemedText>
+              {candidates.length === 0 ? (
+                <ThemedText themeColor="textTertiary" style={Type.caption}>
+                  No one yet
+                </ThemedText>
+              ) : (
+                <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+              )}
+            </Pressable>
           </Card>
         </View>
 
         {/* Being explicit about what the owner cannot do matters as much as
-            what they can — it's what keeps four friends trusting the ledger. */}
-        <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-          <Ionicons name="shield-checkmark-outline" size={15} color={theme.textTertiary} />
-          <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-            Being owner doesn&apos;t give you power over anyone&apos;s money. Every edit you make
-            is recorded and visible to everyone, and balances are always derived from the
-            expenses themselves.
+            what they can — it's what keeps four friends trusting the ledger.
+            One line now; the rest of it is true of every screen. */}
+        <View style={styles.trust}>
+          <Ionicons name="shield-checkmark-outline" size={14} color={theme.textTertiary} />
+          <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
+            Every edit you make is visible to everyone
           </ThemedText>
         </View>
       </ScrollView>
 
+      {/* The explanation lives here, where the decision is made. */}
       <Sheet
         visible={handOver}
         onClose={() => setHandOver(false)}
         title="Hand over ownership"
-        subtitle="They get every owner power. You keep all your expenses and your balance.">
+        subtitle="Somebody has to confirm payments and add housemates while you are away. They get every owner power; you keep your expenses and balance, and they can hand it back.">
         {candidates.map((m) => (
           <Pressable
             key={m.id}
@@ -272,28 +235,30 @@ export default function OwnerScreen() {
   );
 }
 
+/** One link, as on More: grey tile, the name, a count, a chevron. No hint. */
 function Row({
   icon,
   label,
   value,
-  hint,
+  a11y,
   href,
-  tint = false,
-  last = false,
+  first = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value?: string;
-  hint: string;
+  /** Extra words for a screen reader, where the count alone says too little. */
+  a11y?: string;
   href: Href;
-  tint?: boolean;
-  last?: boolean;
+  first?: boolean;
 }) {
   const theme = useTheme();
   const router = useRouter();
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[label, value, a11y].filter(Boolean).join(', ')}
       // navigate, not push. Most of these rows target a screen this Stack
       // owns, but /reports lives in the (tabs) group -- pushing a tab route
       // onto a Stack that does not declare it crashed the app. navigate()
@@ -302,26 +267,17 @@ function Row({
       onPress={() => router.navigate(href)}
       style={({ pressed }) => [
         styles.row,
-        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
         { opacity: pressed ? 0.6 : 1 },
       ]}>
-      <View
-        style={[
-          styles.tile,
-          { backgroundColor: tint ? theme.primarySoft : theme.backgroundSelected },
-        ]}>
-        <Ionicons name={icon} size={18} color={tint ? theme.primary : theme.textSecondary} />
+      <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+        <Ionicons name={icon} size={17} color={theme.text} />
       </View>
 
-      <View style={styles.flex}>
-        <ThemedText style={Type.body}>{label}</ThemedText>
-        <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
-          {hint}
-        </ThemedText>
-      </View>
+      <ThemedText style={[Type.body, styles.flex]}>{label}</ThemedText>
 
       {value ? (
-        <ThemedText themeColor="textSecondary" style={Type.amount}>
+        <ThemedText themeColor="textSecondary" style={Type.body}>
           {value}
         </ThemedText>
       ) : null}
@@ -347,25 +303,36 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
 
-  alert: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  medium: { fontWeight: '600' },
+
+  alert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+  },
   section: { gap: Spacing.two },
+  // Sentence case at heading size, as on More and Account.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
+  // The same soft square as More's rows.
   tile: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  handOver: { gap: Spacing.three },
+  trust: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.one },
   candidate: {
     flexDirection: 'row',
     alignItems: 'center',

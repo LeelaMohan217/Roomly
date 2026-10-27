@@ -290,12 +290,14 @@ export default function HistoryFiltersScreen() {
                   label={c.name}
                   selected={draft.categoryIds.includes(c.id)}
                   onPress={() => toggle('categoryIds', c.id)}
+                  // Grey tiles and avatars: green on this screen means only
+                  // "picked" -- the ticks, the current filter and its count.
                   lead={
-                    <View style={[styles.lead, { backgroundColor: theme.primarySoft }]}>
+                    <View style={[styles.lead, { backgroundColor: theme.backgroundSelected }]}>
                       <MaterialCommunityIcons
                         name={lineIconFor(c.icon) as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
                         size={16}
-                        color={theme.brandInk}
+                        color={theme.textSecondary}
                       />
                     </View>
                   }
@@ -310,7 +312,7 @@ export default function HistoryFiltersScreen() {
                   label={m.displayName}
                   selected={draft.paidByIds.includes(m.id)}
                   onPress={() => toggle('paidByIds', m.id)}
-                  lead={<Avatar name={m.displayName} seed={m.id} size={28} brand />}
+                  lead={<Avatar name={m.displayName} seed={m.id} size={28} />}
                 />
               ))
             : null}

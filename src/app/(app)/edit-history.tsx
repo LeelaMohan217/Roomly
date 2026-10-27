@@ -17,6 +17,7 @@ import {
   subjectOf,
   type AuditKind,
 } from '@/lib/audit';
+import { dayLabel, dayOf } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useAllCategories, useAuditLog, useMembers } from '@/lib/queries';
 
@@ -32,14 +33,15 @@ import { useAllCategories, useAuditLog, useMembers } from '@/lib/queries';
  * screen existed.
  */
 
+// Coloured as Activity is: green added, blue changed or restored, red deleted.
 const LOOK: Record<
   AuditKind,
-  { icon: keyof typeof Ionicons.glyphMap; verb: string; tone: 'plain' | 'danger' | 'primary' }
+  { icon: keyof typeof Ionicons.glyphMap; verb: string; tone: 'success' | 'danger' | 'info' }
 > = {
-  added: { icon: 'add-circle-outline', verb: 'added', tone: 'plain' },
-  edited: { icon: 'create-outline', verb: 'changed', tone: 'primary' },
+  added: { icon: 'add', verb: 'added', tone: 'success' },
+  edited: { icon: 'pencil', verb: 'changed', tone: 'info' },
   deleted: { icon: 'trash-outline', verb: 'deleted', tone: 'danger' },
-  restored: { icon: 'refresh-outline', verb: 'restored', tone: 'primary' },
+  restored: { icon: 'refresh-outline', verb: 'restored', tone: 'info' },
 };
 
 function relative(iso: string): string {
@@ -70,17 +72,33 @@ export default function EditHistoryScreen() {
 
   const entries = log.data ?? [];
 
+  // One group per day, newest first, as on Activity and History.
+  const days: { day: string; entries: typeof entries }[] = [];
+  for (const e of entries) {
+    const day = dayOf(e.at);
+    const last = days[days.length - 1];
+    if (last && last.day === day) last.entries.push(e);
+    else days.push({ day, entries: [e] });
+  }
+
+  const tones = {
+    success: { soft: theme.successSoft, ink: theme.success },
+    info: { soft: theme.infoSoft, ink: theme.info },
+    danger: { soft: theme.dangerSoft, ink: theme.danger },
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Edit history" subtitle="Every change, and who made it" />
+      <ScreenHeader title="Edit history" />
 
       {/* A FlatList, not a ScrollView. useAuditLog fetches 200 entries and
           each row carries an icon, a title, an N-row diff and a timestamp —
           all mounted eagerly before this. Every other list in the app is
-          virtualized; this was both the exception and the longest. */}
+          virtualized; this was both the exception and the longest. Each item
+          is now a day's card, so a day mounts as one. */}
       <FlatList
-        data={entries}
-        keyExtractor={(e) => e.id}
+        data={days}
+        keyExtractor={(d) => d.day}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -104,85 +122,100 @@ export default function EditHistoryScreen() {
             </Card>
           )
         }
-        renderItem={({ item: e, index: i }) => {
-              const kind = auditKind(e);
-              const look = LOOK[kind];
-              const changes = changesOf(e, fmt);
-              const amount = amountOf(e);
-              // "a category" alone is vague when there are thirteen of them,
-              // so name it where the row carries one.
-              const subject = subjectOf(e);
-              const thing = subject ? `${entityLabel(e.entityType)} - ${subject}` : entityLabel(e.entityType);
+        renderItem={({ item: group }) => (
+          <View style={styles.day}>
+            <ThemedText style={styles.dayTitle}>{dayLabel(group.day)}</ThemedText>
+            <Card padded={false}>
+              {group.entries.map((e, i) => {
+                const kind = auditKind(e);
+                const look = LOOK[kind];
+                const changes = changesOf(e, fmt);
+                const amount = amountOf(e);
+                // "a category" alone is vague when there are thirteen of them,
+                // so name it where the row carries one.
+                const subject = subjectOf(e);
+                const thing = subject ? `${entityLabel(e.entityType)} · ${subject}` : entityLabel(e.entityType);
+                const { soft, ink } = tones[look.tone];
 
-              const tint =
-                look.tone === 'danger'
-                  ? theme.danger
-                  : look.tone === 'primary'
-                    ? theme.primary
-                    : theme.textSecondary;
+                // Settlements have no detail screen of their own, and a deleted
+                // expense still opens -- it is soft-deleted, not gone.
+                const openable = e.entityType === 'expenses';
 
-              // Settlements have no detail screen of their own, and a deleted
-              // expense still opens -- it is soft-deleted, not gone.
-              const openable = e.entityType === 'expenses';
+                return (
+                  <Pressable
+                    key={e.id}
+                    disabled={!openable}
+                    onPress={() => router.push(`/expense/${e.entityId}`)}
+                    style={({ pressed }) => [
+                      styles.row,
+                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                      { opacity: pressed && openable ? 0.6 : 1 },
+                    ]}>
+                    <View style={[styles.icon, { backgroundColor: soft }]}>
+                      <Ionicons name={look.icon} size={15} color={ink} />
+                    </View>
 
-              return (
-                <Pressable
-                  disabled={!openable}
-                  onPress={() => router.push(`/expense/${e.entityId}`)}
-                  style={({ pressed }) => [
-                    styles.row,
-                    i < entries.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: theme.border,
-                    },
-                    { opacity: pressed && openable ? 0.6 : 1 },
-                  ]}>
-                  <View style={[styles.icon, { backgroundColor: theme.backgroundSelected }]}>
-                    <Ionicons name={look.icon} size={15} color={tint} />
-                  </View>
+                    <View style={styles.body}>
+                      <ThemedText style={Type.body} numberOfLines={2}>
+                        {e.actorName ?? 'Someone'} {look.verb} {thing}
+                      </ThemedText>
 
-                  <View style={styles.body}>
-                    <ThemedText style={Type.body} numberOfLines={1}>
-                      {e.actorName ?? 'Someone'} {look.verb} {thing}
-                    </ThemedText>
+                      {/* The whole reason this screen exists: the old value,
+                          struck through, beside the new one. A change with no
+                          listed diff means only fields nobody reads moved. */}
+                      {changes.length > 0 ? (
+                        <View style={styles.changes}>
+                          {changes.map((c) => (
+                            <ThemedText
+                              key={c.label}
+                              themeColor="textSecondary"
+                              style={Type.micro}
+                              numberOfLines={1}
+                              accessibilityLabel={`${c.label} changed from ${c.from} to ${c.to}`}>
+                              {c.label}{' '}
+                              {/* Struck only when something was there to
+                                  replace: an added row's "none" is not a
+                                  value that was crossed out. */}
+                              <ThemedText
+                                themeColor="textTertiary"
+                                style={[Type.micro, kind === 'edited' && styles.struck]}>
+                                {c.from}
+                              </ThemedText>{' '}
+                              → {c.to}
+                            </ThemedText>
+                          ))}
+                        </View>
+                      ) : null}
 
-                    {/* The whole reason this screen exists. A change with no
-                        listed diff means only fields nobody reads moved. */}
-                    {changes.length > 0 ? (
-                      <View style={styles.changes}>
-                        {changes.map((c) => (
-                          <ThemedText
-                            key={c.label}
-                            themeColor="textSecondary"
-                            style={Type.micro}
-                            numberOfLines={1}>
-                            {c.label} {c.from} → {c.to}
-                          </ThemedText>
-                        ))}
-                      </View>
+                      <ThemedText themeColor="textTertiary" style={Type.micro}>
+                        {relative(e.at)}
+                      </ThemedText>
+                    </View>
+
+                    {/* Grey once deleted: it no longer counts. */}
+                    {amount !== null ? (
+                      <ThemedText
+                        themeColor={kind === 'deleted' ? 'textTertiary' : 'text'}
+                        style={styles.amount}
+                        numberOfLines={1}>
+                        {formatPaise(amount)}
+                      </ThemedText>
                     ) : null}
-
-                    <ThemedText themeColor="textTertiary" style={Type.micro}>
-                      {relative(e.at)}
-                    </ThemedText>
-                  </View>
-
-                  {amount !== null ? (
-                    <ThemedText style={styles.amount} numberOfLines={1}>
-                      {formatPaise(amount)}
-                    </ThemedText>
-                  ) : null}
-                </Pressable>
-              );
-        }}
-        ListFooterComponent={
-          <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-            <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
-            <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-              Written by the database itself. Nobody — not even the owner — can add to this list
-              or remove from it.
-            </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </Card>
           </View>
+        )}
+        ListFooterComponent={
+          entries.length > 0 ? (
+            <View style={styles.footer}>
+              <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
+              <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
+                Written by the database. Nobody can change this list
+              </ThemedText>
+            </View>
+          ) : null
         }
       />
     </SafeAreaView>
@@ -195,23 +228,29 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
 
+  struck: { textDecorationLine: 'line-through' },
+
+  day: { gap: Spacing.two },
+  // Sentence case at heading size, as on Activity and History.
+  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
   icon: {
-    width: 30,
-    height: 30,
-    borderRadius: Radius.sm,
+    width: 32,
+    height: 32,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   body: { flex: 1, gap: 2 },
   changes: { gap: 1 },
   amount: { fontSize: 14, fontWeight: '700', letterSpacing: -0.2 },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.one },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
   emptyIcon: {

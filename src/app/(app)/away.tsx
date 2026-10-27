@@ -1,13 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
@@ -21,8 +20,6 @@ import { useAwayPeriods, useMembers } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { isPresent } from '@/lib/split';
 import { supabase } from '@/lib/supabase';
-
-const PALETTE = ['#4F7DF0', '#12A594', '#E0862C', '#8B6DE0', '#D9557F', '#3A9E6E'];
 
 export default function AwayScreen() {
   const theme = useTheme();
@@ -48,14 +45,13 @@ export default function AwayScreen() {
   const subject = forMember ?? member?.id ?? null;
   const today = todayIso();
 
-  const colorOf = (memberId: string) => {
-    const i = (members.data ?? []).findIndex((m) => m.id === memberId);
-    return PALETTE[(i < 0 ? 0 : i) % PALETTE.length];
-  };
-
+  // One yellow dot per person away that day. Each person used to get their own
+  // colour (purple and pink among them), but avatars carry no colour any more,
+  // so the colours pointed at nobody; yellow says "someone is away" and the
+  // trip list below says who.
+  //
   // Plain derivation rather than useMemo: React Compiler is enabled and
-  // memoizes this itself, and the hand-written deps could not list colorOf
-  // without rebuilding every render anyway.
+  // memoizes this itself.
   const marks = (() => {
     const out: Record<string, string[]> = {};
     if (!away.data) return out;
@@ -65,11 +61,33 @@ export default function AwayScreen() {
       const iso = isoOf(year, month, d);
       const colors = away.data
         .filter((a) => withinRange(iso, a.startDate, a.endDate))
-        .map((a) => colorOf(a.memberId));
+        .map(() => theme.warning);
       if (colors.length) out[iso] = colors;
     }
     return out;
   })();
+
+  function explain() {
+    void dialog.alert({
+      tone: 'info',
+      icon: 'airplane-outline',
+      title: 'How away works',
+      message:
+        "Mark a trip once and day-to-day costs split without you for those days. Rent, wifi and the gas cylinder still split with everyone — your room doesn't disappear.",
+    });
+  }
+
+  function explainBackdated(count: number) {
+    void dialog.alert({
+      tone: 'warning',
+      icon: 'alert-circle-outline',
+      title: 'Past expenses were not changed',
+      message:
+        count === 0
+          ? 'Nothing had already been split against those days, so nothing needs fixing.'
+          : `${count} expense${count === 1 ? ' was' : 's were'} already split including them in that window. Re-splitting isn't automatic — edit them from History if they need correcting.`,
+    });
+  }
 
   const awayToday = (members.data ?? []).filter(
     (m) => away.data && !isPresent(m.id, today, away.data)
@@ -171,34 +189,41 @@ export default function AwayScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Away calendar" />
+      {/* The explanation behind an icon: it was a paragraph above the
+          calendar on every visit, for something you learn once. */}
+      <ScreenHeader
+        title="Away"
+        action={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="How away works"
+            onPress={explain}
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.headerIcon,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+            ]}>
+            <Ionicons name="information-circle-outline" size={19} color={theme.text} />
+          </Pressable>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-          <Ionicons name="information-circle-outline" size={15} color={theme.textTertiary} />
-          <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-            Mark a trip once and day-to-day costs split without you for those days. Rent, wifi and
-            the gas cylinder still split with everyone — your room doesn&apos;t disappear.
-          </ThemedText>
-        </View>
-
         {awayToday.length > 0 ? (
-          <Card padded={false} style={[styles.banner, { backgroundColor: theme.warningSoft }]}>
-            <Ionicons name="airplane" size={15} color={theme.warning} />
-            <ThemedText style={[Type.caption, styles.flex]}>
+          <View style={[styles.note, { backgroundColor: theme.warningSoft }]}>
+            <Ionicons name="airplane-outline" size={15} color={theme.warning} />
+            <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
               Away today: {awayToday.map((m) => m.displayName).join(', ')}
             </ThemedText>
-          </Card>
+          </View>
         ) : null}
 
         {isOwner && members.data && members.data.length > 1 ? (
           <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              WHO IS THIS FOR
-            </ThemedText>
+            <ThemedText style={styles.sectionTitle}>Who is away</ThemedText>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -247,125 +272,150 @@ export default function AwayScreen() {
         </Card>
 
         {start ? (
-          <Card style={[styles.selection, { borderColor: theme.primary }]}>
-            <View style={styles.selectionHead}>
+          <Card padded={false}>
+            <View style={[styles.formRow, styles.selectionHead]}>
               <View style={styles.flex}>
-                <ThemedText style={Type.headline}>
+                <ThemedText style={styles.rangeTitle}>
                   {openEnded ? formatRange(start, null) : formatRange(start, end ?? start)}
                 </ThemedText>
                 <ThemedText themeColor="textTertiary" style={Type.micro}>
                   {openEnded
                     ? 'Until you remove it'
-                    : `${nights} day${nights === 1 ? '' : 's'}${end ? '' : ' — tap another day for a range'}`}
+                    : `${nights} day${nights === 1 ? '' : 's'}${end ? '' : ' · tap another day for a range'}`}
                 </ThemedText>
               </View>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear the dates"
                 onPress={() => {
                   setStart(null);
                   setEnd(null);
                 }}
                 hitSlop={8}>
-                <Ionicons name="close-circle" size={20} color={theme.textTertiary} />
+                <Ionicons name="close" size={19} color={theme.textTertiary} />
               </Pressable>
             </View>
 
-            <Pressable onPress={() => setOpenEnded((v) => !v)} style={styles.checkRow} hitSlop={8}>
-              <Ionicons
-                name={openEnded ? 'checkbox' : 'square-outline'}
-                size={19}
-                color={openEnded ? theme.primary : theme.borderStrong}
+            <View style={[styles.formRow, styles.switchRow, { borderTopColor: theme.border }]}>
+              <ThemedText style={[Type.body, styles.flex]}>No end date yet</ThemedText>
+              <Switch
+                value={openEnded}
+                onValueChange={setOpenEnded}
+                trackColor={{ false: theme.backgroundSelected, true: theme.primary }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="No end date yet"
               />
-              <ThemedText style={Type.caption}>No end date yet</ThemedText>
-            </Pressable>
+            </View>
 
-            <TextField
-              value={note}
-              onChangeText={setNote}
-              placeholder="Note — hometown, wedding…"
-              editable={!save.isPending}
-            />
-
-            <Button title="Mark away" onPress={() => save.mutate()} loading={save.isPending} />
+            <View style={[styles.formRow, styles.formFoot, { borderTopColor: theme.border }]}>
+              <TextField
+                value={note}
+                onChangeText={setNote}
+                placeholder="Note: hometown, wedding…"
+                editable={!save.isPending}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ busy: save.isPending }}
+                disabled={save.isPending}
+                onPress={() => save.mutate()}
+                style={({ pressed }) => [
+                  styles.pill,
+                  { backgroundColor: theme.primarySoft, opacity: pressed ? 0.7 : 1 },
+                ]}>
+                {save.isPending ? (
+                  <ActivityIndicator size="small" color={theme.brandInk} />
+                ) : (
+                  <ThemedText style={[styles.pillText, { color: theme.brandInk }]}>Mark away</ThemedText>
+                )}
+              </Pressable>
+            </View>
           </Card>
         ) : (
-          <ThemedText themeColor="textTertiary" style={[Type.micro, styles.hint]}>
-            Tap a day to start, then tap another for a range.
+          <ThemedText themeColor="textTertiary" style={[Type.caption, styles.hint]}>
+            Tap a day to start, then another for a range
           </ThemedText>
         )}
 
+        {/* One line once it is saved; the detail is a tap away. */}
         {backdated !== null ? (
-          <View style={[styles.note, { backgroundColor: theme.warningSoft }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => explainBackdated(backdated)}
+            style={({ pressed }) => [
+              styles.note,
+              { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
+            ]}>
             <Ionicons name="alert-circle-outline" size={15} color={theme.warning} />
-            <View style={styles.flex}>
-              <ThemedText style={[Type.caption, styles.semi]}>
-                Saved — past expenses were not changed
-              </ThemedText>
-              <ThemedText themeColor="textSecondary" style={Type.micro}>
-                {backdated === 0
-                  ? 'Nothing had already been split against those days, so nothing needs fixing.'
-                  : `${backdated} expense${backdated === 1 ? ' was' : 's were'} already split including them in that window. Re-splitting isn't automatic — edit them from History if they need correcting.`}
-              </ThemedText>
-              <Pressable onPress={() => setBackdated(null)} hitSlop={8}>
-                <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
-                  Dismiss
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
+            <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
+              Saved · past expenses were not changed
+            </ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss"
+              onPress={() => setBackdated(null)}
+              hitSlop={10}>
+              <Ionicons name="close" size={16} color={theme.warning} />
+            </Pressable>
+          </Pressable>
         ) : null}
 
         {error ? <Notice tone="danger" message={error} /> : null}
 
         <View style={styles.section}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            TRIPS
-          </ThemedText>
+          <ThemedText style={styles.sectionTitle}>Trips</ThemedText>
 
           {away.data && away.data.length > 0 ? (
             <Card padded={false}>
               {away.data.map((a, i) => {
                 const current = withinRange(today, a.startDate, a.endDate);
+                // Removing is behind a tap on the row, with the same popup --
+                // a bin on every trip was the loudest thing in the list.
                 const canRemove = isOwner || a.memberId === member?.id;
                 const label = `${a.memberName} · ${formatRange(a.startDate, a.endDate)}`;
 
                 return (
-                  <View
+                  <Pressable
                     key={a.id}
-                    style={[
+                    disabled={!canRemove}
+                    onPress={() => confirmRemove(a.id, label)}
+                    accessibilityRole={canRemove ? 'button' : 'text'}
+                    accessibilityHint={canRemove ? 'Opens remove' : undefined}
+                    style={({ pressed }) => [
                       styles.tripRow,
-                      i < (away.data?.length ?? 0) - 1 && {
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: theme.border,
-                      },
+                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                      { opacity: pressed ? 0.7 : 1 },
                     ]}>
                     <Avatar name={a.memberName} seed={a.memberId} size={36} />
 
                     <View style={styles.flex}>
                       <View style={styles.tripName}>
-                        <ThemedText style={Type.body} numberOfLines={1}>
+                        <ThemedText style={[Type.body, styles.shrink]} numberOfLines={1}>
                           {a.memberName}
-                          {a.memberId === member?.id ? ' (you)' : ''}
                         </ThemedText>
-                        {current ? (
-                          <View style={[styles.nowPill, { backgroundColor: theme.warningSoft }]}>
-                            <ThemedText style={[Type.micro, { color: theme.warning, fontWeight: '700' }]}>
-                              away now
+                        {a.memberId === member?.id ? (
+                          <View style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
+                            <ThemedText themeColor="textSecondary" style={styles.tagText}>
+                              You
                             </ThemedText>
                           </View>
                         ) : null}
+                        {current ? (
+                          <View style={[styles.tag, { backgroundColor: theme.warningSoft }]}>
+                            <ThemedText style={[styles.tagText, { color: theme.warning }]}>Away now</ThemedText>
+                          </View>
+                        ) : null}
                       </View>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
+                      <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
                         {formatRange(a.startDate, a.endDate)}
                         {a.note ? ` · ${a.note}` : ''}
                       </ThemedText>
                     </View>
 
                     {canRemove ? (
-                      <Pressable onPress={() => confirmRemove(a.id, label)} hitSlop={14}>
-                        <Ionicons name="trash-outline" size={17} color={theme.textTertiary} />
-                      </Pressable>
+                      <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
                     ) : null}
-                  </View>
+                  </Pressable>
                 );
               })}
             </Card>
@@ -388,34 +438,66 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
   semi: { fontWeight: '700' },
+  medium: { fontWeight: '600' },
+  shrink: { flexShrink: 1 },
   dim: { opacity: 0.4 },
   hint: { textAlign: 'center' },
 
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   note: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
     borderRadius: Radius.md,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
   },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three },
 
   section: { gap: Spacing.two },
+  // Sentence case at heading size, as on Settle up and History.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
   peopleRow: { gap: Spacing.four, paddingVertical: Spacing.one, paddingRight: Spacing.four },
   person: { alignItems: 'center', gap: Spacing.two, width: 58 },
 
-  selection: { gap: Spacing.three, borderWidth: 1.4 },
+  formRow: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
   selectionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  rangeTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: Spacing.two,
+  },
+  formFoot: { gap: Spacing.three, borderTopWidth: StyleSheet.hairlineWidth },
+  pill: {
+    alignSelf: 'flex-end',
+    minHeight: 36,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillText: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
 
   tripRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
   tripName: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  nowPill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.four },
 });

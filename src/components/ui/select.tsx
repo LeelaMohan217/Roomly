@@ -22,6 +22,14 @@ type Props = {
   options: SelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  /**
+   * A row in a grouped list rather than a labelled field: no label above it,
+   * no box around it, a grey icon tile while nothing is picked, and a
+   * chevron. The label still names it for screen readers and the sheet.
+   */
+  bare?: boolean;
+  /** The tile's icon while nothing is picked; bare rows only. */
+  icon?: keyof typeof Ionicons.glyphMap;
 };
 
 /**
@@ -29,17 +37,29 @@ type Props = {
  * overflowed sideways and you couldn't see what you hadn't scrolled to; a
  * list shows everything and has room to say what each option does.
  */
-export function Select({ label, placeholder, value, options, onChange, disabled }: Props) {
+export function Select({
+  label,
+  placeholder,
+  value,
+  options,
+  onChange,
+  disabled,
+  bare = false,
+  icon = 'apps-outline',
+}: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value) ?? null;
 
   return (
-    <View style={styles.wrap}>
-      <ThemedText themeColor="textTertiary" style={Type.label}>
-        {label.toUpperCase()}
-      </ThemedText>
+    <View style={bare ? undefined : styles.wrap}>
+      {/* Sentence case, as TextField labels are. */}
+      {bare ? null : (
+        <ThemedText themeColor="textSecondary" style={styles.label}>
+          {label}
+        </ThemedText>
+      )}
 
       <Pressable
         accessibilityRole="button"
@@ -47,16 +67,22 @@ export function Select({ label, placeholder, value, options, onChange, disabled 
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [
-          styles.field,
-          {
-            backgroundColor: theme.backgroundElement,
-            borderColor: theme.border,
-            opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
-          },
+          bare ? styles.bareField : styles.field,
+          bare
+            ? { opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }
+            : {
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.border,
+                opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
+              },
         ]}>
         {selected?.glyph ? (
           <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
             <ThemedText style={styles.glyph}>{selected.glyph}</ThemedText>
+          </View>
+        ) : bare ? (
+          <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+            <Ionicons name={icon} size={16} color={theme.textSecondary} />
           </View>
         ) : null}
 
@@ -74,7 +100,7 @@ export function Select({ label, placeholder, value, options, onChange, disabled 
           ) : null}
         </View>
 
-        <Ionicons name="chevron-down" size={16} color={theme.textTertiary} />
+        <Ionicons name={bare ? 'chevron-forward' : 'chevron-down'} size={bare ? 15 : 16} color={theme.textTertiary} />
       </Pressable>
 
       <Modal
@@ -158,6 +184,14 @@ export function Select({ label, placeholder, value, options, onChange, disabled 
 
 const styles = StyleSheet.create({
   wrap: { gap: Spacing.two },
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  bareField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+  },
   field: {
     flexDirection: 'row',
     alignItems: 'center',

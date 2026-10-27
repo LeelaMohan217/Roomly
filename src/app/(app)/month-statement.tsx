@@ -2,13 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { Notice } from '@/components/ui/notice';
@@ -104,17 +103,18 @@ export default function MonthStatementScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+      {/* The month's state as one small grey tag, not a subtitle and a pill
+          saying the same thing. */}
       <ScreenHeader
         title={label}
-        subtitle={
-          s?.status === 'closed' ? 'Closed and frozen' : s?.status === 'open' ? 'Still open' : undefined
-        }
         action={
-          s?.status === 'closed' ? (
+          s?.status ? (
             <View style={[styles.pill, { backgroundColor: theme.backgroundSelected }]}>
-              <Ionicons name="lock-closed" size={11} color={theme.textTertiary} />
-              <ThemedText themeColor="textTertiary" style={Type.micro}>
-                Closed
+              {s.status === 'closed' ? (
+                <Ionicons name="lock-closed" size={11} color={theme.textSecondary} />
+              ) : null}
+              <ThemedText themeColor="textSecondary" style={styles.pillText}>
+                {s.status === 'closed' ? 'Closed' : 'Open'}
               </ThemedText>
             </View>
           ) : undefined
@@ -131,15 +131,18 @@ export default function MonthStatementScreen() {
           queryState(statement, 'this month', `Adding up ${label}…`)
         ) : (
           <>
-        <Card style={styles.hero}>
-          <ThemedText themeColor="textTertiary" style={Type.micro}>
+        {/* On the page, not in a card -- as on Expense details. */}
+        <View style={styles.hero}>
+          <ThemedText themeColor="textSecondary" style={Type.caption}>
             Household spent
           </ThemedText>
-          <ThemedText style={Type.display} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatPaise(s?.totalPaise ?? 0)}</ThemedText>
-          <ThemedText themeColor="textTertiary" style={Type.micro}>
-            across {s?.expenseCount ?? 0} expense{s?.expenseCount === 1 ? '' : 's'}
+          <ThemedText style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {formatPaise(s?.totalPaise ?? 0)}
           </ThemedText>
-        </Card>
+          <ThemedText themeColor="textTertiary" style={Type.caption}>
+            {s?.expenseCount ?? 0} expense{s?.expenseCount === 1 ? '' : 's'}
+          </ThemedText>
+        </View>
 
         {(s?.expenseCount ?? 0) === 0 ? (
           <Card style={styles.empty}>
@@ -152,15 +155,15 @@ export default function MonthStatementScreen() {
         ) : (
           <>
             <View style={styles.section}>
-              <ThemedText themeColor="textTertiary" style={Type.label}>
-                WHO PAID WHAT
-              </ThemedText>
-              {/* This is the month in isolation, not the running balance —
-                  someone can be up in August and still owe overall. Saying so
-                  prevents the obvious misreading. */}
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.blurb]}>
-                This month only. Your overall balance is on Home.
-              </ThemedText>
+              <View>
+                <ThemedText style={styles.sectionTitle}>Who paid what</ThemedText>
+                {/* This is the month in isolation, not the running balance —
+                    someone can be up in August and still owe overall. Saying
+                    so prevents the obvious misreading. */}
+                <ThemedText themeColor="textTertiary" style={Type.caption}>
+                  This month only
+                </ThemedText>
+              </View>
 
               <Card padded={false}>
                 {s?.perMember.map((p, i) => (
@@ -168,22 +171,29 @@ export default function MonthStatementScreen() {
                     key={p.memberId}
                     style={[
                       styles.memberRow,
-                      i < (s?.perMember.length ?? 0) - 1 && {
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: theme.border,
-                      },
+                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                     ]}>
                     <Avatar name={p.name} seed={p.memberId} size={36} />
 
                     <View style={styles.flex}>
-                      <ThemedText style={Type.body}>{p.name}</ThemedText>
-                      <ThemedText themeColor="textTertiary" style={Type.micro}>
-                        paid {formatPaise(p.paidPaise)} · share {formatPaise(p.owedPaise)}
+                      <View style={styles.nameRow}>
+                        <ThemedText style={[Type.body, styles.shrink]} numberOfLines={1}>
+                          {p.name}
+                        </ThemedText>
                         {/* Someone who has since moved out still took part in
                             this month, and the totals above include them — so
                             omitting their row, as this used to, left the
                             columns not adding up to the household figure. */}
-                        {p.hasLeft ? ' · moved out since' : ''}
+                        {p.hasLeft ? (
+                          <View style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
+                            <ThemedText themeColor="textSecondary" style={styles.tagText}>
+                              Moved out
+                            </ThemedText>
+                          </View>
+                        ) : null}
+                      </View>
+                      <ThemedText themeColor="textTertiary" style={Type.micro}>
+                        Paid {formatPaise(p.paidPaise)} · share {formatPaise(p.owedPaise)}
                       </ThemedText>
                     </View>
 
@@ -201,7 +211,7 @@ export default function MonthStatementScreen() {
                       ]}>
                       {p.netPaise === 0
                         ? '—'
-                        : `${p.netPaise > 0 ? '+' : '−'}${formatPaise(Math.abs(p.netPaise))}`}
+                        : `${p.netPaise > 0 ? '+' : '−'} ${formatPaise(Math.abs(p.netPaise))}`}
                     </ThemedText>
                   </View>
                 ))}
@@ -209,28 +219,26 @@ export default function MonthStatementScreen() {
             </View>
 
             <View style={styles.section}>
-              <ThemedText themeColor="textTertiary" style={Type.label}>
-                WHERE IT WENT
-              </ThemedText>
+              <ThemedText style={styles.sectionTitle}>Where it went</ThemedText>
               <Card padded={false}>
                 {s?.byCategory.map((c, i) => (
                   <View
                     key={c.name}
                     style={[
                       styles.row,
-                      i < (s?.byCategory.length ?? 0) - 1 && {
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: theme.border,
-                      },
+                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                     ]}>
                     <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
                       <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(c.icon)}</ThemedText>
                     </View>
-                    <ThemedText style={[Type.body, styles.flex]}>{c.name}</ThemedText>
-                    <ThemedText themeColor="textTertiary" style={Type.micro}>
+                    <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+                      {c.name}
+                    </ThemedText>
+                    {/* Fixed widths, so the columns line up, as on Reports. */}
+                    <ThemedText themeColor="textTertiary" style={[Type.caption, styles.percent]}>
                       {Math.round((c.totalPaise / (s?.totalPaise || 1)) * 100)}%
                     </ThemedText>
-                    <ThemedText style={Type.amount}>{formatPaise(c.totalPaise)}</ThemedText>
+                    <ThemedText style={[Type.amount, styles.amount]}>{formatPaise(c.totalPaise)}</ThemedText>
                   </View>
                 ))}
               </Card>
@@ -238,40 +246,56 @@ export default function MonthStatementScreen() {
           </>
         )}
 
+        {/* The same rows as Payment history, and the way there is the last
+            row of the list rather than a separate button under it. */}
         <View style={styles.section}>
-          <ThemedText themeColor="textTertiary" style={Type.label}>
-            PAYMENTS THIS MONTH
-          </ThemedText>
-
-          {s && s.settlements.length > 0 ? (
-            <Card padded={false}>
-              {s.settlements.map((t, i) => (
+          <ThemedText style={styles.sectionTitle}>Payments</ThemedText>
+          <Card padded={false}>
+            {s && s.settlements.length > 0 ? (
+              s.settlements.map((t, i) => (
                 <View
                   key={t.id}
+                  accessible
+                  accessibilityLabel={`${t.fromName} paid ${t.toName}, ${formatPaise(t.amountPaise)}`}
                   style={[
                     styles.row,
-                    i < s.settlements.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: theme.border,
-                    },
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                   ]}>
-                  <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
-                    <Ionicons name="checkmark" size={16} color={theme.primary} />
+                  <View style={styles.pair}>
+                    <Avatar name={t.fromName} seed={t.fromMember} size={30} ring ringColor={theme.backgroundElement} />
+                    <Avatar
+                      name={t.toName}
+                      seed={t.toMember}
+                      size={30}
+                      ring
+                      ringColor={theme.backgroundElement}
+                      style={styles.overlap}
+                    />
                   </View>
                   <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
-                    {t.fromName} paid {t.toName}
+                    {t.fromName} → {t.toName}
                   </ThemedText>
                   <ThemedText style={Type.amount}>{formatPaise(t.amountPaise)}</ThemedText>
                 </View>
-              ))}
-            </Card>
-          ) : (
-            <Card>
-              <ThemedText themeColor="textSecondary" style={Type.caption}>
-                Nobody has settled up in {label} yet.
-              </ThemedText>
-            </Card>
-          )}
+              ))
+            ) : (
+              <View style={styles.row}>
+                <ThemedText themeColor="textSecondary" style={Type.body}>
+                  Nobody has settled up in {label} yet
+                </ThemedText>
+              </View>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/settlements')}
+              style={({ pressed }) => [
+                styles.row,
+                { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, opacity: pressed ? 0.6 : 1 },
+              ]}>
+              <ThemedText style={[Type.body, styles.flex, { color: theme.brandInk }]}>See all payments</ThemedText>
+              <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+            </Pressable>
+          </Card>
         </View>
 
           </>
@@ -279,45 +303,38 @@ export default function MonthStatementScreen() {
 
         {error ? <Notice tone="danger" message={error} /> : null}
 
-        <Button
-          title="See all payments"
-          variant="secondary"
-          onPress={() => router.push('/settlements')}
-        />
-
-        {isOwner && period && s?.status === 'open' ? (
-          <>
-            <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="lock-closed-outline" size={15} color={theme.textTertiary} />
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-                Closing freezes {label}. Anyone wanting to change an expense from it will need
-                your approval, and corrections post as adjustments rather than rewriting history.
-              </ThemedText>
-            </View>
-            <Button
-              title={`Close ${MONTHS[month - 1]}`}
-              onPress={confirmClose}
-              loading={close.isPending}
-            />
-          </>
-        ) : null}
-
-        {isOwner && period && s?.status === 'closed' ? (
-          <>
-            <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="lock-open-outline" size={15} color={theme.textTertiary} />
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-                {label} is frozen. Nothing in it can be added, edited, voided or confirmed until
-                it is reopened — including a change someone has already requested.
-              </ThemedText>
-            </View>
-            <Button
-              title={`Reopen ${MONTHS[month - 1]}`}
-              variant="secondary"
-              onPress={confirmReopen}
-              loading={reopen.isPending}
-            />
-          </>
+        {/* One pill for the owner. What closing or reopening does is said in
+            the confirm popup, at the moment it matters, rather than in a
+            paragraph above the button on every visit. */}
+        {isOwner && period && (s?.status === 'open' || s?.status === 'closed') ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: close.isPending || reopen.isPending }}
+            disabled={close.isPending || reopen.isPending}
+            onPress={s.status === 'open' ? confirmClose : confirmReopen}
+            style={({ pressed }) => [
+              styles.actionPill,
+              {
+                backgroundColor: s.status === 'open' ? theme.primarySoft : theme.backgroundSelected,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}>
+            {close.isPending || reopen.isPending ? (
+              <ActivityIndicator size="small" color={theme.brandInk} />
+            ) : (
+              <>
+                <Ionicons
+                  name={s.status === 'open' ? 'lock-closed-outline' : 'lock-open-outline'}
+                  size={15}
+                  color={s.status === 'open' ? theme.brandInk : theme.text}
+                />
+                <ThemedText
+                  style={[styles.actionText, { color: s.status === 'open' ? theme.brandInk : theme.text }]}>
+                  {s.status === 'open' ? `Close ${MONTHS[month - 1]}` : `Reopen ${MONTHS[month - 1]}`}
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -330,47 +347,63 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
 
-  hero: { alignItems: 'center', gap: Spacing.one },
+  shrink: { flexShrink: 1 },
+
+  hero: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
+  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
     borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: Spacing.two + 2,
     paddingVertical: 3,
   },
+  pillText: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
 
   section: { gap: Spacing.two },
-  blurb: { marginTop: -2, marginBottom: Spacing.one },
+  // Sentence case at heading size, as on Settle up and History.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
 
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
+    paddingVertical: Spacing.two + 4,
   },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
+    paddingVertical: Spacing.two + 4,
   },
   tile: {
     width: 34,
     height: 34,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   glyph: { fontSize: 17 },
+  percent: { width: 40, textAlign: 'right' },
+  amount: { minWidth: 84, textAlign: 'right' },
+  pair: { flexDirection: 'row', alignItems: 'center' },
+  overlap: { marginLeft: -10 },
 
-  note: {
+  actionPill: {
+    alignSelf: 'center',
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
+    minHeight: 40,
+    paddingHorizontal: Spacing.four + 2,
+    borderRadius: Radius.pill,
   },
+  actionText: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
 });

@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { iconFor } from '@/lib/icons';
@@ -16,23 +17,24 @@ import { useSession } from '@/lib/session';
 const GROUPS: { kind: ManagedCategory['kind']; title: string; blurb: string }[] = [
   {
     kind: 'fixed',
-    title: 'FIXED COSTS',
-    blurb: 'Split between everyone, away or not — your room doesn’t disappear',
+    title: 'Fixed costs',
+    blurb: 'Split between everyone, away or not — your room doesn’t disappear.',
   },
   {
     kind: 'bulk',
-    title: 'BULK BUYS',
-    blurb: 'Charged in full when bought, because they outlast any one trip',
+    title: 'Bulk buys',
+    blurb: 'Charged in full when bought, because they outlast any one trip.',
   },
   {
     kind: 'consumption',
-    title: 'DAY TO DAY',
-    blurb: 'Split only between people who were actually here',
+    title: 'Day to day',
+    blurb: 'Split only between people who were actually here.',
   },
 ];
 
 export default function CategoriesScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const { member } = useSession();
   const isOwner = member?.role === 'owner';
@@ -41,6 +43,12 @@ export default function CategoriesScreen() {
   const all = categories.data ?? [];
   const live = all.filter((c) => !c.isArchived);
   const archived = all.filter((c) => c.isArchived);
+  // Folded by default: archived categories are history, not choices.
+  const [showArchived, setShowArchived] = useState(false);
+
+  // How a group splits, a tap away rather than a line under every heading.
+  const explain = (title: string, message: string) =>
+    void dialog.alert({ tone: 'info', icon: 'information-circle-outline', title, message });
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -66,12 +74,13 @@ export default function CategoriesScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Members may add; changing one in use is the owner's, because the
+            kind decides how its expenses split. */}
         {!isOwner ? (
-          <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
+          <View style={styles.aside}>
             <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
-            <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-              You can add a category. Changing one that already has expenses on it is the
-              owner&apos;s call — the kind decides how those expenses split.
+            <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
+              Only the owner can change one in use
             </ThemedText>
           </View>
         ) : null}
@@ -82,19 +91,22 @@ export default function CategoriesScreen() {
 
           return (
             <View key={g.kind} style={styles.section}>
-              <ThemedText themeColor="textTertiary" style={Type.label}>
-                {g.title}
-              </ThemedText>
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.blurb]}>
-                {g.blurb}
-              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${g.title}, how it splits`}
+                onPress={() => explain(g.title, g.blurb)}
+                hitSlop={6}
+                style={styles.headingRow}>
+                <ThemedText style={styles.sectionTitle}>{g.title}</ThemedText>
+                <Ionicons name="information-circle-outline" size={16} color={theme.textTertiary} />
+              </Pressable>
 
               <Card padded={false}>
                 {rows.map((c, i) => (
                   <Row
                     key={c.id}
                     category={c}
-                    last={i === rows.length - 1}
+                    first={i === 0}
                     onPress={
                       isOwner
                         ? () => router.push({ pathname: '/category-edit', params: { id: c.id } })
@@ -107,39 +119,45 @@ export default function CategoriesScreen() {
           );
         })}
 
+        {/* One row that opens, rather than a whole section with its own
+            heading and paragraph. */}
         {archived.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              ARCHIVED ({archived.length})
-            </ThemedText>
-            <ThemedText themeColor="textTertiary" style={[Type.micro, styles.blurb]}>
-              Hidden when adding an expense, but old expenses still show them
-            </ThemedText>
-
-            <Card padded={false}>
-              {archived.map((c, i) => (
-                <Row
-                  key={c.id}
-                  category={c}
-                  last={i === archived.length - 1}
-                  dim
-                  onPress={
-                    isOwner
-                      ? () => router.push({ pathname: '/category-edit', params: { id: c.id } })
-                      : undefined
-                  }
-                />
-              ))}
-            </Card>
-          </View>
-        ) : null}
-
-        {isOwner ? (
-          <Button
-            title="Add a category"
-            variant="secondary"
-            onPress={() => router.push('/category-edit')}
-          />
+          <Card padded={false}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showArchived }}
+              accessibilityHint="Hidden when adding an expense; old expenses still show them"
+              onPress={() => setShowArchived((v) => !v)}
+              style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
+              <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                <Ionicons name="archive-outline" size={17} color={theme.text} />
+              </View>
+              <ThemedText style={[Type.body, styles.flex]}>Archived</ThemedText>
+              <ThemedText themeColor="textSecondary" style={Type.body}>
+                {archived.length}
+              </ThemedText>
+              <Ionicons
+                name={showArchived ? 'chevron-up' : 'chevron-down'}
+                size={15}
+                color={theme.textTertiary}
+              />
+            </Pressable>
+            {showArchived
+              ? archived.map((c) => (
+                  <Row
+                    key={c.id}
+                    category={c}
+                    first={false}
+                    dim
+                    onPress={
+                      isOwner
+                        ? () => router.push({ pathname: '/category-edit', params: { id: c.id } })
+                        : undefined
+                    }
+                  />
+                ))
+              : null}
+          </Card>
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -148,47 +166,54 @@ export default function CategoriesScreen() {
 
 function Row({
   category,
-  last,
+  first,
   dim = false,
   onPress,
 }: {
   category: ManagedCategory;
-  last: boolean;
+  first: boolean;
   dim?: boolean;
   onPress?: () => void;
 }) {
   const theme = useTheme();
+  // The count includes deleted expenses, because a voided row still holds the
+  // foreign key and still blocks deletion. So only "never used" is worth a
+  // mark -- it is the one that can still be deleted.
+  const unused = category.expenseCount === 0;
 
   return (
     <Pressable
       disabled={!onPress}
       onPress={onPress}
+      accessibilityLabel={
+        `${category.name}${unused ? ', unused, can be deleted' : ''}` +
+        `${category.respectsAwayCalendar ? ', skips people who are away' : ''}`
+      }
       style={({ pressed }) => [
         styles.row,
-        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
         { opacity: (pressed && onPress ? 0.6 : 1) * (dim ? 0.5 : 1) },
       ]}>
       <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
         <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(category.icon)}</ThemedText>
       </View>
 
-      <View style={styles.flex}>
-        <ThemedText style={Type.body} numberOfLines={1}>
+      <View style={[styles.flex, styles.nameRow]}>
+        <ThemedText style={[Type.body, styles.shrink]} numberOfLines={1}>
           {category.name}
         </ThemedText>
-        {/* The count includes deleted expenses, because a voided row still
-            holds the foreign key and still blocks deletion. So state the
-            consequence rather than a number that would read as "live". */}
-        <ThemedText themeColor="textTertiary" style={Type.micro}>
-          {category.expenseCount === 0 ? 'never used — can be deleted' : 'in use — archive only'}
-        </ThemedText>
+        {unused ? (
+          <View style={[styles.pill, { backgroundColor: theme.backgroundSelected }]}>
+            <ThemedText themeColor="textSecondary" style={styles.pillText}>
+              Unused
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
 
+      {/* Blue: information. Splits skip whoever is away. */}
       {category.respectsAwayCalendar ? (
-        <View style={[styles.pill, { backgroundColor: theme.primarySoft }]}>
-          <Ionicons name="airplane" size={9} color={theme.primary} />
-          <ThemedText style={[Type.micro, { color: theme.primary }]}>away-aware</ThemedText>
-        </View>
+        <Ionicons name="airplane-outline" size={16} color={theme.info} />
       ) : null}
 
       {onPress ? <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} /> : null}
@@ -201,46 +226,39 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
 
+  shrink: { flexShrink: 1 },
+
+  // Round, like the other header icons.
   addButton: {
-    width: 34,
-    height: 34,
-    borderRadius: Radius.sm,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   section: { gap: Spacing.two },
-  blurb: { marginTop: -2, marginBottom: Spacing.one },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, alignSelf: 'flex-start' },
+  // Sentence case at heading size, as on Settle up and History.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  aside: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.one },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
+    paddingVertical: Spacing.two + 4,
   },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tile: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glyph: { fontSize: 18 },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-  },
-
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-  },
+  glyph: { fontSize: 17 },
+  pill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
+  pillText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
 });

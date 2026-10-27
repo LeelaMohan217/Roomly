@@ -138,69 +138,72 @@ export default function HouseholdScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* The list is the screen. Everything else is an action below it. */}
-        <Card padded={false}>
-          {list.map((m, i) => {
-            const joined = !!m.userId;
-            return (
-              <View
-                key={m.id}
-                style={[
-                  styles.row,
-                  i < list.length - 1 && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: theme.border,
-                  },
-                ]}>
-                <Avatar
-                  name={m.displayName}
-                  seed={m.id}
-                  size={40}
-                  style={joined ? undefined : styles.dim}
-                />
+        <View style={styles.section}>
+          <Card padded={false}>
+            {list.map((m, i) => {
+              const joined = !!m.userId;
+              // Anyone but yourself and the owner. Someone who has already
+              // paid for things is no longer un-removable — they are moved
+              // out instead, which keeps their history intact. The row is the
+              // button: a bin on every line read as the main thing to do here.
+              const removable = isOwner && m.role !== 'owner' && m.id !== member?.id;
+              return (
+                <Pressable
+                  key={m.id}
+                  disabled={!removable}
+                  onPress={() => confirmRemove(m.id, m.displayName)}
+                  accessibilityRole={removable ? 'button' : 'text'}
+                  accessibilityHint={removable ? 'Opens remove' : undefined}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}>
+                  <Avatar
+                    name={m.displayName}
+                    seed={m.id}
+                    size={36}
+                    style={joined ? undefined : styles.dim}
+                  />
 
-                <View style={styles.flex}>
-                  <View style={styles.nameRow}>
-                    <ThemedText style={Type.body} numberOfLines={1}>
+                  <View style={[styles.flex, styles.nameRow]}>
+                    <ThemedText style={[Type.body, styles.shrink]} numberOfLines={1}>
                       {m.displayName}
-                      {m.id === member?.id ? ' (you)' : ''}
                     </ThemedText>
-                    {m.role === 'owner' ? (
-                      <View style={[styles.pill, { backgroundColor: theme.primarySoft }]}>
-                        <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
-                          Owner
-                        </ThemedText>
-                      </View>
-                    ) : null}
+                    {m.id === member?.id ? <Tag text="You" /> : null}
+                    {m.role === 'owner' ? <Tag text="Owner" tone="success" /> : null}
+                    {/* Yellow: they still have to claim their account. */}
+                    {!joined ? <Tag text="Not joined yet" tone="warning" /> : null}
                   </View>
-                  <ThemedText themeColor="textTertiary" style={Type.micro}>
-                    {joined ? 'Joined' : 'Waiting to claim their account'}
-                  </ThemedText>
-                </View>
 
-                {/* Anyone but yourself and the owner. Someone who has already
-                    paid for things is no longer un-removable — they are moved
-                    out instead, which keeps their history intact. */}
-                {isOwner && m.role !== 'owner' && m.id !== member?.id ? (
-                  <Pressable onPress={() => confirmRemove(m.id, m.displayName)} hitSlop={14}>
-                    <Ionicons name="trash-outline" size={17} color={theme.textTertiary} />
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-          })}
-        </Card>
+                  {removable ? (
+                    <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </Card>
+          {isOwner && list.length > 1 ? (
+            <ThemedText themeColor="textTertiary" style={[Type.caption, styles.aside]}>
+              Tap a housemate to remove them
+            </ThemedText>
+          ) : null}
+        </View>
 
         {isOwner ? (
-          <View style={styles.actions}>
-            <Button title="＋  Add housemate" onPress={() => setAddOpen(true)} />
-            <Button
-              title="Invite with a code"
-              variant="ghost"
-              onPress={() => {
-                setError(null);
-                setInviteOpen(true);
-              }}
-            />
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Add people</ThemedText>
+            <Card padded={false}>
+              <LinkRow icon="person-add-outline" label="Add a housemate" onPress={() => setAddOpen(true)} first />
+              <LinkRow
+                icon="ticket-outline"
+                label="Invite with a code"
+                onPress={() => {
+                  setError(null);
+                  setInviteOpen(true);
+                }}
+              />
+            </Card>
           </View>
         ) : (
           <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
@@ -239,8 +242,9 @@ export default function HouseholdScreen() {
 
         <Pressable onPress={() => setPickingJoined(true)} disabled={addMember.isPending}>
           <View style={styles.field}>
-            <ThemedText themeColor="textTertiary" style={Type.label}>
-              LIVING HERE SINCE
+            {/* Sentence case, as TextField labels above it are. */}
+            <ThemedText themeColor="textSecondary" style={styles.fieldLabel}>
+              Living here since
             </ThemedText>
             <View style={[styles.dateBox, { backgroundColor: theme.backgroundSunken }]}>
               <Ionicons name="calendar-outline" size={15} color={theme.textTertiary} />
@@ -322,8 +326,53 @@ export default function HouseholdScreen() {
   );
 }
 
+/** A small pill beside a name: grey, green for the owner, yellow for pending. */
+function Tag({ text, tone = 'neutral' }: { text: string; tone?: 'neutral' | 'success' | 'warning' }) {
+  const theme = useTheme();
+  const soft =
+    tone === 'success' ? theme.primarySoft : tone === 'warning' ? theme.warningSoft : theme.backgroundSelected;
+  const ink = tone === 'success' ? theme.brandInk : tone === 'warning' ? theme.warning : theme.textSecondary;
+  return (
+    <View style={[styles.pill, { backgroundColor: soft }]}>
+      <ThemedText style={[styles.pillText, { color: ink }]}>{text}</ThemedText>
+    </View>
+  );
+}
+
+/** A row that opens something, with a grey icon tile -- as on More. */
+function LinkRow({
+  icon,
+  label,
+  onPress,
+  first = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  first?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+        { opacity: pressed ? 0.7 : 1 },
+      ]}>
+      <View style={[styles.linkIcon, { backgroundColor: theme.backgroundSelected }]}>
+        <Ionicons name={icon} size={17} color={theme.text} />
+      </View>
+      <ThemedText style={[Type.body, styles.flex]}>{label}</ThemedText>
+      <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   field: { gap: Spacing.two },
+  fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
   dateBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,17 +386,23 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   dim: { opacity: 0.45 },
 
+  shrink: { flexShrink: 1 },
+
+  section: { gap: Spacing.two },
+  // Sentence case at heading size, as on Settle up and History.
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  aside: { paddingHorizontal: Spacing.one },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 13,
+    paddingVertical: Spacing.two + 4,
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
-
-  actions: { gap: Spacing.two },
+  pillText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  linkIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   codeBox: { borderRadius: Radius.md, padding: Spacing.four, alignItems: 'center', gap: Spacing.one },
   code: { fontSize: 28, fontWeight: '700', letterSpacing: 6 },
 

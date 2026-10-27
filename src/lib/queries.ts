@@ -834,7 +834,14 @@ export type MonthStatement = {
     /** They have since moved out, but took part in this month. */
     hasLeft: boolean;
   }[];
-  settlements: { id: string; fromName: string; toName: string; amountPaise: number }[];
+  settlements: {
+    id: string;
+    fromMember: string;
+    toMember: string;
+    fromName: string;
+    toName: string;
+    amountPaise: number;
+  }[];
 };
 
 /** Everything that happened in one month, for the close-out statement. */
@@ -860,7 +867,7 @@ export function useMonthStatement(year: number, month: number) {
         supabase
           .from('settlements')
           .select(
-            `id, amount_paise,
+            `id, amount_paise, from_member, to_member,
              payer:members!settlements_from_member_fkey ( display_name ),
              payee:members!settlements_to_member_fkey ( display_name )`
           )
@@ -947,10 +954,14 @@ export function useMonthStatement(year: number, month: number) {
         settlements: (settlements.data as unknown as {
           id: string;
           amount_paise: number;
+          from_member: string;
+          to_member: string;
           payer: { display_name: string } | null;
           payee: { display_name: string } | null;
         }[]).map((s) => ({
           id: s.id,
+          fromMember: s.from_member,
+          toMember: s.to_member,
           fromName: s.payer?.display_name ?? '—',
           toName: s.payee?.display_name ?? '—',
           amountPaise: Number(s.amount_paise),
