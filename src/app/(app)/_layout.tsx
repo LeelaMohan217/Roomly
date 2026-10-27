@@ -24,7 +24,6 @@ export default function AppLayout() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="settlements" />
       <Stack.Screen name="month-statement" />
-      <Stack.Screen name="calculator" />
       <Stack.Screen name="add-expense" options={{ presentation: 'modal' }} />
     </Stack>
   );

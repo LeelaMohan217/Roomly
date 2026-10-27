@@ -689,13 +689,13 @@ check(
   !/router\.push\('\/'\)/.test(read('src', 'app', '(app)', 'owner.tsx')),
   "push('/') stacks another copy of the tab shell; the file's own comment says to navigate"
 );
-// Calculator left the tab bar for a row in More, so it is a pushed screen
-// now: it needs the back chevron it used to hide as a tab root.
+// The calculator was removed from the app: no screen, no route, no link.
 check(
-  'the calculator, opened from More, can go back',
+  'the calculator is gone',
   !existsSync(join(ROOT, 'src', 'app', '(app)', '(tabs)', 'calculator.tsx')) &&
-    !/showBack=\{false\}/.test(read('src', 'app', '(app)', 'calculator.tsx')),
-  'Calculator is a tab again, or hides its back chevron as a pushed screen with nowhere else to go'
+    !existsSync(join(ROOT, 'src', 'app', '(app)', 'calculator.tsx')) &&
+    !/calculator/i.test(read('src', 'app', '(app)', '(tabs)', 'more.tsx')),
+  'a calculator screen or a link to it is back'
 );
 check(
   'the recurring form does not swallow the first tap',

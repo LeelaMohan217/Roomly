@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,11 +20,6 @@ export default function AddExpenseScreen() {
   const router = useRouter();
   const { member } = useSession();
   const { submitExpense, online } = useSync();
-
-  // The calculator hands its total over as a param. Everything else about the
-  // form is untouched, so this is additive -- opening Add Expense normally
-  // just leaves it undefined.
-  const params = useLocalSearchParams<{ amount?: string }>();
 
   const categories = useCategories();
   const members = useMembers();
@@ -102,7 +97,7 @@ export default function AddExpenseScreen() {
             error={error}
             showSuggestions
             autoFocusAmount
-            initial={{ paidBy: member?.id, amount: params.amount }}
+            initial={{ paidBy: member?.id }}
           />
         </KeyboardAwareScrollView>
     </SafeAreaView>

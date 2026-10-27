@@ -33,7 +33,6 @@ import {
   withinRange,
 } from '../src/lib/dates.ts';
 import { ICON_SLUGS, iconFor } from '../src/lib/icons.ts';
-import { evaluate, toAmountString } from '../src/lib/calc.ts';
 import { humanError } from '../src/lib/errors.ts';
 import { amountOf, auditKind, changesOf, entityLabel, subjectOf } from '../src/lib/audit.ts';
 import { backupFilename, csvAmount, csvCell, toCsv } from '../src/lib/csv.ts';
@@ -258,44 +257,6 @@ check(
   new Set(ICON_SLUGS.map(iconFor)).size === ICON_SLUGS.length,
   ICON_SLUGS.length + ' slugs but ' + new Set(ICON_SLUGS.map(iconFor)).size + ' distinct glyphs'
 );
-
-
-// ------------------------------ calculator ------------------------------
-suite('calculator');
-eq('a lone number is itself', evaluate([120]), 120);
-eq('adds left to right', evaluate([120, '+', 45, '+', 230]), 395);
-eq('subtracts', evaluate([500, '-', 120]), 380);
-eq('multiplies', evaluate([12, '×', 4]), 48);
-eq('divides', evaluate([100, '÷', 4]), 25);
-// Precedence is the thing a naive left-to-right calculator gets wrong.
-eq('times binds tighter than plus', evaluate([2, '+', 3, '×', 4]), 14);
-eq('divide binds tighter than minus', evaluate([20, '-', 10, '÷', 2]), 15);
-eq('two multiplies chain', evaluate([2, '×', 3, '×', 4]), 24);
-eq('mixed precedence', evaluate([10, '+', 2, '×', 3, '-', 4, '÷', 2]), 14);
-// A half-typed expression must still show a running total.
-eq('trailing operator is dropped', evaluate([120, '+']), 120);
-eq('trailing operator mid-sum', evaluate([120, '+', 45, '-']), 165);
-eq('empty is null', evaluate([]), null);
-eq('a lone operator is null', evaluate(['+']), null);
-eq('divide by zero is null', evaluate([5, '÷', 0]), null);
-eq('divide by zero mid-expression', evaluate([1, '+', 5, '÷', 0]), null);
-// Float artefacts must not reach the screen as 0.30000000000000004.
-check(
-  'point one plus point two rounds clean at 4dp',
-  Number(evaluate([0.1, '+', 0.2])!.toFixed(4)) === 0.3
-);
-
-suite('calculator / handoff to an expense');
-eq('whole number needs no decimals', toAmountString(395), '395');
-eq('two decimals are kept', toAmountString(12.5), '12.50');
-// parseAmount() refuses three decimals, so this must round here.
-eq('three decimals are rounded', toAmountString(33.333), '33.33');
-eq('rounds up at the halfway point', toAmountString(0.125), '0.13');
-eq('null passes through', toAmountString(null), null);
-eq('zero is not an amount', toAmountString(0), null);
-eq('negative is not an amount', toAmountString(-50), null);
-eq('a rounding-to-zero result is refused', toAmountString(0.004), null);
-check('handoff output is always parseable', parseAmount(toAmountString(33.333)!) === 3333);
 
 
 // ------------------------------ error messages ------------------------------

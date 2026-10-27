@@ -116,7 +116,7 @@ Push notifications need an Expo project ID and FCM/APNs credentials. See
 src/
   app/                  Expo Router routes
     (app)/              Signed-in area
-      (tabs)/           Home, history, calculator, reports, more
+      (tabs)/           Home, history, add, reports, more
       ...               Expense, settle, recurring, household, settings screens
     sign-in.tsx, register.tsx, onboarding.tsx, ...   Auth and household setup
   components/           UI kit (ui/), charts, brand, expense form

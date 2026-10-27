@@ -44,12 +44,7 @@ export default function MoreScreen() {
     },
     {
       title: 'Tools',
-      rows: [
-        // Out of the tab bar to make room for Add in the middle, but still
-        // one tap from here -- "Use in an expense" carries its total into Add.
-        { href: '/calculator', icon: 'calculator-outline', label: 'Calculator' },
-        { href: '/edit-history', icon: 'document-text-outline', label: 'Edit history' },
-      ],
+      rows: [{ href: '/edit-history', icon: 'document-text-outline', label: 'Edit history' }],
     },
     {
       title: 'You',
