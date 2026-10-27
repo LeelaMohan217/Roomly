@@ -252,11 +252,11 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
-  unread: { fontWeight: '700' },
+  unread: { fontWeight: '600' },
 
   day: { gap: Spacing.two },
   // Sentence case at heading size, as on History.
-  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
-  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
   dot: { width: 8, height: 8, borderRadius: 4 },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },

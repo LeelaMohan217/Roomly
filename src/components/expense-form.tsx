@@ -463,7 +463,7 @@ export function ExpenseForm({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  semi: { fontWeight: '700' },
+  semi: { fontWeight: '600' },
   dim: { opacity: 0.4 },
   struck: { textDecorationLine: 'line-through' },
 
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     maxWidth: 280,
     fontSize: 40,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: -1,
     padding: 0,
   },
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   // minWidth 0 for the same web reason as the amount input.
   detailInput: { flex: 1, minWidth: 0, paddingVertical: Spacing.one },
   // Sentence case at heading size, as on the redesigned screens.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   chip: {
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,

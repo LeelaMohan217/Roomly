@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
-  semi: { fontWeight: '700' },
+  semi: { fontWeight: '600' },
   dim: { opacity: 0.4 },
 
   field: { gap: Spacing.two },
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   currency: { fontSize: 22, fontWeight: '600' },
-  amountInput: { flex: 1, minWidth: 0, fontSize: 26, fontWeight: '700', padding: 0 },
+  amountInput: { flex: 1, minWidth: 0, fontSize: 26, fontWeight: '600', padding: 0 },
 
   payerRow: { gap: Spacing.four, paddingVertical: Spacing.one, paddingRight: Spacing.four },
   payer: { alignItems: 'center', gap: Spacing.two, width: 60 },

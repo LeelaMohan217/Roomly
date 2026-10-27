@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   centeredFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
-  medium: { fontWeight: '600' },
+  medium: { fontWeight: '500' },
   centered: { textAlign: 'center' },
 
   headerIcons: { flexDirection: 'row', gap: Spacing.two },
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   heroGlyph: { fontSize: 24 },
-  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
+  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '600', letterSpacing: -1 },
 
   note: {
     flexDirection: 'row',
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   aside: { paddingHorizontal: Spacing.one },
   row: {
     flexDirection: 'row',
@@ -536,5 +536,5 @@ const styles = StyleSheet.create({
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
-  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
 });

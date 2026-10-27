@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   aside: { paddingHorizontal: Spacing.one },
   row: {
     flexDirection: 'row',
@@ -401,10 +401,10 @@ const styles = StyleSheet.create({
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pill: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
-  pillText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  pillText: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
   linkIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   codeBox: { borderRadius: Radius.md, padding: Spacing.four, alignItems: 'center', gap: Spacing.one },
-  code: { fontSize: 28, fontWeight: '700', letterSpacing: 6 },
+  code: { fontSize: 28, fontWeight: '600', letterSpacing: 6 },
 
   note: {
     flexDirection: 'row',

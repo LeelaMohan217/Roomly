@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14.5,
     lineHeight: 20,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: -0.1,
     textAlign: 'center',
   },

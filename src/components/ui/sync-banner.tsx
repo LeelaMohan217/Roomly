@@ -34,7 +34,7 @@ export function SyncBanner() {
             </ThemedText>
           </View>
           <Pressable onPress={() => void retryOne(p.id)} hitSlop={8}>
-            <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '700' }]}>
+            <ThemedText style={[Type.micro, { color: theme.primary, fontWeight: '600' }]}>
               Retry
             </ThemedText>
           </Pressable>
@@ -87,5 +87,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   flex: { flex: 1 },
-  semi: { fontWeight: '700' },
+  semi: { fontWeight: '600' },
 });

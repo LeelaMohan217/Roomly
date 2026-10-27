@@ -34,5 +34,5 @@ export function Logo({ size = 30, markOnly = false }: Props) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   mark: { alignItems: 'center', justifyContent: 'center' },
-  word: { fontWeight: '700', letterSpacing: -0.6 },
+  word: { fontWeight: '600', letterSpacing: -0.6 },
 });

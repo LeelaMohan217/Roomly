@@ -437,8 +437,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
-  semi: { fontWeight: '700' },
-  medium: { fontWeight: '600' },
+  semi: { fontWeight: '600' },
+  medium: { fontWeight: '500' },
   shrink: { flexShrink: 1 },
   dim: { opacity: 0.4 },
   hint: { textAlign: 'center' },
@@ -463,13 +463,13 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   peopleRow: { gap: Spacing.four, paddingVertical: Spacing.one, paddingRight: Spacing.four },
   person: { alignItems: 'center', gap: Spacing.two, width: 58 },
 
   formRow: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
   selectionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  rangeTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  rangeTitle: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   },
   tripName: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
-  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.four },
 });

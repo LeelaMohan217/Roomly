@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  countText: { fontSize: 11, fontWeight: '700', lineHeight: 14 },
+  countText: { fontSize: 11, fontWeight: '600', lineHeight: 14 },
   paneContent: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.four },
   option: {
     flexDirection: 'row',

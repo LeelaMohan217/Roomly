@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
   },
-  buttonText: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  buttonText: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
 
   toastWrap: { position: 'absolute', left: Spacing.three, right: Spacing.three, alignItems: 'center' },
   toast: {
@@ -352,5 +352,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   toastIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  toastText: { flexShrink: 1, fontWeight: '600' },
+  toastText: { flexShrink: 1, fontWeight: '500' },
 });

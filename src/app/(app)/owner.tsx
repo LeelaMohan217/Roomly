@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
-  semi: { fontWeight: '700' },
+  semi: { fontWeight: '600' },
 
   locked: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.five },
   lockIcon: {
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
 
-  medium: { fontWeight: '600' },
+  medium: { fontWeight: '500' },
 
   alert: {
     flexDirection: 'row',
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   },
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on More and Account.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
 
   row: {
     flexDirection: 'row',

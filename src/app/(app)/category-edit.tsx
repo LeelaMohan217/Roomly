@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   flex: { flex: 1 },
-  semi: { fontWeight: '700' },
+  semi: { fontWeight: '600' },
 
   preview: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.four },
   previewTile: {

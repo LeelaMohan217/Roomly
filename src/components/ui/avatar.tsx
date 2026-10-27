@@ -97,5 +97,5 @@ export function Avatar({
 
 const styles = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  text: { fontWeight: '700', letterSpacing: 0.3 },
+  text: { fontWeight: '600', letterSpacing: 0.3 },
 });

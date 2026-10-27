@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   },
 
   hero: { alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two },
-  heroName: { fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.4 },
+  heroName: { fontSize: 20, lineHeight: 26, fontWeight: '600', letterSpacing: -0.4 },
   // Overlaps the avatar's lower right, ringed in the page colour so it reads
   // as sitting on top.
   badge: {

@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
   recurringErrorText: { flex: 1 },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
-  semi: { fontWeight: '700' },
+  semi: { fontWeight: '600' },
 
   cards: { gap: Spacing.two + Spacing.one },
   householdRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
@@ -876,7 +876,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   balanceRings: { position: 'absolute', right: -30, bottom: -50 },
-  balanceValue: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
+  balanceValue: { fontSize: 32, lineHeight: 40, fontWeight: '600', letterSpacing: -1 },
   // The same line height as the figure it stands in for, so nothing moves.
   balanceSkeleton: { height: 40, justifyContent: 'center' },
 
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
   // The label and its icon on one line, centred on each other: top-aligned,
   // the text's line box put its letters visibly below the tile's top edge.
   smallHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  smallLabel: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600' },
+  smallLabel: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '500' },
   smallIcon: {
     width: 30,
     height: 30,
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.half,
   },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   countPill: {
     minWidth: 17,
     height: 17,
@@ -928,7 +928,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  countText: { color: '#fff', fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
+  countText: { color: '#fff', fontSize: 10.5, fontWeight: '600', lineHeight: 14 },
 
 
   row: {
@@ -941,8 +941,8 @@ const styles = StyleSheet.create({
   // A pressed tint follows the card's corners.
   rowPressed: { borderRadius: Radius.lg },
   recentList: { gap: Spacing.two },
-  medium: { fontWeight: '600' },
-  amount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  medium: { fontWeight: '500' },
+  amount: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
   amountCol: { alignItems: 'flex-end' },
   note: {
     flexDirection: 'row',

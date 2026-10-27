@@ -63,5 +63,5 @@ const styles = StyleSheet.create({
   },
   icon: { marginTop: 1 },
   text: { flex: 1, gap: 2 },
-  title: { fontWeight: '700' },
+  title: { fontWeight: '600' },
 });

@@ -70,5 +70,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
     borderRadius: Radius.sm,
   },
-  selected: { fontWeight: '700' },
+  selected: { fontWeight: '600' },
 });

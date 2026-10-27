@@ -228,7 +228,7 @@ export default function TabsLayout() {
                 <View style={[styles.addButton, { backgroundColor: theme.primary }]}>
                   <Ionicons name="add" size={26} color={theme.onPrimary} />
                 </View>
-                <Text style={[styles.label, { color: theme.primary, fontWeight: '700' }]}>
+                <Text style={[styles.label, { color: theme.primary, fontWeight: '600' }]}>
                   Add
                 </Text>
               </Pressable>

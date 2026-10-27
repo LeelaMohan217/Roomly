@@ -130,7 +130,7 @@ export function Select({
           <View style={styles.sheetHeader}>
             <ThemedText style={Type.title}>{label}</ThemedText>
             <Pressable onPress={() => setOpen(false)} hitSlop={12}>
-              <ThemedText style={[Type.body, { color: theme.primary, fontWeight: '700' }]}>
+              <ThemedText style={[Type.body, { color: theme.primary, fontWeight: '600' }]}>
                 Done
               </ThemedText>
             </Pressable>

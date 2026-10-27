@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
 
   day: { gap: Spacing.two },
   // Sentence case at heading size, as on Activity and History.
-  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1, gap: 2 },
   changes: { gap: 1 },
-  amount: { fontSize: 14, fontWeight: '700', letterSpacing: -0.2 },
+  amount: { fontSize: 14, fontWeight: '600', letterSpacing: -0.2 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.one },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },

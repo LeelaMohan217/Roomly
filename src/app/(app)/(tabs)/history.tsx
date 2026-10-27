@@ -332,10 +332,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.three,
     marginBottom: Spacing.one,
   },
-  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   day: { gap: Spacing.one + 2, marginTop: Spacing.two + Spacing.one },
   filterLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingHorizontal: Spacing.half },
-  clear: { fontWeight: '700' },
+  clear: { fontWeight: '600' },
   content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance },
   badge: {
     position: 'absolute',
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 14 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '600', lineHeight: 14 },
   centered: { textAlign: 'center' },
   row: {
     flexDirection: 'row',
@@ -361,8 +361,8 @@ const styles = StyleSheet.create({
   // A pressed tint follows the card's corners on its first and last rows.
   rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
   rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
-  medium: { fontWeight: '600' },
-  amount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  medium: { fontWeight: '500' },
+  amount: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
   tile: {
     width: 34,
     height: 34,

@@ -215,17 +215,24 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
  * One type scale, used everywhere. Ad-hoc fontSize values are the main reason
  * a screen looks assembled rather than designed.
  */
+/**
+ * Three weights, and no bold. Regular (400) for reading -- body, captions,
+ * hints. Medium (500) for what a list is scanned by: names and amounts.
+ * Semibold (600) only for titles, section headings, the big numbers and
+ * buttons. Body used to be medium and headings bold, which made every line on
+ * every screen heavy and nothing stand out.
+ */
 export const Type = {
   /** The single biggest number on a screen. Never bigger than this. */
-  display: { fontSize: 32, fontWeight: '700', letterSpacing: -1.1, lineHeight: 38 },
-  title: { fontSize: 20, fontWeight: '700', letterSpacing: -0.4, lineHeight: 26 },
+  display: { fontSize: 32, fontWeight: '600', letterSpacing: -1.1, lineHeight: 38 },
+  title: { fontSize: 20, fontWeight: '600', letterSpacing: -0.4, lineHeight: 26 },
   headline: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2, lineHeight: 22 },
-  body: { fontSize: 15, fontWeight: '500', letterSpacing: -0.1, lineHeight: 21 },
-  amount: { fontSize: 15, fontWeight: '600', letterSpacing: -0.2, lineHeight: 20 },
-  caption: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
-  micro: { fontSize: 11.5, fontWeight: '500', lineHeight: 16 },
+  body: { fontSize: 15, fontWeight: '400', letterSpacing: -0.1, lineHeight: 21 },
+  amount: { fontSize: 15, fontWeight: '500', letterSpacing: -0.2, lineHeight: 20 },
+  caption: { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  micro: { fontSize: 11.5, fontWeight: '400', lineHeight: 16 },
   /** Section headers. Small, spaced, quiet — never bold black. */
-  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, lineHeight: 15 },
+  label: { fontSize: 11, fontWeight: '600', letterSpacing: 0.7, lineHeight: 15 },
 } satisfies Record<string, TextStyle>;
 
 export const Fonts = Platform.select({

@@ -309,11 +309,11 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
-  medium: { fontWeight: '600' },
+  medium: { fontWeight: '500' },
 
   // Arrows close to the month they change, not pushed to the screen edges.
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.four },
-  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3, minWidth: 150, textAlign: 'center' },
+  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3, minWidth: 150, textAlign: 'center' },
   navButton: {
     width: 34,
     height: 34,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
 
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  total: { fontSize: 30, lineHeight: 38, fontWeight: '700', letterSpacing: -1 },
+  total: { fontSize: 30, lineHeight: 38, fontWeight: '600', letterSpacing: -1 },
   deltaPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,11 +332,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two + 2,
     paddingVertical: 4,
   },
-  deltaText: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  deltaText: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
   chartBlock: { marginTop: Spacing.four },
 
   section: { gap: Spacing.two },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
 
   donutWrap: { alignItems: 'center', paddingVertical: Spacing.four },
   dot: { width: 9, height: 9, borderRadius: 5 },

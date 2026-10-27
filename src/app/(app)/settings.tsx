@@ -348,13 +348,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   identity: { flex: 1, gap: 2 },
-  name: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  name: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
 
   group: { gap: Spacing.two },
   groupTitle: {
     fontSize: 17,
     lineHeight: 23,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: -0.3,
     paddingLeft: Spacing.half,
   },

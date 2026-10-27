@@ -122,5 +122,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   // fontSize is supplied inline -- it depends on how long the amount is.
-  value: { fontWeight: '700', letterSpacing: -0.5 },
+  value: { fontWeight: '600', letterSpacing: -0.5 },
 });

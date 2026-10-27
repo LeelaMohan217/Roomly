@@ -108,5 +108,5 @@ const styles = StyleSheet.create({
   barHit: { position: 'absolute', top: 0 },
   labels: { flexDirection: 'row', gap: 10 },
   labelCell: { flex: 1, alignItems: 'center' },
-  selectedLabel: { fontWeight: '700' },
+  selectedLabel: { fontWeight: '600' },
 });

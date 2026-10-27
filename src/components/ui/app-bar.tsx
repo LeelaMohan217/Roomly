@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 14 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '600', lineHeight: 14 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flex: 1 },
   backButton: {
     width: 38,
@@ -266,11 +266,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerText: { flex: 1, gap: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
+  headerTitle: { fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
   titleBlock: { flex: 1, gap: 1 },
   homeText: { flex: 1, gap: 2 },
   homeGreeting: { fontSize: 19, fontWeight: '500', letterSpacing: -0.3, lineHeight: 25 },
-  homeName: { fontSize: 19, fontWeight: '700', letterSpacing: -0.3, lineHeight: 25 },
+  homeName: { fontSize: 19, fontWeight: '600', letterSpacing: -0.3, lineHeight: 25 },
   homeRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + Spacing.one },
   // A circle, matching the round avatar beside it in the header.
   iconButton: {
@@ -284,5 +284,5 @@ const styles = StyleSheet.create({
   // lineHeight set explicitly: ThemedText's default style carries 24, and a
   // 22px bold title in a 24px line box clipped its descenders -- the tail
   // of the "y" in "History" was cut off.
-  screenTitle: { fontSize: 22, lineHeight: 30, fontWeight: '700', letterSpacing: -0.5 },
+  screenTitle: { fontSize: 22, lineHeight: 30, fontWeight: '600', letterSpacing: -0.5 },
 });

@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 17,
     lineHeight: 23,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: -0.3,
     paddingLeft: Spacing.half,
   },

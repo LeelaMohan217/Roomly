@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   faded: { opacity: 0.45 },
 
   hero: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.two },
-  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '700', letterSpacing: -1 },
+  heroAmount: { fontSize: 32, lineHeight: 40, fontWeight: '600', letterSpacing: -1 },
 
   sectionHeader: {
     flexDirection: 'row',
@@ -281,11 +281,11 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four,
     paddingBottom: Spacing.two,
   },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   overlap: { marginLeft: -10 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
-  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  tagText: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

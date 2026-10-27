@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
+import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
@@ -15,7 +16,7 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, daysInMonth, formatRange, isoOf, todayIso } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
-import { useMonthlyTotals } from '@/lib/queries';
+import { useMembers, useMonthlyTotals } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { canMakePdf, exportStatement, type StatementFormat } from '@/lib/statement';
 import { supabase } from '@/lib/supabase';
@@ -52,6 +53,7 @@ export default function StatementScreen() {
   const dialog = useDialog();
   const { member } = useSession();
   const totals = useMonthlyTotals();
+  const members = useMembers();
 
   const household = useQuery({
     queryKey: ['household', member?.household_id],
@@ -95,6 +97,21 @@ export default function StatementScreen() {
   const [format, setFormat] = useState<StatementFormat>(pdfReady ? 'pdf' : 'csv');
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Whose expenses: the people whose payments go in. null means everyone --
+   * the default, and kept as "everyone" rather than a list of today's ids, so
+   * it still means everyone if the member list arrives after this mounts.
+   */
+  const [payers, setPayers] = useState<string[] | null>(null);
+  const everyone = (members.data ?? []).map((m) => m.id);
+  const picked = payers ?? everyone;
+  const allPicked = everyone.length > 0 && everyone.every((id) => picked.includes(id));
+
+  function togglePayer(id: string) {
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+    setPayers(everyone.every((x) => next.includes(x)) ? null : next);
+  }
+
   /** The chosen period as dates, and in words for the summary line. */
   const period = (() => {
     const today = todayIso();
@@ -122,7 +139,17 @@ export default function StatementScreen() {
   })();
 
   const needsDates = tab === 'range' && rangeKey === 'custom' && !custom.from;
-  const canDownload = !busy && !needsDates && !!member && (format === 'csv' || pdfReady);
+  const canDownload =
+    !busy && !needsDates && !!member && picked.length > 0 && (format === 'csv' || pdfReady);
+
+  // In words, for the line above the button and the PDF's header.
+  const nameOf = (id: string) =>
+    id === member?.id ? 'you' : (members.data?.find((m) => m.id === id)?.displayName ?? '—');
+  const whose = allPicked
+    ? 'everyone'
+    : picked.length === 0
+      ? 'nobody'
+      : `paid by ${picked.map(nameOf).join(', ')}`;
 
   async function download() {
     if (!canDownload || !member) return;
@@ -131,9 +158,11 @@ export default function StatementScreen() {
       householdName: household.data?.name ?? 'Roomly',
       myName: member.display_name,
       myId: member.id,
-      filters: { from: period.from, to: period.to, categoryIds: [], paidByIds: [] },
+      // Everyone means no payer filter at all, so expenses paid by someone
+      // who has since moved out still come in.
+      filters: { from: period.from, to: period.to, categoryIds: [], paidByIds: allPicked ? [] : picked },
       search: '',
-      summary: '',
+      summary: allPicked ? '' : `Paid by ${picked.map((id) => (id === member.id ? member.display_name : nameOf(id))).join(', ')}`,
     });
     setBusy(false);
     if (!result.ok) {
@@ -223,6 +252,55 @@ export default function StatementScreen() {
         </View>
 
         <View style={styles.section}>
+          <View style={styles.headRow}>
+            <ThemedText style={[styles.sectionTitle, styles.flex]}>Whose expenses</ThemedText>
+            {/* One tap to tick everyone, or to clear them all and pick one. */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setPayers(allPicked ? [] : null)}
+              hitSlop={8}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+              <ThemedText style={[Type.caption, { color: theme.brandInk }]}>
+                {allPicked ? 'Clear all' : 'Select all'}
+              </ThemedText>
+            </Pressable>
+          </View>
+          <Card padded={false}>
+            {(members.data ?? []).map((m, i) => {
+              const on = picked.includes(m.id);
+              return (
+                <Pressable
+                  key={m.id}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  onPress={() => togglePayer(m.id)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}>
+                  <Avatar name={m.displayName} seed={m.id} size={32} />
+                  <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+                    {m.displayName}
+                    {m.id === member?.id ? ' (you)' : ''}
+                  </ThemedText>
+                  {/* More than one can be ticked; Select all above says so. */}
+                  <View
+                    style={[
+                      styles.box,
+                      on
+                        ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                        : { borderColor: theme.borderStrong },
+                    ]}>
+                    {on ? <Ionicons name="checkmark" size={14} color={theme.onPrimary} /> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </Card>
+        </View>
+
+        <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>File type</ThemedText>
           <Card padded={false}>
             <Option
@@ -252,7 +330,9 @@ export default function StatementScreen() {
           list grows. The line above it says exactly what will come out. */}
       <View style={[styles.footer, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
         <ThemedText themeColor="textTertiary" style={[Type.caption, styles.centered]} numberOfLines={1}>
-          {period.label} · {format === 'pdf' ? 'PDF' : 'CSV'} · every expense in the house
+          {picked.length === 0
+            ? 'Pick at least one person'
+            : `${period.label} · ${format === 'pdf' ? 'PDF' : 'CSV'} · ${whose}`}
         </ThemedText>
         <Pressable
           accessibilityRole="button"
@@ -380,7 +460,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on the other redesigned screens.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
 
   row: {
     flexDirection: 'row',
@@ -392,6 +472,9 @@ const styles = StyleSheet.create({
   tile: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   tick: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   ring: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5 },
+  // Round, like every other choice on this screen.
+  box: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
 
   footer: {
     paddingHorizontal: Spacing.four,
@@ -408,5 +491,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
   },
-  buttonText: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  buttonText: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
 });

@@ -1408,8 +1408,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
-  semi: { fontWeight: '700' },
-  medium: { fontWeight: '600' },
+  semi: { fontWeight: '600' },
+  medium: { fontWeight: '500' },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
   emptyIcon: {
@@ -1422,7 +1422,7 @@ const styles = StyleSheet.create({
   },
 
   section: { gap: Spacing.two },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '700', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
 
   summary: {
     borderRadius: Radius.xl,
@@ -1430,7 +1430,7 @@ const styles = StyleSheet.create({
     padding: Spacing.three + Spacing.one,
     gap: Spacing.one,
   },
-  summaryValue: { fontSize: 30, lineHeight: 38, fontWeight: '700', letterSpacing: -1 },
+  summaryValue: { fontSize: 30, lineHeight: 38, fontWeight: '600', letterSpacing: -1 },
   summarySplit: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -1440,7 +1440,7 @@ const styles = StyleSheet.create({
   },
   summaryDivider: { width: StyleSheet.hairlineWidth },
   summaryRight: { paddingLeft: Spacing.three },
-  summaryPart: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  summaryPart: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
   // The amount on the left, Settle up on the right of it.
   summaryAction: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
 
@@ -1452,7 +1452,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + Spacing.one,
   },
-  rowAmount: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  rowAmount: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
   rowBody: { marginHorizontal: Spacing.three, marginBottom: Spacing.three },
   planRow: { padding: Spacing.three, gap: Spacing.two },
   roundIcon: {
@@ -1477,7 +1477,7 @@ const styles = StyleSheet.create({
   pillInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
 
   payAmount: { alignItems: 'center', gap: 2 },
-  payAmountText: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.6 },
+  payAmountText: { fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.6 },
   // Four to a row, like a phone's own app drawer.
   payGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: Spacing.three },
   payTile: { width: '25%', alignItems: 'center', gap: Spacing.one + 2 },
@@ -1497,7 +1497,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  transferAmount: { fontSize: 17, fontWeight: '700', letterSpacing: -0.4 },
+  transferAmount: { fontSize: 17, fontWeight: '600', letterSpacing: -0.4 },
   reviewRow: { flexDirection: 'row', gap: Spacing.two },
 
   whyToggle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
