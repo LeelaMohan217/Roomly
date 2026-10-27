@@ -40,8 +40,11 @@ that only triggers or other SECURITY DEFINER functions call need no grant.
 1. **Authentication → Providers**: enable Email. (Google sign-in is *not*
    implemented in the app — there is no `signInWithOAuth` call anywhere in
    `src/`. Enabling the provider alone does nothing.)
-2. **Authentication → URL Configuration**: add `roomly://` to the redirect
-   allowlist, or password reset will silently go nowhere.
+2. **Authentication → URL Configuration**: add `roomly://**` to the redirect
+   allowlist, and set **Site URL** to `roomly://`. The app asks for
+   `roomly://reset-password`, which a bare `roomly://` entry does not cover;
+   an address that isn't allowed falls back to the Site URL, which defaults to
+   `http://localhost:3000` -- so the reset email opened a dead localhost page.
 3. **Realtime**: nothing to do — `0027` adds `notifications` and
    `join_requests` to the `supabase_realtime` publication in SQL.
 

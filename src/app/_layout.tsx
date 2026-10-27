@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
@@ -69,10 +70,52 @@ export default function RootLayout() {
  */
 function RootNavigator() {
   const { status } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const url = Linking.useURL();
+  const handledUrl = useRef<string | null>(null);
 
   useEffect(() => {
     if (status !== 'loading') void SplashScreen.hideAsync();
   }, [status]);
+
+  /**
+   * The password-reset link, delivered by hand.
+   *
+   * On a cold start the link arrives while this component is still showing
+   * the brand screen below instead of the Stack, and expo-router's own
+   * handling of it was lost: the app opened on sign in, the code never reached
+   * reset-password, and the reset email did nothing. So once the session is
+   * known, and the Stack is mounted to navigate in, read the URL the app was
+   * opened with and go there ourselves.
+   *
+   * Each URL is handled once, and not at all when reset-password is already
+   * showing -- the warm-start case expo-router does handle. The code is single
+   * use, so opening the screen a second time with it would burn it and show
+   * "This link didn't work".
+   */
+  useEffect(() => {
+    if (status === 'loading' || !url || handledUrl.current === url) return;
+
+    const link = Linking.parse(url);
+    // roomly:///reset-password puts it in the path; roomly://reset-password
+    // in the hostname. Accept either.
+    const target = `${link.hostname ?? ''}/${link.path ?? ''}`;
+    if (!target.includes('reset-password')) return;
+
+    const code = typeof link.queryParams?.code === 'string' ? link.queryParams.code : undefined;
+    const tokenHash =
+      typeof link.queryParams?.token_hash === 'string' ? link.queryParams.token_hash : undefined;
+    if (!code && !tokenHash) return;
+
+    handledUrl.current = url;
+    if (pathname === '/reset-password') return;
+
+    router.replace({
+      pathname: '/reset-password',
+      params: code ? { code } : { token_hash: tokenHash!, type: 'recovery' },
+    });
+  }, [status, url, pathname, router]);
 
   // While the session is still being worked out, the brand screen -- the
   // same green and wordmark as the native splash -- rather than nothing. The
