@@ -147,8 +147,8 @@ function BalanceCard({
  *
  * Two greens, one per card -- mint for the household, a soft lime for you --
  * so the pair stays on-brand yet reads as two different things; each tone
- * carries its own darker ink from the theme. The label names the month ("House
- * spent · Oct") and the footnote says "Last month": without them a cold
+ * carries its own darker ink from the theme. The label names the month ("Household
+ * · Oct") and the footnote says "Last month": without them a cold
  * reader could not tell what either figure was. Whole rupees here
  * (formatWholeRupees): it's a glance at a month's spending. History has the
  * exact figures.
@@ -162,7 +162,7 @@ function SmallCard({
 }: {
   tone: 'house' | 'share';
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  /** What and when: "House spent · Oct", "Your share · Oct". */
+  /** What and when: "Household · Oct", "Your share · Oct". */
   label: string;
   value?: string;
   /** Last month's figure: "Last month ₹68,825". */
@@ -195,7 +195,12 @@ function SmallCard({
       {/* Label left, icon right, tops level: one line, not a tile stacked
           over the text. */}
       <View style={styles.smallHead}>
-        <ThemedText style={[styles.smallLabel, { color: c.muted }]} numberOfLines={1}>
+        {/* Shrinks rather than cut off: the month at the end is the point. */}
+        <ThemedText
+          style={[styles.smallLabel, { color: c.muted }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}>
           {label}
         </ThemedText>
         <View style={[styles.smallIcon, { backgroundColor: c.chip }]}>
@@ -456,7 +461,7 @@ export default function HomeScreen() {
             <SmallCard
               tone="house"
               icon="home-outline"
-              label={`House spent · ${monthShort}`}
+              label={`Household · ${monthShort}`}
               value={spend.data ? formatWholeRupees(spend.data.roomMonthPaise) : undefined}
               compare={
                 spend.data

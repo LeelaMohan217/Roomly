@@ -11,7 +11,8 @@ import { supabase } from '@/lib/supabase';
 
 /**
  * History's statement: every expense matching History's filters, as a
- * spreadsheet or a PDF, handed to the share sheet.
+ * spreadsheet or a PDF, saved into the phone's Downloads (or, on an older
+ * APK, handed to the share sheet).
  *
  * Fetched here rather than taken from the screen. With no date range History
  * loads only the newest 200, so a statement built from what is on screen would
@@ -21,9 +22,27 @@ import { supabase } from '@/lib/supabase';
 
 export type StatementFormat = 'csv' | 'pdf';
 
+/** Where a statement went: saved into Downloads, or handed to the share sheet. */
 export type StatementResult =
-  | { ok: true; rows: number }
+  | { ok: true; rows: number; saved: { uri: string; name: string; mimeType: string } | null }
   | { ok: false; reason: string };
+
+type DownloadsModule = {
+  save(source: string, name: string, mimeType: string): Promise<string | null>;
+  open(uri: string, mimeType: string): boolean;
+};
+
+/**
+ * The local module in modules/downloads. Missing on APKs built before it was
+ * added, and it returns null below Android 10; either way the statement goes
+ * to the share sheet as before.
+ */
+const Downloads = requireOptionalNativeModule<DownloadsModule>('RoomlyDownloads');
+
+/** Opens a statement saved into Downloads. False when no app can show it. */
+export function openDownload(uri: string, mimeType: string): boolean {
+  return Downloads?.open(uri, mimeType) ?? false;
+}
 
 type StatementRow = {
   date: string;
@@ -231,12 +250,21 @@ function toStatementHtml(scope: StatementScope, rows: StatementRow[]): string {
 </body></html>`;
 }
 
-async function share(uri: string, mimeType: string, UTI: string, dialogTitle: string) {
+/** Into Downloads where the phone allows it, else the share sheet. */
+async function deliver(
+  file: FileSystem.File,
+  rows: number,
+  mimeType: string,
+  UTI: string
+): Promise<StatementResult> {
+  const saved = Downloads ? await Downloads.save(file.uri, file.name, mimeType) : null;
+  if (saved) return { ok: true, rows, saved: { uri: saved, name: file.name, mimeType } };
+
   if (!(await Sharing.isAvailableAsync())) {
-    return { ok: false as const, reason: 'This device cannot share files.' };
+    return { ok: false, reason: 'This device cannot share files.' };
   }
-  await Sharing.shareAsync(uri, { mimeType, UTI, dialogTitle });
-  return { ok: true as const };
+  await Sharing.shareAsync(file.uri, { mimeType, UTI, dialogTitle: 'Statement' });
+  return { ok: true, rows, saved: null };
 }
 
 export async function exportStatement(
@@ -251,8 +279,7 @@ export async function exportStatement(
       const file = new FileSystem.File(FileSystem.Paths.cache, filenameOf(scope, 'csv'));
       file.create({ overwrite: true });
       file.write(toStatementCsv(rows));
-      const shared = await share(file.uri, 'text/csv', 'public.comma-separated-values-text', 'Statement');
-      return shared.ok ? { ok: true, rows: rows.length } : shared;
+      return await deliver(file, rows.length, 'text/csv', 'public.comma-separated-values-text');
     }
 
     if (!canMakePdf()) {
@@ -265,11 +292,10 @@ export async function exportStatement(
     const { uri } = await Print.printToFileAsync({ html: toStatementHtml(scope, rows), width: 595, height: 842 });
 
     // printToFileAsync names the file with a random id; give it a readable one
-    // before it reaches WhatsApp or Drive.
+    // before it reaches Downloads or WhatsApp.
     const named = new FileSystem.File(FileSystem.Paths.cache, filenameOf(scope, 'pdf'));
     new FileSystem.File(uri).move(named, { overwrite: true });
-    const shared = await share(named.uri, 'application/pdf', 'com.adobe.pdf', 'Statement');
-    return shared.ok ? { ok: true, rows: rows.length } : shared;
+    return await deliver(named, rows.length, 'application/pdf', 'com.adobe.pdf');
   } catch (e) {
     return { ok: false, reason: humanError(e) };
   }

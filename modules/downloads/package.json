@@ -1,0 +1,6 @@
+{
+  "name": "downloads",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Saves a file into the phone's Downloads folder, and opens it. Android only."
+}

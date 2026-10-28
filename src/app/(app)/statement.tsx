@@ -18,7 +18,7 @@ import { addDays, daysInMonth, formatRange, isoOf, todayIso } from '@/lib/dates'
 import { formatPaise } from '@/lib/money';
 import { useMembers, useMonthlyTotals } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { canMakePdf, exportStatement, type StatementFormat } from '@/lib/statement';
+import { canMakePdf, exportStatement, openDownload, type StatementFormat } from '@/lib/statement';
 import { supabase } from '@/lib/supabase';
 
 const MONTHS = [
@@ -167,6 +167,26 @@ export default function StatementScreen() {
     setBusy(false);
     if (!result.ok) {
       void dialog.alert({ tone: 'warning', title: 'Could not make the statement', message: result.reason });
+      return;
+    }
+    // Saved straight to the phone: say where, and offer to open it.
+    const { saved } = result;
+    if (saved) {
+      const open = await dialog.confirm({
+        tone: 'success',
+        icon: 'download-outline',
+        title: 'Saved to Downloads',
+        message: saved.name,
+        confirmLabel: 'Open',
+        cancelLabel: 'Done',
+      });
+      if (open && !openDownload(saved.uri, saved.mimeType)) {
+        void dialog.alert({
+          tone: 'info',
+          title: 'No app to open it',
+          message: 'It is in your Downloads folder. Open it from the Files app.',
+        });
+      }
     }
   }
 
