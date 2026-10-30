@@ -1,7 +1,7 @@
 import { usePathname } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useUpdates } from 'expo-updates';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { useDialog } from '@/components/ui/dialog';
@@ -18,8 +18,13 @@ import { applyUpdate } from '@/lib/build-info';
  * Only on the four tabs. Add expense and the expense screen (where editing
  * happens) are routes of their own, so a pathname check keeps the popup from
  * landing on somebody half-way through typing an amount; it waits for them
- * to come back. "Later" means later: not again for that update this session,
- * and the next cold start applies it anyway.
+ * to come back.
+ *
+ * "Later" lasts only until they leave the app: every return to Roomly asks
+ * again, until they restart. That is exactly the people who need nagging --
+ * any cold start (swiped away, or Android reclaiming it overnight) opens on
+ * the downloaded update by itself, so only a phone keeping Roomly alive in
+ * the background can stay on the old version.
  *
  * The launch check covers a phone that is opened fresh. One that keeps Roomly
  * in the background for days never relaunches, so returning to the app checks
@@ -41,7 +46,10 @@ export function UpdatePrompt() {
   // isUpdatePending and downloadedUpdate live on this hook in SDK 57.
   const { isUpdatePending, downloadedUpdate } = useUpdates();
 
-  const asked = useRef<string | null>(null);
+  // The update they said "Later" to on this visit; cleared on every return.
+  const [deferred, setDeferred] = useState<string | null>(null);
+  // The dialog is up: its own answer decides what happens next.
+  const showing = useRef(false);
   const lastCheck = useRef(0);
 
   useEffect(() => {
@@ -51,7 +59,10 @@ export function UpdatePrompt() {
     lastCheck.current = Date.now();
 
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active' || Date.now() - lastCheck.current < RECHECK_MS) return;
+      if (state !== 'active') return;
+      // Back in the app: "Later" has run out, so ask again.
+      setDeferred(null);
+      if (Date.now() - lastCheck.current < RECHECK_MS) return;
       lastCheck.current = Date.now();
       void (async () => {
         try {
@@ -71,10 +82,10 @@ export function UpdatePrompt() {
   const onTab = TAB_PATHS.has(pathname);
 
   useEffect(() => {
-    if (!updateId || !onTab || asked.current === updateId) return;
+    if (!updateId || !onTab || deferred === updateId || showing.current) return;
 
     const timer = setTimeout(() => {
-      asked.current = updateId;
+      showing.current = true;
       void dialog
         .confirm({
           tone: 'success',
@@ -85,13 +96,16 @@ export function UpdatePrompt() {
           cancelLabel: 'Later',
         })
         .then((restart) => {
+          showing.current = false;
           // Anything queued offline is in the outbox on disk, so a reload
           // loses nothing.
           if (restart) void applyUpdate();
+          // Tapping outside the popup counts as Later too.
+          else setDeferred(updateId);
         });
     }, SHOW_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [updateId, onTab, dialog]);
+  }, [updateId, onTab, deferred, dialog]);
 
   return null;
 }

@@ -1349,6 +1349,11 @@ check(
     'the restart popup can appear over a half-typed expense'
   );
   check(
+    '"Later" lasts only until the next return to the app',
+    /setDeferred\(null\)/.test(prompt) && /state !== 'active'/.test(prompt),
+    'one "Later" silences the update for as long as the app stays in the background'
+  );
+  check(
     'a phone left open for days still hears about updates',
     /AppState\.addEventListener/.test(prompt) && /fetchUpdateAsync/.test(prompt),
     'only a cold start ever checks, so a backgrounded app never prompts'
