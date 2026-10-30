@@ -93,7 +93,9 @@ async function fetchRows(scope: StatementScope): Promise<StatementRow[]> {
          members!expenses_paid_by_fkey ( display_name ),
          expense_splits ( member_id, amount_paise )`
       )
-      .is('voided_at', null);
+      .is('voided_at', null)
+      // Approved only, as every balance counts (0039).
+      .eq('approval_status', 'approved');
     if (filters.from) query = query.gte('expense_date', filters.from);
     if (filters.to) query = query.lte('expense_date', filters.to);
     if (filters.categoryIds.length > 0) query = query.in('category_id', filters.categoryIds);

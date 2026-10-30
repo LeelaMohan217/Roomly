@@ -2,9 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ExpensePhotos, useExpenseAttachments } from '@/components/bill-photos';
 import { ExpenseForm, type ExpenseFormValues } from '@/components/expense-form';
 import { ThemedText } from '@/components/themed-text';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
@@ -13,8 +14,10 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog, type Tone } from '@/components/ui/dialog';
+import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { MAX_PHOTOS, uploadBillPhotos } from '@/lib/attachments';
 import { humanError } from '@/lib/errors';
 import { formatRange } from '@/lib/dates';
 import { iconFor } from '@/lib/icons';
@@ -34,10 +37,13 @@ export default function ExpenseDetailScreen() {
   const expense = useExpense(id);
   const members = useMembers();
   const pending = usePendingChanges();
+  const attachments = useExpenseAttachments(id);
 
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
 
   const e = expense.data;
 
@@ -115,10 +121,54 @@ export default function ExpenseDetailScreen() {
       }
     }
 
+    // Photos need no approval -- they move no money -- so they go straight
+    // on, whether the edit itself was saved or only requested.
+    if (values.photos.length > 0) {
+      const { failed, reason } = await uploadBillPhotos(member!.household_id, member!.id, id, values.photos);
+      if (failed > 0) {
+        void dialog.alert({
+          tone: 'warning',
+          icon: 'image-outline',
+          title: 'Not every photo uploaded',
+          message: `${failed === 1 ? 'One photo' : `${failed} photos`} did not upload${reason ? ` (${reason})` : ''}. Try adding ${failed === 1 ? 'it' : 'them'} again below.`,
+        });
+      }
+    }
+
     await queryClient.invalidateQueries();
     setBusy(false);
     setEditing(false);
   }
+
+  /**
+   * Approve or reject a housemate's expense (migration 0039). The server
+   * decides who may -- e.canReview is its answer -- and rejecting voids it, as
+   * a rejected payment is.
+   */
+  const review = useMutation({
+    mutationFn: async ({ approve, note }: { approve: boolean; note: string | null }) => {
+      const { error: rpcError } = await supabase.rpc('review_expense', {
+        p_expense: id,
+        p_approve: approve,
+        p_note: note,
+      });
+      if (rpcError) throw rpcError;
+    },
+    onMutate: () => setError(null),
+    onSuccess: (_, { approve }) => {
+      setRejecting(false);
+      setRejectNote('');
+      dialog.toast({
+        message: approve ? 'Approved. It counts now.' : 'Rejected. It won’t count.',
+        tone: approve ? 'success' : 'info',
+      });
+      void queryClient.invalidateQueries();
+    },
+    onError: (err) => {
+      setRejecting(false);
+      setError(humanError(err));
+    },
+  });
 
   const remove = useMutation({
     mutationFn: async () => {
@@ -245,6 +295,7 @@ export default function ExpenseDetailScreen() {
               onSubmit={submit}
               busy={busy}
               error={error}
+              photoRoom={attachments.data ? MAX_PHOTOS - attachments.data.length : undefined}
               initial={{
                 amount: String(e.totalPaise / 100),
                 categoryId: e.categoryId,
@@ -276,7 +327,25 @@ export default function ExpenseDetailScreen() {
                 </ThemedText>
               </View>
 
-              {e.voidedAt ? (
+              {e.approvalStatus === 'rejected' ? (
+                <Note
+                  tone="danger"
+                  icon="close-circle-outline"
+                  text={`Rejected${e.reviewedByName ? ` by ${e.reviewedByName}` : ''}`}
+                  onPress={() =>
+                    explain(
+                      'danger',
+                      'close-circle-outline',
+                      'Rejected',
+                      `It never counted towards anyone's balance.${e.voidReason ? ` Reason: ${e.voidReason}` : ''}${
+                        canEditNow && !locked
+                          ? ' If it was a mistake, you can send it for approval again below.'
+                          : ''
+                      }`
+                    )
+                  }
+                />
+              ) : e.voidedAt ? (
                 <Note
                   tone="danger"
                   icon="trash-outline"
@@ -290,6 +359,45 @@ export default function ExpenseDetailScreen() {
                     )
                   }
                 />
+              ) : null}
+
+              {e.approvalStatus === 'pending' && !e.voidedAt ? (
+                <Note
+                  tone="warning"
+                  icon="time-outline"
+                  text={e.canReview ? 'Waiting for your approval' : 'Waiting for approval'}
+                  onPress={() =>
+                    explain(
+                      'warning',
+                      'time-outline',
+                      'Waiting for approval',
+                      e.createdBy === member?.id
+                        ? 'It doesn’t count towards anyone’s balance yet. Someone else in the split has to approve it first.'
+                        : 'It doesn’t count towards anyone’s balance until someone other than the person who added it approves it.'
+                    )
+                  }
+                />
+              ) : null}
+
+              {/* The approver's place to answer, right under the notice that
+                  asks: Home's "Needs you" card leads here too. */}
+              {e.canReview ? (
+                <View style={styles.reviewActions}>
+                  <Button
+                    title="Approve"
+                    onPress={() => review.mutate({ approve: true, note: null })}
+                    loading={review.isPending && review.variables?.approve === true}
+                    disabled={review.isPending}
+                    style={styles.flex}
+                  />
+                  <Button
+                    title="Reject"
+                    variant="ghost"
+                    onPress={() => setRejecting(true)}
+                    disabled={review.isPending}
+                    style={styles.flex}
+                  />
+                </View>
               ) : null}
 
               {locked ? (
@@ -383,13 +491,33 @@ export default function ExpenseDetailScreen() {
                     {addedOn(e.createdAt)}
                   </ThemedText>
                 </View>
+                {/* Only when a person approved it: automatic approvals and
+                    everything from before approvals existed have no name. */}
+                {e.approvalStatus === 'approved' && e.reviewedByName && e.reviewedAt ? (
+                  <View
+                    accessible
+                    accessibilityLabel={`Approved by ${e.reviewedByName}, ${addedOn(e.reviewedAt)}`}
+                    style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
+                    <Ionicons name="checkmark-circle-outline" size={17} color={theme.textSecondary} />
+                    <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
+                      Approved by {e.reviewedByName}
+                    </ThemedText>
+                    <ThemedText themeColor="textTertiary" style={Type.caption}>
+                      {addedOn(e.reviewedAt)}
+                    </ThemedText>
+                  </View>
+                ) : null}
               </Card>
+
+              <ExpensePhotos expenseId={id} canAdd={!e.voidedAt} />
 
               {error ? <Note tone="danger" icon="alert-circle-outline" text={error} /> : null}
 
+              {/* Restoring a rejected expense sends it back for approval
+                  rather than straight into the balances (0039). */}
               {e.voidedAt && canEditNow && !locked ? (
                 <Button
-                  title="Restore this expense"
+                  title={e.approvalStatus === 'rejected' ? 'Send for approval again' : 'Restore this expense'}
                   variant="secondary"
                   loading={restore.isPending}
                   onPress={() => restore.mutate()}
@@ -398,6 +526,35 @@ export default function ExpenseDetailScreen() {
             </>
           )}
         </KeyboardAwareScrollView>
+
+        <Sheet
+          visible={rejecting}
+          title="Reject this expense?"
+          subtitle="It won’t count towards anyone’s balance, and stays in History marked rejected."
+          onClose={() => setRejecting(false)}>
+          <View style={styles.rejectSheet}>
+            <TextInput
+              value={rejectNote}
+              onChangeText={setRejectNote}
+              placeholder="Why? (optional)"
+              placeholderTextColor={theme.textTertiary}
+              accessibilityLabel="Reason for rejecting"
+              maxLength={200}
+              multiline
+              style={[
+                Type.body,
+                styles.rejectInput,
+                { color: theme.text, backgroundColor: theme.backgroundSunken, borderColor: theme.border },
+              ]}
+            />
+            <Button
+              title="Reject"
+              variant="danger"
+              loading={review.isPending}
+              onPress={() => review.mutate({ approve: false, note: rejectNote.trim() || null })}
+            />
+          </View>
+        </Sheet>
     </SafeAreaView>
   );
 }
@@ -521,6 +678,16 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 2,
+  },
+
+  reviewActions: { flexDirection: 'row', gap: Spacing.two },
+  rejectSheet: { gap: Spacing.three },
+  rejectInput: {
+    minHeight: 72,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three,
+    textAlignVertical: 'top',
   },
 
   section: { gap: Spacing.two },

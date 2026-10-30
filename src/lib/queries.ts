@@ -48,8 +48,16 @@ export type Balance = {
   balancePaise: number;
 };
 
+/**
+ * Whether an expense counts yet (migration 0039). Only 'approved' moves a
+ * balance, a total or a report; the other two are listed so people can see
+ * them, never summed.
+ */
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 export type Expense = {
   id: string;
+  approvalStatus: ApprovalStatus;
   totalPaise: number;
   description: string | null;
   expenseDate: string;
@@ -195,6 +203,9 @@ export function useSpendSummary(memberId: string | undefined) {
         .from('expenses')
         .select('expense_date, total_paise, expense_splits ( member_id, amount_paise )')
         .is('voided_at', null)
+        // Approved only, as member_balance() counts (0039). An expense still
+        // waiting for a housemate has not been spent as far as anyone agrees.
+        .eq('approval_status', 'approved')
         .gte('expense_date', from);
       if (error) throw error;
 
@@ -381,24 +392,31 @@ export function useBalances() {
  * A range is fetched from the server rather than cut out of the newest few
  * hundred, so History's date filter reaches back as far as you ask, not only
  * as far as the default page happens to go.
+ *
+ * Includes expenses waiting for approval and ones a housemate rejected, each
+ * marked by approvalStatus, so they can be shown as such. Anything summing
+ * these rows must count 'approved' only.
  */
 export function useExpenses(limit = 50, range?: { from: string | null; to: string | null }) {
   const from = range?.from ?? null;
   const to = range?.to ?? null;
   return useQuery({
-    // Versioned: rows gained paidById and categoryId, and a cache persisted
-    // by an older build must not be read as the new shape.
-    queryKey: ['expenses', 2, limit, from, to],
+    // Versioned: rows gained approvalStatus (and before that paidById and
+    // categoryId), and a cache persisted by an older build must not be read
+    // as the new shape.
+    queryKey: ['expenses', 3, limit, from, to],
     queryFn: async (): Promise<Expense[]> => {
       let query = supabase
         .from('expenses')
         .select(
-          `id, total_paise, description, expense_date, paid_by, category_id,
+          `id, approval_status, total_paise, description, expense_date, paid_by, category_id,
            categories ( name, icon ),
            members!expenses_paid_by_fkey ( display_name ),
            expense_splits ( member_id )`
         )
-        .is('voided_at', null);
+        // Live ones, and rejected ones -- which are voided too, but stay
+        // visible so the person who added it can see what happened.
+        .or('voided_at.is.null,approval_status.eq.rejected');
       if (from) query = query.gte('expense_date', from);
       if (to) query = query.lte('expense_date', to);
       const { data, error } = await query
@@ -409,6 +427,7 @@ export function useExpenses(limit = 50, range?: { from: string | null; to: strin
 
       type Row = {
         id: string;
+        approval_status: ApprovalStatus;
         total_paise: number;
         description: string | null;
         expense_date: string;
@@ -421,6 +440,7 @@ export function useExpenses(limit = 50, range?: { from: string | null; to: strin
 
       return (data as unknown as Row[]).map((e) => ({
         id: e.id,
+        approvalStatus: e.approval_status,
         totalPaise: Number(e.total_paise),
         description: e.description,
         expenseDate: e.expense_date,
@@ -458,22 +478,36 @@ export type ExpenseDetail = {
   voidedAt: string | null;
   voidReason: string | null;
   splits: { memberId: string; amountPaise: number }[];
+  createdBy: string;
+  approvalStatus: ApprovalStatus;
+  /** Who approved or rejected it; null while pending or when it was automatic. */
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  /**
+   * Whether THIS member may approve or reject it now -- can_review_expense(),
+   * the same function review_expense() checks (migration 0039), so the
+   * buttons appear exactly when they would work.
+   */
+  canReview: boolean;
 };
 
 export function useExpense(id: string | undefined) {
   return useQuery({
-    queryKey: ['expense', id],
+    // Versioned: the result gained the approval fields.
+    queryKey: ['expense', 2, id],
     enabled: !!id,
     queryFn: async (): Promise<ExpenseDetail> => {
       const { data, error } = await supabase
         .from('expenses')
         .select(
           `id, total_paise, description, expense_date, paid_by, category_id,
-           created_at, voided_at, void_reason, can_edit_now,
+           created_at, created_by, voided_at, void_reason, can_edit_now,
+           approval_status, reviewed_at, can_review_expense,
            categories ( name, icon ),
            periods ( status ),
            payer:members!expenses_paid_by_fkey ( display_name ),
            creator:members!expenses_created_by_fkey ( display_name ),
+           reviewer:members!expenses_reviewed_by_fkey ( display_name ),
            expense_splits ( member_id, amount_paise )`
         )
         .eq('id', id!)
@@ -488,13 +522,18 @@ export function useExpense(id: string | undefined) {
         paid_by: string;
         category_id: string;
         created_at: string;
+        created_by: string;
         voided_at: string | null;
         void_reason: string | null;
         can_edit_now: boolean;
+        approval_status: ApprovalStatus;
+        reviewed_at: string | null;
+        can_review_expense: boolean;
         categories: { name: string; icon: string | null } | null;
         periods: { status: 'open' | 'closed' } | null;
         payer: { display_name: string } | null;
         creator: { display_name: string } | null;
+        reviewer: { display_name: string } | null;
         expense_splits: { member_id: string; amount_paise: number }[];
       };
 
@@ -519,7 +558,77 @@ export function useExpense(id: string | undefined) {
           memberId: s.member_id,
           amountPaise: Number(s.amount_paise),
         })),
+        createdBy: e.created_by,
+        approvalStatus: e.approval_status,
+        reviewedByName: e.reviewer?.display_name ?? null,
+        reviewedAt: e.reviewed_at,
+        canReview: e.can_review_expense === true,
       };
+    },
+  });
+}
+
+/** Not outbox.ts's PendingExpense, which is one still on the phone. */
+export type AwaitingExpense = {
+  id: string;
+  totalPaise: number;
+  description: string | null;
+  categoryName: string;
+  categoryIcon: string | null;
+  expenseDate: string;
+  createdBy: string;
+  createdByName: string;
+  paidByName: string;
+  /** Whether THIS member may approve or reject it (can_review_expense, 0039). */
+  canReview: boolean;
+};
+
+/**
+ * Expenses waiting for a housemate's approval, oldest first. Home's "Needs
+ * you" shows the ones this member can review; the rest are somebody else's
+ * to answer.
+ */
+export function useAwaitingApproval() {
+  return useQuery({
+    queryKey: ['awaiting-approval'],
+    queryFn: async (): Promise<AwaitingExpense[]> => {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select(
+          `id, total_paise, description, expense_date, created_by, can_review_expense,
+           categories ( name, icon ),
+           payer:members!expenses_paid_by_fkey ( display_name ),
+           creator:members!expenses_created_by_fkey ( display_name )`
+        )
+        .eq('approval_status', 'pending')
+        .is('voided_at', null)
+        .order('created_at');
+      if (error) throw error;
+
+      type Row = {
+        id: string;
+        total_paise: number;
+        description: string | null;
+        expense_date: string;
+        created_by: string;
+        can_review_expense: boolean;
+        categories: { name: string; icon: string | null } | null;
+        payer: { display_name: string } | null;
+        creator: { display_name: string } | null;
+      };
+
+      return (data as unknown as Row[]).map((e) => ({
+        id: e.id,
+        totalPaise: Number(e.total_paise),
+        description: e.description,
+        categoryName: e.categories?.name ?? 'Uncategorised',
+        categoryIcon: e.categories?.icon ?? null,
+        expenseDate: e.expense_date,
+        createdBy: e.created_by,
+        createdByName: e.creator?.display_name ?? '—',
+        paidByName: e.payer?.display_name ?? '—',
+        canReview: e.can_review_expense === true,
+      }));
     },
   });
 }
@@ -581,6 +690,9 @@ export type NotificationKind =
   | 'expense_added'
   | 'expense_changed'
   | 'expense_deleted'
+  | 'expense_pending'
+  | 'expense_approved'
+  | 'expense_rejected'
   | 'settlement'
   | 'settlement_pending'
   | 'settlement_rejected'
@@ -863,7 +975,9 @@ export function useMonthStatement(year: number, month: number) {
           )
           .gte('expense_date', first)
           .lte('expense_date', last)
-          .is('voided_at', null),
+          .is('voided_at', null)
+          // Approved only, exactly as member_balance() counts (0039).
+          .eq('approval_status', 'approved'),
         supabase
           .from('settlements')
           .select(
@@ -1153,6 +1267,9 @@ export function usePairwiseLedger(memberId: string | undefined) {
              expense_splits ( member_id, amount_paise )`
           )
           .is('voided_at', null)
+          // Approved only, matching member_balance() (0039) -- otherwise the
+          // pairwise nets stop reconciling with the balance.
+          .eq('approval_status', 'approved')
           .order('expense_date', { ascending: false }),
         supabase
           .from('settlements')

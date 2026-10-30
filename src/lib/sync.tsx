@@ -27,10 +27,13 @@ type SyncValue = {
   online: boolean;
   pending: PendingExpense[];
   syncing: boolean;
-  /** Queue an expense. Returns true if it went straight to the server. */
+  /**
+   * Queue an expense. Returns its id if it went straight to the server, or
+   * null if it was queued and has no server row yet.
+   */
   submitExpense: (
     e: Omit<PendingExpense, 'id' | 'createdAt' | 'attempts' | 'lastError' | 'blocked'>
-  ) => Promise<boolean>;
+  ) => Promise<string | null>;
   syncNow: () => Promise<void>;
   retryOne: (id: string) => Promise<void>;
   discard: (id: string) => Promise<void>;
@@ -175,7 +178,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       const clientId = newClientId();
 
       if (online) {
-        const { error } = await supabase.rpc('create_expense', {
+        const { data, error } = await supabase.rpc('create_expense', {
           p_total_paise: e.totalPaise,
           p_category: e.categoryId,
           p_expense_date: e.expenseDate,
@@ -188,7 +191,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
         if (!error) {
           await queryClient.invalidateQueries();
-          return true;
+          return data as string;
         }
 
         // A real rejection (closed month, bad split) must surface now, while
@@ -205,7 +208,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
       const item = await enqueue(e, clientId);
       setPending((p) => [...p, item]);
-      return false;
+      return null;
     },
     [online, queryClient]
   );

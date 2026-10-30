@@ -295,9 +295,9 @@ check(
   'post_due_recurrences looks only at the current month -- this is bug P0-3'
 );
 
-// Closed months: three functions bypass RLS and so must check the period
+// Closed months: these functions bypass RLS and so must check the period
 // themselves.
-for (const fn of ['review_pending_change', 'review_settlement', 'post_recurring_now']) {
+for (const fn of ['review_pending_change', 'review_settlement', 'post_recurring_now', 'review_expense']) {
   const def = latestDefinitionOf(fn);
   check(
     `${fn} checks the month is open`,
@@ -1255,6 +1255,92 @@ check(
     'an undone payment carries no routing note',
     /routed && !voided/.test(payments),
     'a voided payment claims to have settled something'
+  );
+}
+
+// ---- an expense counts once a housemate approves it (migration 0039) -------
+//
+// The same drift 0020 and 0024 were written about, waiting to happen a third
+// time: one place forgets the new filter and the app shows two answers to one
+// question. Every place that SUMS expenses must count approved ones only.
+{
+  check(
+    'the balance counts approved expenses only',
+    !!balanceFn && /approval_status = 'approved'/.test(balanceFn.body),
+    'member_balance() would count an expense nobody has approved'
+  );
+  const latestMig = migs
+    .slice()
+    .reverse()
+    .map((f) => readFileSync(join(migDir, f), 'utf8'))
+    .find((t) => /create or replace view member_ledger/.test(t));
+  check(
+    'the ledger breakdown counts approved expenses only',
+    !!latestMig && /view member_ledger[\s\S]*?approval_status = 'approved'[\s\S]*?from members m/.test(latestMig),
+    'member_ledger would stop reconciling with member_balance()'
+  );
+  const latestTotals = migs
+    .slice()
+    .reverse()
+    .map((f) => readFileSync(join(migDir, f), 'utf8'))
+    .find((t) => /create or replace view monthly_category_totals/.test(t));
+  check(
+    'Reports counts approved expenses only',
+    !!latestTotals && /view monthly_category_totals[\s\S]*?approval_status = 'approved'/.test(latestTotals),
+    'monthly_category_totals would count an expense nobody has approved'
+  );
+
+  const reviewFn = latestDefinitionOf('review_expense');
+  check(
+    'nobody approves their own expense',
+    !!reviewFn && /v_me = v_row\.created_by/.test(reviewFn.body),
+    'review_expense lets the person who added an expense approve it'
+  );
+  check(
+    'a month cannot close over an expense waiting for approval',
+    /approval_status = 'pending'/.test(latestDefinitionOf('close_period')?.body ?? ''),
+    'close_period seals a month with an unapproved expense in it'
+  );
+
+  const queries = read('src', 'lib', 'queries.ts');
+  for (const hook of ['useSpendSummary', 'useMonthStatement', 'usePairwiseLedger']) {
+    const at = queries.indexOf(`export function ${hook}(`);
+    const body = at === -1 ? '' : queries.slice(at, queries.indexOf('\nexport ', at + 1));
+    check(
+      `${hook} counts approved expenses only`,
+      /\.eq\('approval_status', 'approved'\)/.test(body),
+      'a client-side total includes expenses still waiting for approval'
+    );
+  }
+  check(
+    'the statement export counts approved expenses only',
+    /\.eq\('approval_status', 'approved'\)/.test(read('src', 'lib', 'statement.ts')),
+    'the downloaded statement includes expenses still waiting for approval'
+  );
+  check(
+    'History totals a month from approved expenses only',
+    /e\.approvalStatus === 'approved' \? e\.totalPaise : 0/.test(read('src', 'app', '(app)', '(tabs)', 'history.tsx')),
+    'the month band adds up expenses that do not count'
+  );
+}
+
+// ---- bill photos (migration 0040) ------------------------------------------
+{
+  const att = read('src', 'lib', 'attachments.ts');
+  check(
+    'the gallery opens the phone’s own files, not Google Photos',
+    /legacy: true/.test(att) && /legacy: true/.test(read('src', 'lib', 'photo.ts')),
+    'a picker is back on the Android photo picker, which opens on Google Photos'
+  );
+  check(
+    'the camera is gated on the installed APK, not the bundle',
+    /nativeBuildVersion/.test(att) && /CAMERA_SINCE_VERSION_CODE/.test(att),
+    'an OTA would offer a camera the installed APK has no permission for'
+  );
+  check(
+    'bill photos are private to the household',
+    /'expense-attachments', 'expense-attachments', false/.test(migAll),
+    'the bucket is public, so anyone with a URL can read a bill'
   );
 }
 

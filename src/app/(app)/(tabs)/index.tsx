@@ -14,11 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
+import { ApprovalTag, approvalAmountStyle } from '@/components/approval-tag';
 import { ThemedText } from '@/components/themed-text';
 import { HomeHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useDialog } from '@/components/ui/dialog';
 
 import { Appear, Reveal } from '@/components/ui/motion';
 import { QuickActions } from '@/components/ui/quick-actions';
@@ -31,6 +33,7 @@ import { humanError } from '@/lib/errors';
 import { iconFor } from '@/lib/icons';
 import { formatPaise, formatWholeRupees } from '@/lib/money';
 import {
+  useAwaitingApproval,
   useAwayPeriods,
   useBalances,
   useExpenses,
@@ -273,6 +276,7 @@ function RowSkeleton({ round = false, last = false }: { round?: boolean; last?: 
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -285,6 +289,7 @@ export default function HomeScreen() {
   const expenses = useExpenses(6);
   const away = useAwayPeriods();
   const changes = usePendingChanges();
+  const awaiting = useAwaitingApproval();
   const recurring = useRecurring();
   const spend = useSpendSummary(member?.id);
   // Resolves once every active query has refetched, so the disc stays up for
@@ -373,6 +378,33 @@ export default function HomeScreen() {
     onSuccess: () => void queryClient.invalidateQueries(),
   });
 
+  // A housemate's new expense, which counts nowhere until someone other than
+  // whoever added it says yes (migration 0039).
+  const reviewExpense = useMutation({
+    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
+      const { error } = await supabase.rpc('review_expense', {
+        p_expense: id,
+        p_approve: approve,
+        p_note: null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries(),
+    onError: (e) =>
+      void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
+  });
+
+  async function rejectExpense(id: string) {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'close-circle-outline',
+      title: 'Reject this expense?',
+      message: 'It won’t count towards anyone’s balance, and stays in History marked rejected.',
+      confirmLabel: 'Reject',
+    });
+    if (ok) reviewExpense.mutate({ id, approve: false });
+  }
+
   const reviewJoin = useMutation({
     mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
       const { error } = await supabase.rpc('review_join_request', {
@@ -390,7 +422,11 @@ export default function HomeScreen() {
   const awayToday = (members.data ?? []).filter(
     (m) => away.data && !isPresent(m.id, today, away.data)
   );
-  const approvalCount = (requests.data?.length ?? 0) + (changes.data?.length ?? 0);
+  // Join requests and change requests are the owner's to answer; a new
+  // expense is answered by whoever can_review_expense() says may, owner or not.
+  const toApprove = (awaiting.data ?? []).filter((e) => e.canReview);
+  const approvalCount =
+    (isOwner ? (requests.data?.length ?? 0) + (changes.data?.length ?? 0) : 0) + toApprove.length;
   const dueForAmount = (recurring.data ?? []).filter(
     (r) => r.isDue && r.mode === 'confirm'
   ).length;
@@ -420,7 +456,7 @@ export default function HomeScreen() {
       <HomeHeader
         greeting={greeting}
         name={firstName}
-        badge={isOwner ? approvalCount : 0}
+        badge={approvalCount}
       />
 
       <ScrollView
@@ -559,10 +595,51 @@ export default function HomeScreen() {
           </Appear>
         ) : null}
 
-        {isOwner && approvalCount > 0 ? (
+        {approvalCount > 0 ? (
           <Appear index={8}>
           <Section title="Needs you" count={approvalCount}>
-            {changes.data?.map((c) => (
+            {toApprove.map((e) => {
+              const busy = reviewExpense.isPending && reviewExpense.variables?.id === e.id;
+              return (
+                <Card key={e.id} style={styles.approval}>
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
+                    style={styles.approvalHead}>
+                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
+                        {iconFor(e.categoryIcon)}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.flex}>
+                      <ThemedText style={Type.headline}>
+                        {e.createdByName} added {formatPaise(e.totalPaise)}
+                      </ThemedText>
+                      <ThemedText themeColor="textSecondary" style={Type.caption} numberOfLines={1}>
+                        {e.description || e.categoryName} · paid by {e.paidByName} · tap to review
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                  <View style={styles.approvalActions}>
+                    <Button
+                      title="Approve"
+                      onPress={() => reviewExpense.mutate({ id: e.id, approve: true })}
+                      loading={busy}
+                      disabled={reviewExpense.isPending}
+                      style={styles.flex}
+                    />
+                    <Button
+                      title="Reject"
+                      variant="ghost"
+                      onPress={() => void rejectExpense(e.id)}
+                      disabled={reviewExpense.isPending}
+                      style={styles.flex}
+                    />
+                  </View>
+                </Card>
+              );
+            })}
+
+            {(isOwner ? changes.data : [])?.map((c) => (
               <Card key={c.id} style={styles.approval}>
                 <Pressable
                   onPress={() =>
@@ -596,7 +673,7 @@ export default function HomeScreen() {
               </Card>
             ))}
 
-            {requests.data?.map((r) => (
+            {(isOwner ? requests.data : [])?.map((r) => (
               <Card key={r.id} style={styles.approval}>
                 <View style={styles.approvalHead}>
                   <Avatar name={r.display_name} seed={r.id} size={36} />
@@ -791,9 +868,12 @@ export default function HomeScreen() {
                         {e.paidByName} · {e.participantCount} way
                         {e.participantCount === 1 ? '' : 's'}
                       </ThemedText>
+                      <ApprovalTag status={e.approvalStatus} />
                     </View>
                     <View style={styles.amountCol}>
-                      <ThemedText style={styles.amount}>{formatPaise(e.totalPaise)}</ThemedText>
+                      <ThemedText style={[styles.amount, approvalAmountStyle(theme, e.approvalStatus)]}>
+                        {formatPaise(e.totalPaise)}
+                      </ThemedText>
                       <ThemedText themeColor="textTertiary" style={Type.micro}>
                         {dayLabel(e.expenseDate)}
                       </ThemedText>

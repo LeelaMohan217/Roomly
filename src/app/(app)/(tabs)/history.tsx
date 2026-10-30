@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ApprovalTag, approvalAmountStyle } from '@/components/approval-tag';
 import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
@@ -80,7 +81,9 @@ export default function HistoryScreen() {
     return {
       key,
       title: `${MONTHS[m - 1]} ${y}`,
-      total: rows.reduce((sum, e) => sum + e.totalPaise, 0),
+      // Approved only: a waiting or rejected expense is listed, not counted
+      // (0039), so the band agrees with the month's statement.
+      total: rows.reduce((sum, e) => sum + (e.approvalStatus === 'approved' ? e.totalPaise : 0), 0),
       data: byKey(rows, (e) => e.expenseDate).map(([day, items]) => ({ day, items })),
     };
   });
@@ -314,9 +317,12 @@ export default function HistoryScreen() {
                       {item.paidByName} · {item.participantCount} way
                       {item.participantCount === 1 ? '' : 's'}
                     </ThemedText>
+                    <ApprovalTag status={item.approvalStatus} />
                   </View>
 
-                  <ThemedText style={styles.amount}>{formatPaise(item.totalPaise)}</ThemedText>
+                  <ThemedText style={[styles.amount, approvalAmountStyle(theme, item.approvalStatus)]}>
+                    {formatPaise(item.totalPaise)}
+                  </ThemedText>
                 </Pressable>
               ))}
             </Card>

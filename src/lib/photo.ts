@@ -32,6 +32,9 @@ export async function pickAndUploadPhoto(
     const ImagePicker = await import('expo-image-picker');
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
+      // The phone's own files, not Google Photos -- see pickBillPhotos in
+      // attachments.ts.
+      legacy: true,
       allowsEditing: true,
       aspect: [1, 1],
       // Avatars are drawn at most ~80pt; this keeps a phone photo well under

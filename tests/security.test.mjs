@@ -62,6 +62,8 @@ const TABLES = [
   // 0035: which number belongs to which account, and the lockout counter.
   'phone_logins',
   'phone_login_attempts',
+  // 0040: which bill photo belongs to which expense.
+  'expense_attachments',
 ];
 
 for (const t of TABLES) {

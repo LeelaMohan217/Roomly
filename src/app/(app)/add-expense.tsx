@@ -6,9 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExpenseForm, type ExpenseFormValues } from '@/components/expense-form';
 import { ThemedText } from '@/components/themed-text';
+import { useDialog } from '@/components/ui/dialog';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { MAX_PHOTOS, uploadBillPhotos } from '@/lib/attachments';
 import { humanError } from '@/lib/errors';
 import { committed, rejected } from '@/lib/haptics';
 import { useCategories, useMembers } from '@/lib/queries';
@@ -17,6 +19,7 @@ import { useSync } from '@/lib/sync';
 
 export default function AddExpenseScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const { member } = useSession();
   const { submitExpense, online } = useSync();
@@ -36,8 +39,9 @@ export default function AddExpenseScreen() {
     const category = categories.data?.find((c) => c.id === values.categoryId);
     const payer = members.data?.find((m) => m.id === values.paidBy);
 
+    let expenseId: string | null;
     try {
-      await submitExpense({
+      expenseId = await submitExpense({
         totalPaise: values.amountPaise,
         categoryId: values.categoryId,
         categoryName: category?.name ?? 'Uncategorised',
@@ -51,19 +55,51 @@ export default function AddExpenseScreen() {
           amount_paise: s.amountPaise,
         })),
       });
-
-      // Sent or queued, the entry is safe either way — so the screen closes
-      // and the banner reports what happened. The buzz is the confirmation
-      // that survives the screen disappearing.
-      committed();
-      router.back();
     } catch (e) {
       // Only a genuine rejection lands here: a closed month, a bad split.
       // Those must be fixed now, not queued.
       rejected();
       setError(humanError(e));
       setBusy(false);
+      return;
     }
+
+    // Sent or queued, the entry is safe either way — so the screen closes
+    // and the banner reports what happened. The buzz is the confirmation
+    // that survives the screen disappearing.
+    committed();
+
+    // Photos follow the expense, which needs to exist first. A queued expense
+    // has no server row yet, so its photos cannot go with it: say so rather
+    // than drop them quietly.
+    if (values.photos.length > 0 && member) {
+      if (expenseId) {
+        const { failed, reason } = await uploadBillPhotos(
+          member.household_id,
+          member.id,
+          expenseId,
+          values.photos
+        );
+        if (failed > 0) {
+          void dialog.alert({
+            tone: 'warning',
+            icon: 'image-outline',
+            title: 'Saved, but not every photo',
+            message: `${failed === 1 ? 'One photo' : `${failed} photos`} did not upload${reason ? ` (${reason})` : ''}. Open the expense to add ${failed === 1 ? 'it' : 'them'} again.`,
+          });
+        }
+      } else {
+        void dialog.alert({
+          tone: 'warning',
+          icon: 'cloud-offline-outline',
+          title: 'Saved without the photos',
+          message:
+            'You’re offline, so the expense is queued and the photos can’t go with it. Once it appears, open it and add them from there.',
+        });
+      }
+    }
+
+    router.back();
   }
 
   return (
@@ -108,6 +144,7 @@ export default function AddExpenseScreen() {
             error={error}
             showSuggestions
             autoFocusAmount
+            photoRoom={MAX_PHOTOS}
             initial={{ paidBy: member?.id }}
           />
         </KeyboardAwareScrollView>

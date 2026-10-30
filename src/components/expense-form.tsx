@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+import { BillPhotoPicker } from '@/components/bill-photos';
 import { ThemedText } from '@/components/themed-text';
 import { MonthCalendar } from '@/components/ui/month-calendar';
 import { Sheet } from '@/components/ui/sheet';
@@ -12,6 +13,7 @@ import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import type { PickedPhoto } from '@/lib/attachments';
 import { addDays, formatRange, todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
 import { iconFor } from '@/lib/icons';
@@ -31,6 +33,8 @@ export type ExpenseFormValues = {
   paidBy: string;
   date: string;
   splits: Split[];
+  /** Chosen on the form, uploaded by the caller once the expense is saved. */
+  photos: PickedPhoto[];
 };
 
 type Props = {
@@ -48,6 +52,8 @@ type Props = {
   error?: string | null;
   showSuggestions?: boolean;
   autoFocusAmount?: boolean;
+  /** How many bill photos may still be attached. Omitted: no photo picker. */
+  photoRoom?: number;
 };
 
 /**
@@ -63,6 +69,7 @@ export function ExpenseForm({
   error = null,
   showSuggestions = false,
   autoFocusAmount = false,
+  photoRoom,
 }: Props) {
   const theme = useTheme();
 
@@ -76,6 +83,7 @@ export function ExpenseForm({
   const [description, setDescription] = useState(initial?.description ?? '');
   const [paidBy, setPaidBy] = useState<string | null>(initial?.paidBy ?? null);
   const [date, setDate] = useState(initial?.date ?? todayIso());
+  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
 
   // The calendar sheet. pickerMonth is separate from `date` so paging back
   // through months does not change the selection until a day is actually
@@ -428,6 +436,10 @@ export function ExpenseForm({
         ) : null}
       </View>
 
+      {photoRoom !== undefined ? (
+        <BillPhotoPicker photos={photos} onChange={setPhotos} max={photoRoom} disabled={busy} />
+      ) : null}
+
       {error ?? splitError ? <Notice tone="danger" message={(error ?? splitError)!} /> : null}
 
       <Button
@@ -452,6 +464,7 @@ export function ExpenseForm({
             paidBy: paidBy!,
             date,
             splits,
+            photos,
           });
         }}
         loading={busy}

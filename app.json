@@ -59,8 +59,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Roomly uses your photos to set your profile picture.",
-          "cameraPermission": false,
+          "photosPermission": "Roomly uses your photos to set your profile picture and attach bills to expenses.",
+          "cameraPermission": "Roomly uses your camera to photograph bills.",
           "microphonePermission": false
         }
       ]

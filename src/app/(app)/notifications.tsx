@@ -35,6 +35,14 @@ function describe(n: AppNotification): { title: string; amount: string; needsYou
       return { title: `${who} changed ${n.subject}`, amount };
     case 'expense_deleted':
       return { title: `${who} deleted ${n.subject}`, amount };
+    // Household-wide, like settlement_pending: whether it is yours to approve
+    // is on the expense screen and Home's "Needs you".
+    case 'expense_pending':
+      return { title: `${who} added ${n.subject} to approve`, amount, needsYou: true };
+    case 'expense_approved':
+      return { title: `${who} approved ${n.subject}`, amount };
+    case 'expense_rejected':
+      return { title: `${who} rejected ${n.subject}`, amount };
     case 'settlement': {
       const [from, to] = (n.subject ?? '').split(' -> ');
       return { title: `${from} paid ${to}`, amount };
@@ -71,6 +79,9 @@ const ICONS: Record<AppNotification['kind'], keyof typeof Ionicons.glyphMap> = {
   expense_added: 'add',
   expense_changed: 'pencil',
   expense_deleted: 'trash-outline',
+  expense_pending: 'hourglass-outline',
+  expense_approved: 'checkmark',
+  expense_rejected: 'close',
   settlement: 'swap-horizontal',
   settlement_pending: 'hourglass-outline',
   settlement_rejected: 'close',
@@ -88,6 +99,9 @@ const TINTS: Record<AppNotification['kind'], Tint> = {
   expense_added: 'success',
   expense_changed: 'info',
   expense_deleted: 'danger',
+  expense_pending: 'warning',
+  expense_approved: 'success',
+  expense_rejected: 'danger',
   settlement: 'success',
   settlement_pending: 'warning',
   settlement_rejected: 'danger',

@@ -85,7 +85,7 @@ export async function exportBackup(householdName: string): Promise<BackupResult>
       supabase
         .from('expenses')
         .select(
-          `id, total_paise, description, expense_date, voided_at,
+          `id, total_paise, description, expense_date, voided_at, approval_status,
            categories ( name ),
            payer:members!expenses_paid_by_fkey ( display_name ),
            creator:members!expenses_created_by_fkey ( display_name ),
@@ -113,6 +113,7 @@ export async function exportBackup(householdName: string): Promise<BackupResult>
       description: string | null;
       expense_date: string;
       voided_at: string | null;
+      approval_status: 'pending' | 'approved' | 'rejected';
       categories: { name: string } | null;
       payer: { display_name: string } | null;
       creator: { display_name: string } | null;
@@ -136,7 +137,15 @@ export async function exportBackup(householdName: string): Promise<BackupResult>
     for (const e of expenses.data as unknown as ExpenseRow[]) {
       // Voided expenses are kept. A backup that drops what was deleted cannot
       // answer "why did my balance change last Tuesday".
-      const status = e.voided_at ? 'deleted' : 'active';
+      // Pending and rejected ones too, said as such: only 'active' counts.
+      const status =
+        e.approval_status === 'rejected'
+          ? 'rejected'
+          : e.voided_at
+            ? 'deleted'
+            : e.approval_status === 'pending'
+              ? 'awaiting approval'
+              : 'active';
 
       for (const s of e.expense_splits) {
         rows.push([
