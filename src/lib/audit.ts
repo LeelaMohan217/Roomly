@@ -102,6 +102,15 @@ export function changesOf(r: AuditRecord, fmt: Formatters): Change[] {
     out.push({ label: 'Paid by', from: fmt.member(payerA), to: fmt.member(payerB) });
   }
 
+  // Approving or rejecting (migration 0039) changes nothing else on the row,
+  // so without this an approval would read as an edit with nothing under it.
+  const approvalA = str(before.approval_status);
+  const approvalB = str(after.approval_status);
+  if (approvalA && approvalB && approvalA !== approvalB) {
+    const word = (s: string) => (s === 'pending' ? 'waiting' : s);
+    out.push({ label: 'Approval', from: word(approvalA), to: word(approvalB) });
+  }
+
   // ---- members, categories and recurring bills (migration 0021) ----
   // Without these, a rename or a pause shows as "changed" with nothing under
   // it, which is worse than not logging it at all.

@@ -48,6 +48,10 @@
 -- parts for the breakdown and the reconciliation check at the bottom proves
 -- the two still agree.
 --
+-- ALSO HERE, because a pending expense is a new kind of loose end: a month
+-- cannot close over one (close_period), and nobody can move out while they
+-- are on one (remove_member) -- 0024's departed guard would freeze it.
+--
 -- ORDER OF RELEASE: apply this BEFORE publishing the app update. The new app
 -- filters on approval_status and would fail against a database without it.
 -- Phones still on the old app after this runs keep working; their client-side
@@ -120,6 +124,15 @@ begin
   end if;
 
   -- UPDATE. First, what the client itself asked for.
+
+  -- created_by decides who may approve, so it must not move. expenses_insert
+  -- pins it on the way in (0003), but expenses_update (0031) lets the owner
+  -- write any column -- and an owner who repointed their own expense at a
+  -- housemate could then approve it themselves.
+  if v_client and new.created_by is distinct from old.created_by then
+    raise exception 'Who added an expense cannot be changed.';
+  end if;
+
   if v_client and (new.approval_status, new.reviewed_by, new.reviewed_at)
                   is distinct from (old.approval_status, old.reviewed_by, old.reviewed_at) then
     -- The one change a client may make: its own approved expense back to
@@ -170,10 +183,19 @@ create trigger expenses_approval_guard
 create or replace function expense_splits_need_review()
 returns trigger language plpgsql set search_path = public as $fn$
 declare
-  v_expense uuid := coalesce(new.expense_id, old.expense_id);
+  v_expense uuid;
 begin
   if current_user not in ('authenticated', 'anon') then
     return null;
+  end if;
+
+  -- Branch on the operation rather than coalesce(new, old): NEW is not a
+  -- usable row in a DELETE trigger, and referencing it there is an error
+  -- waiting on the Postgres version.
+  if tg_op = 'DELETE' then
+    v_expense := old.expense_id;
+  else
+    v_expense := new.expense_id;
   end if;
 
   update expenses e
@@ -524,6 +546,109 @@ $fn$;
 grant execute on function close_period(uuid) to authenticated;
 
 
+-- ---------------  nobody moves out from under a pending expense  ---------------
+-- 0024's expenses_departed_guard refuses ANY update to an expense that names
+-- someone who has moved out. A pending expense counts in nobody's balance, so
+-- the balance check below would let them go -- and then that expense could be
+-- neither approved, rejected nor deleted, and close_period above would refuse
+-- its month forever. So: decide it first. Otherwise 0030's version, unchanged.
+
+create or replace function remove_member(p_member_id uuid)
+returns text
+language plpgsql security definer set search_path = public as $fn$
+declare
+  v_household uuid;
+  v_target    members%rowtype;
+  v_balance   bigint;
+  v_used      boolean;
+begin
+  if not is_owner() then
+    raise exception 'Only the owner can remove people from the household';
+  end if;
+
+  v_household := current_household();
+
+  select * into v_target
+    from members
+   where id = p_member_id and household_id = v_household;
+
+  if not found then
+    raise exception 'That person is not in this household';
+  end if;
+
+  if v_target.id = current_member() then
+    raise exception 'You cannot remove yourself. Transfer ownership first.';
+  end if;
+
+  if v_target.role = 'owner' then
+    raise exception 'Transfer ownership before removing the owner';
+  end if;
+
+  if v_target.left_on is not null then
+    return 'moved_out';
+  end if;
+
+  select exists (select 1 from expense_splits where member_id = p_member_id)
+      or exists (select 1 from expenses
+                  where paid_by = p_member_id or created_by = p_member_id)
+      or exists (select 1 from settlements
+                  where from_member = p_member_id or to_member = p_member_id)
+      or exists (select 1 from pending_changes where requested_by = p_member_id)
+    into v_used;
+
+  if not v_used then
+    if exists (select 1 from recurring_expenses where paid_by = p_member_id) then
+      raise exception
+        'They are the payer on a recurring bill. Change or delete that rule first.';
+    end if;
+
+    delete from away_periods      where member_id = p_member_id;
+    delete from expense_templates where owner_member = p_member_id;
+    delete from join_requests     where claim_member_id = p_member_id
+                                    and status = 'pending';
+
+    begin
+      delete from members where id = p_member_id;
+      return 'deleted';
+    exception when foreign_key_violation then
+      null;
+    end;
+  end if;
+
+  if exists (
+    select 1 from expenses e
+     where e.approval_status = 'pending'
+       and e.voided_at is null
+       and (e.paid_by = p_member_id
+            or e.created_by = p_member_id
+            or exists (select 1 from expense_splits s
+                        where s.expense_id = e.id and s.member_id = p_member_id))
+  ) then
+    raise exception
+      '% is on an expense still waiting for approval. Approve or reject it first.',
+      v_target.display_name;
+  end if;
+
+  -- One definition of a balance (migration 0024). Do not restate it.
+  v_balance := member_balance(p_member_id);
+
+  if v_balance <> 0 then
+    raise exception
+      'Settle up with % first. Their balance is not zero (% paise), and removing them now would unbalance the ledger.',
+      v_target.display_name, v_balance;
+  end if;
+
+  update members
+     set left_on = greatest(household_today(v_household), v_target.joined_on)
+   where id = p_member_id;
+
+  return 'moved_out';
+end;
+$fn$;
+
+grant execute on function remove_member(uuid) to authenticated;
+
+
 -- ---------------------------  telling people  ---------------------------
 
 alter table notifications drop constraint if exists notifications_kind_check;
@@ -630,6 +755,8 @@ select
   (select count(*) = 0 from expenses where approval_status is null)                as every_row_has_a_status,
   (select count(*) from pg_trigger
     where tgname in ('expenses_approval_guard', 'splits_need_review')) = 2         as guards_installed,
+  (select prosrc like '%waiting for approval%' from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'remove_member')                    as removal_checks_pending,
   (select prosrc like '%approval_status%' from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'member_balance')                   as balance_counts_approved_only,
   has_function_privilege('authenticated', 'review_expense(uuid, boolean, text)', 'execute') as review_open,

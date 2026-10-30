@@ -408,6 +408,20 @@ eq(
   changesOf({ entityType: 'settlements', action: 'updated', before: { amount_paise: 500 }, after: { amount_paise: 900 } }, FMT).length,
   1
 );
+// An approval (0039) touches nothing else on the row; it must still say so.
+eq(
+  'an approval is reported',
+  changesOf(
+    {
+      entityType: 'expenses',
+      action: 'updated',
+      before: { approval_status: 'pending' },
+      after: { approval_status: 'approved' },
+    },
+    FMT
+  )[0]?.to,
+  'approved'
+);
 // updated_at and rev change on every edit and would bury the real line.
 eq(
   'noise fields are not reported',
