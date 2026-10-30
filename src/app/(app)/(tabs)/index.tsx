@@ -456,7 +456,11 @@ export default function HomeScreen() {
       <HomeHeader
         greeting={greeting}
         name={firstName}
-        badge={approvalCount}
+        // The owner's items only. The badge sits on the account button, which
+        // opens Settings and Owner tools; expense approvals are answered here
+        // on Home, so counting them there sent members to a screen with
+        // nothing to approve.
+        badge={isOwner ? (requests.data?.length ?? 0) + (changes.data?.length ?? 0) : 0}
       />
 
       <ScrollView

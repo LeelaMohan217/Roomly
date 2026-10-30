@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { useDialog } from '@/components/ui/dialog';
@@ -95,7 +95,8 @@ export function BillPhotoPicker({
         contentContainerStyle={styles.strip}>
         {photos.map((p, i) => (
           <Thumb
-            key={p.uri}
+            // The same file can be picked twice; the index keeps keys unique.
+            key={`${p.uri}-${i}`}
             uri={p.uri}
             label={`Photo ${i + 1}`}
             onRemove={disabled ? undefined : () => onChange(photos.filter((x) => x !== p))}
@@ -334,6 +335,7 @@ function PhotoViewer({
   onRemove: () => void;
 }) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const visible = index !== null && index < photos.length;
 
   return (
@@ -343,7 +345,10 @@ function PhotoViewer({
       onRequestClose={onClose}
       statusBarTranslucent
       navigationBarTranslucent>
-      <SafeAreaView style={styles.viewer}>
+      {/* Padded from the app's insets rather than a SafeAreaView: inside a
+          translucent Android Modal the native view can measure zero, which
+          put the close button under the status bar. */}
+      <View style={[styles.viewer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.viewerBar}>
           <ViewerButton icon="close" label="Close" onPress={onClose} />
           <ThemedText style={[Type.caption, styles.viewerCount]}>
@@ -377,7 +382,7 @@ function PhotoViewer({
             )}
           />
         ) : null}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

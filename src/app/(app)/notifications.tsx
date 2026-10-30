@@ -21,10 +21,10 @@ import { supabase } from '@/lib/supabase';
  * Wording lives here, not in SQL — money formatting has one home.
  *
  * The amount is returned on its own, for the right-hand column where every
- * other list in the app puts money; `needsYou` marks the one notification
+ * other list in the app puts money; `waiting` is the tag on a notification
  * that is a request rather than news.
  */
-function describe(n: AppNotification): { title: string; amount: string; needsYou?: boolean } {
+function describe(n: AppNotification): { title: string; amount: string; waiting?: string } {
   const who = n.actorName ?? 'Someone';
   const amount = n.amountPaise !== null ? formatPaise(n.amountPaise) : '';
 
@@ -35,10 +35,11 @@ function describe(n: AppNotification): { title: string; amount: string; needsYou
       return { title: `${who} changed ${n.subject}`, amount };
     case 'expense_deleted':
       return { title: `${who} deleted ${n.subject}`, amount };
-    // Household-wide, like settlement_pending: whether it is yours to approve
-    // is on the expense screen and Home's "Needs you".
+    // Household-wide, like settlement_pending -- including the person who
+    // added it -- so the tag states a fact rather than "needs you". Whether it
+    // is yours to approve is on the expense screen and Home's "Needs you".
     case 'expense_pending':
-      return { title: `${who} added ${n.subject} to approve`, amount, needsYou: true };
+      return { title: `${who} added ${n.subject}`, amount, waiting: 'Waiting for approval' };
     case 'expense_approved':
       return { title: `${who} approved ${n.subject}`, amount };
     case 'expense_rejected':
@@ -49,7 +50,7 @@ function describe(n: AppNotification): { title: string; amount: string; needsYou
     }
     case 'settlement_pending': {
       const [from, to] = (n.subject ?? '').split(' -> ');
-      return { title: `${from} says they paid ${to}`, amount, needsYou: true };
+      return { title: `${from} says they paid ${to}`, amount, waiting: 'Needs confirming' };
     }
     case 'settlement_rejected': {
       const [from, to] = (n.subject ?? '').split(' -> ');
@@ -196,7 +197,7 @@ export default function NotificationsScreen() {
             <ThemedText style={styles.dayTitle}>{dayLabel(group.day)}</ThemedText>
             <Card padded={false}>
               {group.items.map((item, index) => {
-                const { title, amount, needsYou } = describe(item);
+                const { title, amount, waiting } = describe(item);
                 const tappable = item.kind.startsWith('expense') && item.entityId;
                 const { soft, ink } = tint(TINTS[item.kind] ?? 'neutral');
 
@@ -209,7 +210,7 @@ export default function NotificationsScreen() {
                     }
                     accessibilityLabel={
                       `${item.unread ? 'New. ' : ''}${title}` +
-                      `${amount ? `, ${amount}` : ''}${needsYou ? ', needs confirming' : ''}` +
+                      `${amount ? `, ${amount}` : ''}${waiting ? `, ${waiting.toLowerCase()}` : ''}` +
                       `, ${relative(item.createdAt)}`
                     }
                     style={({ pressed }) => [
@@ -231,10 +232,10 @@ export default function NotificationsScreen() {
                         <ThemedText themeColor="textTertiary" style={Type.micro}>
                           {relative(item.createdAt)}
                         </ThemedText>
-                        {needsYou ? (
+                        {waiting ? (
                           <View style={[styles.tag, { backgroundColor: theme.warningSoft }]}>
                             <ThemedText style={[styles.tagText, { color: theme.warning }]}>
-                              Needs confirming
+                              {waiting}
                             </ThemedText>
                           </View>
                         ) : null}
