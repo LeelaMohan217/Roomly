@@ -49,6 +49,12 @@ type SessionValue = {
   pending: JoinRequestRow | null;
   status: SessionStatus;
   /**
+   * Just signed in and membership is still being read. `status` already says
+   * needsOnboarding at this point, which is not yet true, so whatever it
+   * shows must be covered until this clears.
+   */
+  resolving: boolean;
+  /**
    * True when the last membership read did not come back. The difference
    * between "you are in no household" and "we could not find out" is the whole
    * of the bug this flag exists to prevent: screens must not state the former
@@ -137,6 +143,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<JoinRequestRow | null>(null);
   const [unreachable, setUnreachable] = useState(false);
   const [booting, setBooting] = useState(true);
+  /**
+   * Whose membership has been looked up, answer or not. Until it matches the
+   * signed-in user, "no member row" means "not read yet", not "no household".
+   *
+   * Signing in sets the session at once but reads membership a tick later
+   * (see onAuthStateChange below), and in that gap the status worked out to
+   * needsOnboarding -- so every sign-in flashed "Create a household / Join
+   * with a code" for a second before Home. A cold start never showed it only
+   * because `booting` happened to cover the same wait.
+   */
+  const [resolvedFor, setResolvedFor] = useState<string | null>(null);
 
   /**
    * RLS does the work here: `members` is only readable by someone who already
@@ -209,11 +226,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPending((request as JoinRequestRow) ?? null);
   }, []);
 
+  /**
+   * loadMembership, bounded, then marked as answered for this user -- whatever
+   * the answer was, including none at all after the timeout. Without the bound
+   * a request that never came back would hold the brand screen up forever.
+   */
+  const resolveMembership = useCallback(
+    async (userId: string | undefined) => {
+      await withTimeout(loadMembership(userId), 8000);
+      setResolvedFor(userId ?? null);
+    },
+    [loadMembership]
+  );
+
   const refresh = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
     setSession(data.session);
-    await loadMembership(data.session?.user.id);
-  }, [loadMembership]);
+    await resolveMembership(data.session?.user.id);
+  }, [resolveMembership]);
 
   useEffect(() => {
     let active = true;
@@ -226,7 +256,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // RootNavigator renders null while loading -- so a request that never
       // came back (captive portal, a network that accepts and drops) left the
       // app on its splash screen indefinitely, with no timeout anywhere.
-      await withTimeout(loadMembership(data.session?.user.id), 8000);
+      await resolveMembership(data.session?.user.id);
       if (active) setBooting(false);
     })();
 
@@ -238,7 +268,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // client methods from inside it can deadlock; loadMembership issues
       // PostgREST requests that need that lock to attach a token.
       setTimeout(() => {
-        if (active) void loadMembership(next?.user.id);
+        if (active) void resolveMembership(next?.user.id);
       }, 0);
     });
 
@@ -246,7 +276,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, [loadMembership]);
+  }, [resolveMembership]);
 
   /**
    * While a join request is pending, watch it over Realtime so the waiting
@@ -329,6 +359,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  // Signed in, but whether they belong to a household is not known yet. A
+  // token refresh re-reads membership for the same user, so resolvedFor
+  // already matches and this never flickers on; only a new sign-in waits.
+  //
+  // A flag beside status rather than status 'loading': RootNavigator swaps the
+  // whole Stack out while loading, and a password-reset link signs the user in
+  // from inside that Stack -- unmounting it would lose the reset screen.
+  const resolving = !booting && !!session && resolvedFor !== session.user.id;
+
   const status: SessionStatus = booting
     ? 'loading'
     : !session
@@ -340,8 +379,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           : 'needsOnboarding';
 
   const value = useMemo(
-    () => ({ session, member, pending, status, unreachable, refresh, signOut }),
-    [session, member, pending, status, unreachable, refresh, signOut]
+    () => ({ session, member, pending, status, resolving, unreachable, refresh, signOut }),
+    [session, member, pending, status, resolving, unreachable, refresh, signOut]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

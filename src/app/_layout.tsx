@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
@@ -70,7 +71,7 @@ export default function RootLayout() {
  * that no two groups both claim "/".
  */
 function RootNavigator() {
-  const { status } = useSession();
+  const { status, resolving } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const url = Linking.useURL();
@@ -149,6 +150,7 @@ function RootNavigator() {
   }
 
   return (
+    <>
     <Stack screenOptions={{ headerShown: false }}>
       {/* The first screen declared under a passing guard is where the app
           lands. React Navigation's StackRouter falls back to routeNames[0]
@@ -187,5 +189,18 @@ function RootNavigator() {
           also survives the guard swap when verification signs the user in. */}
       <Stack.Screen name="reset-password" />
     </Stack>
+
+    {/* Just signed in, household not known yet: the brand screen over the
+        Stack while the guards settle underneath, so sign in goes straight to
+        Home instead of flashing "Create a household / Join with a code" for
+        the second the membership read takes. Over it, not instead of it, so
+        the Stack -- and a reset-password screen mid-verification -- stays
+        mounted; and not on that screen, which has its own progress state. */}
+    {resolving && pathname !== '/reset-password' ? (
+      <View style={StyleSheet.absoluteFill}>
+        <BrandSplash />
+      </View>
+    ) : null}
+    </>
   );
 }
