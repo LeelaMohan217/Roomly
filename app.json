@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.roomly.app",
-      "buildNumber": "21",
+      "buildNumber": "22",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -26,7 +26,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",
-      "versionCode": 21
+      "versionCode": 22
     },
     "web": {
       "output": "single",
@@ -74,8 +74,8 @@
       "eas": {
         "projectId": "3532ed5b-bf4c-4efc-9159-f75bd1d62e47"
       },
-      "buildNumber": 20,
-      "buildTime": "2026-10-28T11:57"
+      "buildNumber": 21,
+      "buildTime": "2026-10-31T01:08"
     },
     "runtimeVersion": {
       "policy": "appVersion"
