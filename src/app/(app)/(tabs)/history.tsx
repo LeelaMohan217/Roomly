@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Appear, Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
+import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatRange } from '@/lib/dates';
 import { activeFilterCount, useHistoryFilters } from '@/lib/history-filters';
@@ -41,6 +42,7 @@ export default function HistoryScreen() {
   const members = useMembers();
   const ranged = !!(filters.from || filters.to);
   const expenses = useExpenses(ranged ? 2000 : 200, { from: filters.from, to: filters.to });
+  const pull = usePullRefresh(() => expenses.refetch());
 
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
@@ -201,8 +203,8 @@ export default function HistoryScreen() {
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        refreshing={expenses.isFetching}
-        onRefresh={() => void expenses.refetch()}
+        refreshing={pull.refreshing}
+        onRefresh={pull.onRefresh}
         ListEmptyComponent={
           // "Nothing logged yet" is a claim about the data, so it may only be
           // made once the data has been read. This used to be shown after a

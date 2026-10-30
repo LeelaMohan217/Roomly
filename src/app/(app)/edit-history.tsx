@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
+import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import {
   amountOf,
@@ -59,6 +60,7 @@ export default function EditHistoryScreen() {
   const router = useRouter();
 
   const log = useAuditLog();
+  const pull = usePullRefresh(() => log.refetch());
   const categories = useAllCategories();
   const members = useMembers();
 
@@ -103,8 +105,8 @@ export default function EditHistoryScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={log.isFetching}
-            onRefresh={() => void log.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={theme.textSecondary}
           />
         }

@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
+import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, dayOf } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
@@ -110,6 +111,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const notifications = useNotifications();
+  const pull = usePullRefresh(() => notifications.refetch());
 
   const markRead = useMutation({
     mutationFn: async () => {
@@ -160,8 +162,8 @@ export default function NotificationsScreen() {
         keyExtractor={(d) => d.day}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshing={notifications.isFetching}
-        onRefresh={() => void notifications.refetch()}
+        refreshing={pull.refreshing}
+        onRefresh={pull.onRefresh}
         ListEmptyComponent={
           queryState(notifications, 'your activity') ?? (
             <Card style={styles.empty}>

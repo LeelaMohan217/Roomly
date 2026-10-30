@@ -24,6 +24,7 @@ import { Appear, Reveal } from '@/components/ui/motion';
 import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
+import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
@@ -286,6 +287,9 @@ export default function HomeScreen() {
   const changes = usePendingChanges();
   const recurring = useRecurring();
   const spend = useSpendSummary(member?.id);
+  // Resolves once every active query has refetched, so the disc stays up for
+  // the whole of a pull and never for a background refresh.
+  const pull = usePullRefresh(() => queryClient.invalidateQueries());
 
   /**
    * Post any due recurring expenses. There's no cron — this fires when
@@ -424,8 +428,8 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={balances.isFetching || expenses.isFetching}
-            onRefresh={() => void queryClient.invalidateQueries()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={theme.textSecondary}
           />
         }>

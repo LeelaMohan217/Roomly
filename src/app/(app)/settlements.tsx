@@ -12,6 +12,7 @@ import { useDialog } from '@/components/ui/dialog';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
+import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
 import { formatPaise } from '@/lib/money';
@@ -32,6 +33,7 @@ export default function SettlementsScreen() {
   const isOwner = member?.role === 'owner';
 
   const settlements = useSettlements();
+  const pull = usePullRefresh(() => settlements.refetch());
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -119,8 +121,8 @@ export default function SettlementsScreen() {
         contentContainerStyle={styles.content}
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
-        refreshing={settlements.isFetching}
-        onRefresh={() => void settlements.refetch()}
+        refreshing={pull.refreshing}
+        onRefresh={pull.onRefresh}
         ListHeaderComponent={
           <>
             {/* On the page, not in a card -- as on Expense details. */}
