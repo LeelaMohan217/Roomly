@@ -1324,6 +1324,15 @@ check(
   );
 }
 
+// ---- new functions start closed (migration 0041) ---------------------------
+// A per-schema default privilege cannot take away PUBLIC's global EXECUTE, so
+// 0034's `in schema public` revoke left every later function open to anon.
+check(
+  'new functions start closed globally, not just per schema',
+  /alter default privileges for role postgres\s+revoke execute on functions from public;/.test(migAll),
+  'only the per-schema revoke exists, which cannot remove PUBLIC’s global grant'
+);
+
 // ---- bill photos (migration 0040) ------------------------------------------
 {
   const att = read('src', 'lib', 'attachments.ts');
