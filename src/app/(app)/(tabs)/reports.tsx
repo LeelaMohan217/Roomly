@@ -8,7 +8,9 @@ import { DonutChart, type Slice } from '@/components/charts/donut-chart';
 import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
+import { Appear, Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatPaise } from '@/lib/money';
@@ -119,7 +121,7 @@ export default function ReportsScreen() {
       <AppBar title="Reports" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.monthNav}>
+        <Appear style={styles.monthNav}>
           <NavButton icon="chevron-back" onPress={() => step(-1)} label="Previous month" />
           <ThemedText style={styles.monthTitle}>
             {MONTHS[month - 1]} {year}
@@ -130,8 +132,9 @@ export default function ReportsScreen() {
             label="Next month"
             disabled={atLatest}
           />
-        </View>
+        </Appear>
 
+        <Appear index={1}>
         <Card>
           <ThemedText themeColor="textTertiary" style={Type.caption}>
             Spent
@@ -140,13 +143,23 @@ export default function ReportsScreen() {
               spent more than last month, green when less. Last month's own
               figure is the bar beside this one in the chart below. */}
           <View style={styles.totalRow}>
-            <ThemedText
-              style={[styles.total, styles.flex]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.6}>
-              {formatPaise(currentTotal)}
-            </ThemedText>
+            {/* A shape until the totals arrive: "₹0.00" before they did was
+                a wrong answer, shown first. */}
+            {totals.data ? (
+              <Reveal style={styles.flex}>
+                <ThemedText
+                  style={styles.total}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}>
+                  {formatPaise(currentTotal)}
+                </ThemedText>
+              </Reveal>
+            ) : (
+              <View style={[styles.flex, styles.totalSkeleton]}>
+                <Skeleton width="50%" height={26} />
+              </View>
+            )}
             {previousTotal > 0 && delta !== 0 ? (
               <View
                 accessible
@@ -181,10 +194,15 @@ export default function ReportsScreen() {
             />
           </View>
         </Card>
+        </Appear>
 
         {queryState(totals, 'your reports') ?? null}
 
+        {/* These mount when the totals land (or when a month with spending
+            replaces an empty one), so their entrance doubles as the swap
+            from the skeleton above. A refetch keeps them mounted. */}
         {!totals.isLoading && !totals.isError && current.length === 0 ? (
+          <Appear index={2}>
           <Card style={styles.empty}>
             <Ionicons name="bar-chart-outline" size={22} color={theme.textTertiary} />
             <ThemedText style={Type.headline}>Nothing this month</ThemedText>
@@ -192,11 +210,13 @@ export default function ReportsScreen() {
               Expenses you add will break down here by category.
             </ThemedText>
           </Card>
+          </Appear>
         ) : current.length === 0 ? null : (
           <>
             {/* The donut and the list are one thing: each row's dot is its
                 slice. They used to be a donut with a legend AND a separate
                 "By category" list, which named every category twice. */}
+            <Appear index={2}>
             <Section title="Where it went">
               <Card padded={false}>
                 <View style={styles.donutWrap}>
@@ -226,10 +246,12 @@ export default function ReportsScreen() {
                 ))}
               </Card>
             </Section>
+            </Appear>
 
             {/* Rent and wifi aren't going down whatever you decide, so this is
                 the only split that can change anyone's behaviour. One bar for
                 the whole month, cut by kind, instead of a bar on every row. */}
+            <Appear index={3}>
             <Section title="Fixed vs flexible">
               <Card style={styles.kindCard}>
                 <View style={[styles.kindBar, { backgroundColor: theme.chartTrack }]}>
@@ -257,6 +279,7 @@ export default function ReportsScreen() {
                 </View>
               </Card>
             </Section>
+            </Appear>
           </>
         )}
       </ScrollView>
@@ -324,6 +347,8 @@ const styles = StyleSheet.create({
 
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   total: { fontSize: 30, lineHeight: 38, fontWeight: '600', letterSpacing: -1 },
+  // The total's own line height, so nothing shifts when the number lands.
+  totalSkeleton: { height: 38, justifyContent: 'center' },
   deltaPill: {
     flexDirection: 'row',
     alignItems: 'center',

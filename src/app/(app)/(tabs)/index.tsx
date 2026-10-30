@@ -20,7 +20,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-import { Appear } from '@/components/ui/appear';
+import { Appear, Reveal } from '@/components/ui/motion';
 import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
@@ -483,7 +483,10 @@ export default function HomeScreen() {
           </View>
         </Appear>
 
-        <Appear delay={60}>
+        {/* Top to bottom, one step each: cards, actions, notes, Balances,
+            Recent. Every section draws at once -- skeletons included -- and
+            only its arrival is staggered. */}
+        <Appear index={1}>
         <QuickActions
           // No Add here: the Add button in the tab bar already adds an
           // expense, and two Add buttons on one screen left recurring bills
@@ -522,26 +525,31 @@ export default function HomeScreen() {
         {/* Notes, one line each, coloured by what they are: yellow for
             something to keep in mind, never green, which means money in. */}
         {awayToday.length > 0 ? (
-          <Note
-            tone="warning"
-            icon="airplane-outline"
-            text={`${awayToday.map((m) => m.displayName).join(', ')} ${awayToday.length === 1 ? 'is' : 'are'} away`}
-            onPress={() => router.push('/away')}
-          />
+          <Appear index={2}>
+            <Note
+              tone="warning"
+              icon="airplane-outline"
+              text={`${awayToday.map((m) => m.displayName).join(', ')} ${awayToday.length === 1 ? 'is' : 'are'} away`}
+              onPress={() => router.push('/away')}
+            />
+          </Appear>
         ) : null}
 
         {/* Varying bills can't be auto-posted, so they surface here rather
             than silently not happening. */}
         {dueForAmount > 0 ? (
-          <Note
-            tone="warning"
-            icon="repeat"
-            text={`${dueForAmount} bill${dueForAmount === 1 ? '' : 's'} need${dueForAmount === 1 ? 's' : ''} an amount`}
-            onPress={() => router.push('/recurring')}
-          />
+          <Appear index={2}>
+            <Note
+              tone="warning"
+              icon="repeat"
+              text={`${dueForAmount} bill${dueForAmount === 1 ? '' : 's'} need${dueForAmount === 1 ? 's' : ''} an amount`}
+              onPress={() => router.push('/recurring')}
+            />
+          </Appear>
         ) : null}
 
         {isOwner && approvalCount > 0 ? (
+          <Appear index={2}>
           <Section title="Needs you" count={approvalCount}>
             {changes.data?.map((c) => (
               <Card key={c.id} style={styles.approval}>
@@ -606,11 +614,13 @@ export default function HomeScreen() {
               </Card>
             ))}
           </Section>
+          </Appear>
         ) : null}
 
         {/* No category breakdown on Home: the Reports tab has it, and Home
             stays on where you stand and what just happened. */}
 
+        <Appear index={3}>
         <Section
           // No "Manage" link: the People quick action above goes to the same
           // screen, and two doors to one place on a single screen is just
@@ -623,7 +633,12 @@ export default function HomeScreen() {
             {!balances.data
               ? [0, 1, 2].map((i) => <RowSkeleton key={i} round last={i === 2} />)
               : null}
-            {balances.data && openBalances.length === 0 ? (
+            {/* The real rows fade in where the skeleton was. Mounted once,
+                when the first data lands; a refetch keeps balances.data, so
+                it never replays. */}
+            {balances.data ? (
+            <Reveal>
+            {openBalances.length === 0 ? (
               <View style={styles.row}>
                 <View style={[styles.lineIcon, { backgroundColor: theme.backgroundSelected }]}>
                   <MaterialCommunityIcons name="check" size={17} color={theme.textSecondary} />
@@ -676,9 +691,13 @@ export default function HomeScreen() {
                 {settledCount === 1 ? '1 other is' : `${settledCount} others are`} settled up
               </ThemedText>
             ) : null}
+            </Reveal>
+            ) : null}
           </Card>
         </Section>
+        </Appear>
 
+        <Appear index={4}>
         <Section
           title="Recent"
           action={
@@ -701,7 +720,7 @@ export default function HomeScreen() {
               ))}
             </View>
           ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
-            <View style={styles.recentList}>
+            <Reveal style={styles.recentList}>
               {/* Queued entries sit at the top marked as sending, so what you
                   just typed is visibly there rather than seeming lost. */}
               {pending.map((p) => (
@@ -766,7 +785,7 @@ export default function HomeScreen() {
                   </Pressable>
                 </Card>
               ))}
-            </View>
+            </Reveal>
           ) : (
             <Card style={styles.empty}>
               <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
@@ -779,6 +798,7 @@ export default function HomeScreen() {
             </Card>
           )}
         </Section>
+        </Appear>
       </ScrollView>
     </SafeAreaView>
   );

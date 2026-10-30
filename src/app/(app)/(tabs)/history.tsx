@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
+import { Appear, Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -119,7 +120,7 @@ export default function HistoryScreen() {
         }
       />
 
-      <View style={styles.top}>
+      <Appear style={styles.top}>
         {/* Search and filter share one bar: the two ways of narrowing the
             same list, side by side. */}
         <View
@@ -185,8 +186,14 @@ export default function HistoryScreen() {
             </Pressable>
           </View>
         ) : null}
-      </View>
+      </Appear>
 
+      {/* Keyed on the first load, so the list is drawn twice at most: once
+          over its skeleton, and once more -- fading in -- when the expenses
+          land. A pull-to-refresh or a background refetch keeps isLoading
+          false, so the list is never re-faded under someone reading it, and
+          no row animates on its own as it scrolls into view. */}
+      <Reveal key={expenses.isLoading ? 'loading' : 'ready'} style={styles.flex}>
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.day}
@@ -287,6 +294,7 @@ export default function HistoryScreen() {
           </View>
         )}
       />
+      </Reveal>
     </SafeAreaView>
   );
 }

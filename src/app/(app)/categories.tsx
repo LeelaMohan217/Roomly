@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Reveal } from '@/components/ui/motion';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { iconFor } from '@/lib/icons';
@@ -142,8 +143,10 @@ export default function CategoriesScreen() {
                 color={theme.textTertiary}
               />
             </Pressable>
-            {showArchived
-              ? archived.map((c) => (
+            {/* Fades open as a block rather than row by row. */}
+            {showArchived ? (
+              <Reveal>
+                {archived.map((c) => (
                   <Row
                     key={c.id}
                     category={c}
@@ -155,8 +158,9 @@ export default function CategoriesScreen() {
                         : undefined
                     }
                   />
-                ))
-              : null}
+                ))}
+              </Reveal>
+            ) : null}
           </Card>
         ) : null}
       </ScrollView>

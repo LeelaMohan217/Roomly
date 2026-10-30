@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet } from '@/components/ui/sheet';
@@ -816,7 +817,7 @@ export default function SettleScreen() {
               </Pressable>
 
               {isOpen ? (
-                <View style={[styles.why, styles.rowBody, { backgroundColor: theme.backgroundSunken }]}>
+                <Reveal style={[styles.why, styles.rowBody, { backgroundColor: theme.backgroundSunken }]}>
                   {/* The explanations, first: why there is no "Settle this"
                       when you come out ahead overall, and any routing that
                       makes this pair look unsettled. */}
@@ -900,7 +901,7 @@ export default function SettleScreen() {
                       }
                     />
                   </View>
-                </View>
+                </Reveal>
               ) : null}
             </View>
           );
@@ -1073,7 +1074,7 @@ export default function SettleScreen() {
                   </View>
 
                   {routed && planOpen === key ? (
-                    <View style={[styles.why, { backgroundColor: theme.backgroundSunken }]}>
+                    <Reveal style={[styles.why, { backgroundColor: theme.backgroundSunken }]}>
                       <View style={styles.whyRow}>
                         <ThemedText
                           themeColor="textSecondary"
@@ -1111,7 +1112,7 @@ export default function SettleScreen() {
                           ? `Pay the full ${formatPaise(t.amountPaise)} — it is fewer transfers for the same money. Afterwards "Owed to you" will show ${nameOf(t.to)} owing you ${formatPaise(routed.routedPaise)} until ${onwards} settle up.`
                           : `Only ${formatPaise(routed.directPaise)} of this is yours. Afterwards "You owe" will show ${formatPaise(routed.routedPaise)} against ${nameOf(t.from)} until the rest of the plan goes through — it is money passing through you, not money you spent.`}
                       </ThemedText>
-                    </View>
+                    </Reveal>
                   ) : null}
 
                   {/* Once it is sent there is nothing more for this person to

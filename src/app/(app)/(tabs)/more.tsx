@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
+import { Appear } from '@/components/ui/motion';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
@@ -57,8 +58,8 @@ export default function MoreScreen() {
       <AppBar title="More" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {groups.map((g) => (
-          <View key={g.title} style={styles.group}>
+        {groups.map((g, gi) => (
+          <Appear key={g.title} index={gi} style={styles.group}>
             <ThemedText style={styles.groupTitle}>{g.title}</ThemedText>
             <Card padded={false}>
               {g.rows.map((r, i) => (
@@ -85,7 +86,7 @@ export default function MoreScreen() {
                 </Pressable>
               ))}
             </Card>
-          </View>
+          </Appear>
         ))}
       </ScrollView>
     </SafeAreaView>

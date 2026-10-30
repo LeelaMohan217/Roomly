@@ -5,11 +5,15 @@ import {
   type PressableProps,
   type ViewStyle,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { usePressFeedback } from '@/components/ui/motion';
 import { tapped } from '@/lib/haptics';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Props = Omit<PressableProps, 'style'> & {
   title: string;
@@ -32,7 +36,8 @@ export function Button({
   // Wrapped rather than left to each caller: a button that sometimes buzzes is
   // worse than one that never does. onPress is optional on PressableProps, so
   // the feedback fires only when there is something to press.
-  const { onPress, ...pressable } = rest;
+  const { onPress, onPressIn, onPressOut, ...pressable } = rest;
+  const press = usePressFeedback({ resting: isDisabled ? 0.45 : 1, onPressIn, onPressOut });
 
   const background =
     variant === 'primary'
@@ -47,18 +52,20 @@ export function Button({
     variant === 'primary' ? theme.onPrimary : variant === 'danger' ? theme.danger : theme.text;
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ disabled: !!isDisabled, busy: loading }}
       disabled={isDisabled}
-      style={({ pressed }) => [
+      style={[
         styles.base,
         { backgroundColor: background },
         variant === 'ghost' && { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
-        // A slight squash on press reads as responsive without an animation lib.
-        { opacity: isDisabled ? 0.45 : pressed ? 0.82 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] },
         style,
+        // A slight dim and squash, eased on the UI thread.
+        press.style,
       ]}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       onPress={
         onPress
           ? (e) => {
@@ -75,7 +82,7 @@ export function Button({
           {title}
         </ThemedText>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

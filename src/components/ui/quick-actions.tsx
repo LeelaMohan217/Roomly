@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { usePressFeedback } from '@/components/ui/motion';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -13,6 +15,8 @@ export type QuickAction = {
 };
 
 const SIZE = 48;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * The row of round actions under the balance, straight out of every banking
@@ -27,26 +31,35 @@ const SIZE = 48;
  * place to land; solid green is kept for that card and the Add button.
  */
 export function QuickActions({ actions }: { actions: QuickAction[] }) {
-  const theme = useTheme();
-
   return (
     <View style={styles.row}>
       {actions.map((a) => (
-        <Pressable
-          key={a.key}
-          accessibilityRole="button"
-          accessibilityLabel={a.label}
-          onPress={a.onPress}
-          style={({ pressed }) => [styles.item, { opacity: pressed ? 0.6 : 1 }]}>
-          <View style={[styles.circle, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name={a.icon} size={21} color={theme.brandInk} />
-          </View>
-          <ThemedText style={[Type.micro, styles.label]} numberOfLines={1}>
-            {a.label}
-          </ThemedText>
-        </Pressable>
+        <Action key={a.key} action={a} />
       ))}
     </View>
+  );
+}
+
+/** Its own component so each action has its own press animation. */
+function Action({ action: a }: { action: QuickAction }) {
+  const theme = useTheme();
+  const press = usePressFeedback({ dim: 0.35, squash: 0.04 });
+
+  return (
+    <AnimatedPressable
+      accessibilityRole="button"
+      accessibilityLabel={a.label}
+      onPress={a.onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={[styles.item, press.style]}>
+      <View style={[styles.circle, { backgroundColor: theme.primarySoft }]}>
+        <Ionicons name={a.icon} size={21} color={theme.brandInk} />
+      </View>
+      <ThemedText style={[Type.micro, styles.label]} numberOfLines={1}>
+        {a.label}
+      </ThemedText>
+    </AnimatedPressable>
   );
 }
 

@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { Motion } from '@/components/ui/motion';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -33,9 +36,36 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   const theme = useTheme();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
+
+  // The white pill slides to the new choice instead of blinking there, so the
+  // change reads as one thing moving. Until the row has been measured the
+  // selected segment paints its own background, so nothing is ever missing.
+  const segment = width > 0 ? (width - PAD * 2 - GAP * (options.length - 1)) / options.length : 0;
+  const x = useSharedValue(0);
+  const placed = useRef(false);
+
+  useEffect(() => {
+    if (segment === 0) return;
+    const target = index * (segment + GAP);
+    // The first placement jumps: there is nothing to slide from.
+    x.value = placed.current ? withTiming(target, { duration: Motion.fade }) : target;
+    placed.current = true;
+  }, [index, segment, x]);
+
+  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 
   return (
-    <View style={[styles.row, { backgroundColor: theme.backgroundSunken }]}>
+    <View
+      style={[styles.row, { backgroundColor: theme.backgroundSunken }]}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {segment > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.thumb, { width: segment, backgroundColor: theme.backgroundElement }, thumb]}
+        />
+      ) : null}
       {options.map((opt) => {
         const selected = opt.value === value;
         return (
@@ -46,7 +76,10 @@ export function Segmented<T extends string>({
             accessibilityLabel={opt.count ? `${opt.label}, ${opt.count}` : opt.label}
             onPress={() => onChange(opt.value)}
             disabled={disabled}
-            style={[styles.item, selected && { backgroundColor: theme.backgroundElement }]}>
+            style={[
+              styles.item,
+              selected && segment === 0 && { backgroundColor: theme.backgroundElement },
+            ]}>
             <ThemedText
               themeColor={selected ? 'text' : 'textSecondary'}
               style={[Type.caption, selected && styles.selected]}
@@ -61,8 +94,12 @@ export function Segmented<T extends string>({
   );
 }
 
+const PAD = 3;
+const GAP = 3;
+
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', borderRadius: Radius.md, padding: 3, gap: 3 },
+  row: { flexDirection: 'row', borderRadius: Radius.md, padding: PAD, gap: GAP },
+  thumb: { position: 'absolute', top: PAD, bottom: PAD, left: PAD, borderRadius: Radius.sm },
   item: {
     flex: 1,
     alignItems: 'center',

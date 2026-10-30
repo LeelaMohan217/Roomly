@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { SkeletonRows } from '@/components/ui/skeleton';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -30,16 +31,20 @@ type QueryLike = {
   refetch: () => unknown;
 };
 
-/** A spinner that says what it is waiting for. */
+/**
+ * The list's shape, pulsing, in place of the list. It used to be a spinner
+ * card, which made every data screen open as a blank card and then jump to
+ * a list of a different height. The label is still there for screen readers,
+ * which cannot see a shape.
+ */
 export function Loading({ label = 'Loading…' }: { label?: string }) {
-  const theme = useTheme();
-
   return (
-    <Card style={styles.block}>
-      <ActivityIndicator color={theme.primary} />
-      <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-        {label}
-      </ThemedText>
+    <Card
+      padded={false}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}>
+      <SkeletonRows />
     </Card>
   );
 }
