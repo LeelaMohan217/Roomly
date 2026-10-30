@@ -72,7 +72,11 @@ export default function CategoryEditScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const name = nameEdit ?? existing?.name ?? '';
-  const icon = iconEdit ?? existing?.icon ?? 'misc';
+  // An icon no longer offered (the cookie was removed) is drawn as the box
+  // everywhere, so it is the box here too: highlighted in the grid, and what
+  // a save writes -- rather than a preview of one thing and a save of another.
+  const storedIcon = existing?.icon && ICON_SLUGS.includes(existing.icon) ? existing.icon : 'misc';
+  const icon = iconEdit ?? storedIcon;
   // 'asset' is a real kind in the database but not offered in this form.
   const kind: Kind =
     kindEdit ?? (existing ? (existing.kind === 'asset' ? 'bulk' : existing.kind) : 'consumption');
