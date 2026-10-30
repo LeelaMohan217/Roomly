@@ -11,6 +11,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { MonthCalendar } from '@/components/ui/month-calendar';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
@@ -145,7 +146,7 @@ export default function HouseholdScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* The list is the screen. Everything else is an action below it. */}
-        <View style={styles.section}>
+        <Appear index={0} style={styles.section}>
           {queryState(members, 'the household') ?? (
           <Card padded={false}>
             {list.map((m, i) => {
@@ -197,10 +198,10 @@ export default function HouseholdScreen() {
               Tap a housemate to remove them
             </ThemedText>
           ) : null}
-        </View>
+        </Appear>
 
         {isOwner ? (
-          <View style={styles.section}>
+          <Appear index={1} style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Add people</ThemedText>
             <Card padded={false}>
               <LinkRow icon="person-add-outline" label="Add a housemate" onPress={() => setAddOpen(true)} first />
@@ -213,14 +214,16 @@ export default function HouseholdScreen() {
                 }}
               />
             </Card>
-          </View>
+          </Appear>
         ) : (
-          <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-            <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
-            <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
-              Only the owner can add or remove people.
-            </ThemedText>
-          </View>
+          <Appear index={1}>
+            <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
+              <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
+              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
+                Only the owner can add or remove people.
+              </ThemedText>
+            </View>
+          </Appear>
         )}
       </ScrollView>
 

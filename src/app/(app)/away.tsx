@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
+import { Appear } from '@/components/ui/motion';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
 import { Notice } from '@/components/ui/notice';
@@ -214,16 +215,16 @@ export default function AwayScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         {awayToday.length > 0 ? (
-          <View style={[styles.note, { backgroundColor: theme.warningSoft }]}>
+          <Appear index={0} style={[styles.note, { backgroundColor: theme.warningSoft }]}>
             <Ionicons name="airplane-outline" size={15} color={theme.warning} />
             <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
               Away today: {awayToday.map((m) => m.displayName).join(', ')}
             </ThemedText>
-          </View>
+          </Appear>
         ) : null}
 
         {isOwner && members.data && members.data.length > 1 ? (
-          <View style={styles.section}>
+          <Appear index={1} style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Who is away</ThemedText>
             <ScrollView
               horizontal
@@ -254,116 +255,127 @@ export default function AwayScreen() {
                 );
               })}
             </ScrollView>
-          </View>
+          </Appear>
         ) : null}
 
-        <Card>
-          <MonthCalendar
-            year={year}
-            month={month}
-            onMonthChange={(y, m) => {
-              setYear(y);
-              setMonth(m);
-            }}
-            start={start}
-            end={end}
-            onDayPress={pickDay}
-            marks={marks}
-          />
-        </Card>
-
-        {start ? (
-          <Card padded={false}>
-            <View style={[styles.formRow, styles.selectionHead]}>
-              <View style={styles.flex}>
-                <ThemedText style={styles.rangeTitle}>
-                  {openEnded ? formatRange(start, null) : formatRange(start, end ?? start)}
-                </ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.micro}>
-                  {openEnded
-                    ? 'Until you remove it'
-                    : `${nights} day${nights === 1 ? '' : 's'}${end ? '' : ' · tap another day for a range'}`}
-                </ThemedText>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Clear the dates"
-                onPress={() => {
-                  setStart(null);
-                  setEnd(null);
-                }}
-                hitSlop={8}>
-                <Ionicons name="close" size={19} color={theme.textTertiary} />
-              </Pressable>
-            </View>
-
-            <View style={[styles.formRow, styles.switchRow, { borderTopColor: theme.border }]}>
-              <ThemedText style={[Type.body, styles.flex]}>No end date yet</ThemedText>
-              <Switch
-                value={openEnded}
-                onValueChange={setOpenEnded}
-                trackColor={{ false: theme.backgroundSelected, true: theme.primary }}
-                thumbColor="#FFFFFF"
-                accessibilityLabel="No end date yet"
-              />
-            </View>
-
-            <View style={[styles.formRow, styles.formFoot, { borderTopColor: theme.border }]}>
-              <TextField
-                value={note}
-                onChangeText={setNote}
-                placeholder="Note: hometown, wedding…"
-                editable={!save.isPending}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ busy: save.isPending }}
-                disabled={save.isPending}
-                onPress={() => save.mutate()}
-                style={({ pressed }) => [
-                  styles.pill,
-                  { backgroundColor: theme.primarySoft, opacity: pressed ? 0.7 : 1 },
-                ]}>
-                {save.isPending ? (
-                  <ActivityIndicator size="small" color={theme.brandInk} />
-                ) : (
-                  <ThemedText style={[styles.pillText, { color: theme.brandInk }]}>Mark away</ThemedText>
-                )}
-              </Pressable>
-            </View>
+        <Appear index={2}>
+          <Card>
+            <MonthCalendar
+              year={year}
+              month={month}
+              onMonthChange={(y, m) => {
+                setYear(y);
+                setMonth(m);
+              }}
+              start={start}
+              end={end}
+              onDayPress={pickDay}
+              marks={marks}
+            />
           </Card>
-        ) : (
-          <ThemedText themeColor="textTertiary" style={[Type.caption, styles.hint]}>
-            Tap a day to start, then another for a range
-          </ThemedText>
-        )}
+        </Appear>
+
+        {/* One wrapper for both, so picking a day swaps them in place. */}
+        <Appear index={3}>
+          {start ? (
+            <Card padded={false}>
+              <View style={[styles.formRow, styles.selectionHead]}>
+                <View style={styles.flex}>
+                  <ThemedText style={styles.rangeTitle}>
+                    {openEnded ? formatRange(start, null) : formatRange(start, end ?? start)}
+                  </ThemedText>
+                  <ThemedText themeColor="textTertiary" style={Type.micro}>
+                    {openEnded
+                      ? 'Until you remove it'
+                      : `${nights} day${nights === 1 ? '' : 's'}${end ? '' : ' · tap another day for a range'}`}
+                  </ThemedText>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear the dates"
+                  onPress={() => {
+                    setStart(null);
+                    setEnd(null);
+                  }}
+                  hitSlop={8}>
+                  <Ionicons name="close" size={19} color={theme.textTertiary} />
+                </Pressable>
+              </View>
+
+              <View style={[styles.formRow, styles.switchRow, { borderTopColor: theme.border }]}>
+                <ThemedText style={[Type.body, styles.flex]}>No end date yet</ThemedText>
+                <Switch
+                  value={openEnded}
+                  onValueChange={setOpenEnded}
+                  trackColor={{ false: theme.backgroundSelected, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                  accessibilityLabel="No end date yet"
+                />
+              </View>
+
+              <View style={[styles.formRow, styles.formFoot, { borderTopColor: theme.border }]}>
+                <TextField
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder="Note: hometown, wedding…"
+                  editable={!save.isPending}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: save.isPending }}
+                  disabled={save.isPending}
+                  onPress={() => save.mutate()}
+                  style={({ pressed }) => [
+                    styles.pill,
+                    { backgroundColor: theme.primarySoft, opacity: pressed ? 0.7 : 1 },
+                  ]}>
+                  {save.isPending ? (
+                    <ActivityIndicator size="small" color={theme.brandInk} />
+                  ) : (
+                    <ThemedText style={[styles.pillText, { color: theme.brandInk }]}>Mark away</ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            </Card>
+          ) : (
+            <ThemedText themeColor="textTertiary" style={[Type.caption, styles.hint]}>
+              Tap a day to start, then another for a range
+            </ThemedText>
+          )}
+        </Appear>
 
         {/* One line once it is saved; the detail is a tap away. */}
         {backdated !== null ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => explainBackdated(backdated)}
-            style={({ pressed }) => [
-              styles.note,
-              { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
-            ]}>
-            <Ionicons name="alert-circle-outline" size={15} color={theme.warning} />
-            <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
-              Saved · past expenses were not changed
-            </ThemedText>
+          <Appear index={4}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Dismiss"
-              onPress={() => setBackdated(null)}
-              hitSlop={10}>
-              <Ionicons name="close" size={16} color={theme.warning} />
+              onPress={() => explainBackdated(backdated)}
+              style={({ pressed }) => [
+                styles.note,
+                { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
+              ]}>
+              <Ionicons name="alert-circle-outline" size={15} color={theme.warning} />
+              <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
+                Saved · past expenses were not changed
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss"
+                onPress={() => setBackdated(null)}
+                hitSlop={10}>
+                <Ionicons name="close" size={16} color={theme.warning} />
+              </Pressable>
             </Pressable>
-          </Pressable>
+          </Appear>
         ) : null}
 
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Appear index={5}>
+            <Notice tone="danger" message={error} />
+          </Appear>
+        ) : null}
 
-        <View style={styles.section}>
+        <Appear index={6} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Trips</ThemedText>
 
           {/* Loading is not "no trips": that used to show until the list
@@ -431,7 +443,7 @@ export default function AwayScreen() {
               </ThemedText>
             </Card>
           ))}
-        </View>
+        </Appear>
       </ScrollView>
     </SafeAreaView>
   );

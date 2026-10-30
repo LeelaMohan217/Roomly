@@ -1,13 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
+import { Appear } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
@@ -111,6 +112,9 @@ const TINTS: Record<AppNotification['kind'], Tint> = {
   ownership_transferred: 'info',
 };
 
+const ENTRANCE_STEPS = 10;
+const SETTLE_MS = 800;
+
 function relative(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (mins < 1) return 'just now';
@@ -168,6 +172,15 @@ export default function NotificationsScreen() {
             ? { soft: theme.warningSoft, ink: theme.warning }
             : { soft: theme.backgroundSelected, ink: theme.textSecondary };
 
+  // As on History: only the first screenful rises in; after SETTLE_MS days mount still.
+  const hasData = !!notifications.data;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!hasData) return;
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [hasData]);
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Activity" />
@@ -181,19 +194,21 @@ export default function NotificationsScreen() {
         onRefresh={pull.onRefresh}
         ListEmptyComponent={
           queryState(notifications, 'your activity') ?? (
-            <Card style={styles.empty}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
-                <Ionicons name="notifications-outline" size={20} color={theme.textTertiary} />
-              </View>
-              <ThemedText style={Type.headline}>Nothing yet</ThemedText>
-              <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-                When anyone adds an expense, records a payment or joins, it shows up here.
-              </ThemedText>
-            </Card>
+            <Appear>
+              <Card style={styles.empty}>
+                <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
+                  <Ionicons name="notifications-outline" size={20} color={theme.textTertiary} />
+                </View>
+                <ThemedText style={Type.headline}>Nothing yet</ThemedText>
+                <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
+                  When anyone adds an expense, records a payment or joins, it shows up here.
+                </ThemedText>
+              </Card>
+            </Appear>
           )
         }
-        renderItem={({ item: group }) => (
-          <View style={styles.day}>
+        renderItem={({ item: group, index: position }) => (
+          <Appear index={position} still={settled || position > ENTRANCE_STEPS} style={styles.day}>
             <ThemedText style={styles.dayTitle}>{dayLabel(group.day)}</ThemedText>
             <Card padded={false}>
               {group.items.map((item, index) => {
@@ -257,7 +272,7 @@ export default function NotificationsScreen() {
                 );
               })}
             </Card>
-          </View>
+          </Appear>
         )}
       />
     </SafeAreaView>

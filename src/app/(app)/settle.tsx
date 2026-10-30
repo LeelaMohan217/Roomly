@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
-import { Reveal } from '@/components/ui/motion';
+import { Appear, Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet } from '@/components/ui/sheet';
@@ -375,67 +375,69 @@ export default function SettleScreen() {
             three tabs otherwise left you to add up. The same green card as
             Home's, so the two screens agree on what the headline is. */}
         {myBalance !== undefined ? (
-          <View
-            style={[
-              styles.summary,
-              { backgroundColor: theme.balanceCard, borderColor: theme.balanceEdge },
-            ]}>
-            <ThemedText style={[Type.caption, { color: theme.onBalanceMuted }]}>
-              {myBalance > 0
-                ? 'Overall, you get back'
-                : myBalance < 0
-                  ? 'Overall, you owe'
-                  : 'You’re all square'}
-            </ThemedText>
-            <View style={styles.summaryAction}>
-              <ThemedText
-                style={[
-                  styles.summaryValue,
-                  styles.flex,
-                  {
-                    color:
-                      myBalance > 0
-                        ? theme.balancePositive
-                        : myBalance < 0
-                          ? theme.balanceNegative
-                          : theme.onBalance,
-                  },
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}>
-                {formatPaise(Math.abs(myBalance))}
+          <Appear index={0}>
+            <View
+              style={[
+                styles.summary,
+                { backgroundColor: theme.balanceCard, borderColor: theme.balanceEdge },
+              ]}>
+              <ThemedText style={[Type.caption, { color: theme.onBalanceMuted }]}>
+                {myBalance > 0
+                  ? 'Overall, you get back'
+                  : myBalance < 0
+                    ? 'Overall, you owe'
+                    : 'You’re all square'}
               </ThemedText>
-              {/* The way to act, beside the amount it settles. Only when the
-                  plan actually asks you to pay: pairwise nets SUM to your
-                  balance, so you can owe one person and still have nothing to
-                  pay, and then this would open a plan with nothing of yours. */}
-              {view !== 'plan' && iPayInPlan ? (
-                <PillButton title="Settle up" onTint onPress={() => show('plan')} />
+              <View style={styles.summaryAction}>
+                <ThemedText
+                  style={[
+                    styles.summaryValue,
+                    styles.flex,
+                    {
+                      color:
+                        myBalance > 0
+                          ? theme.balancePositive
+                          : myBalance < 0
+                            ? theme.balanceNegative
+                            : theme.onBalance,
+                    },
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}>
+                  {formatPaise(Math.abs(myBalance))}
+                </ThemedText>
+                {/* The way to act, beside the amount it settles. Only when the
+                    plan actually asks you to pay: pairwise nets SUM to your
+                    balance, so you can owe one person and still have nothing to
+                    pay, and then this would open a plan with nothing of yours. */}
+                {view !== 'plan' && iPayInPlan ? (
+                  <PillButton title="Settle up" onTint onPress={() => show('plan')} />
+                ) : null}
+              </View>
+              {/* Only with lists to sum: when they are withheld for drift, two
+                  zeros here would contradict the figure above. */}
+              {pairs.rows.length > 0 ? (
+                <View style={[styles.summarySplit, { borderTopColor: theme.balanceRule }]}>
+                  <View style={styles.flex}>
+                    <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>You owe</ThemedText>
+                    <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
+                      {formatPaise(iOweTotal)}
+                    </ThemedText>
+                  </View>
+                  <View style={[styles.summaryDivider, { backgroundColor: theme.balanceRule }]} />
+                  <View style={[styles.flex, styles.summaryRight]}>
+                    <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>
+                      Owed to you
+                    </ThemedText>
+                    <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
+                      {formatPaise(owedTotal)}
+                    </ThemedText>
+                  </View>
+                </View>
               ) : null}
             </View>
-            {/* Only with lists to sum: when they are withheld for drift, two
-                zeros here would contradict the figure above. */}
-            {pairs.rows.length > 0 ? (
-              <View style={[styles.summarySplit, { borderTopColor: theme.balanceRule }]}>
-                <View style={styles.flex}>
-                  <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>You owe</ThemedText>
-                  <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
-                    {formatPaise(iOweTotal)}
-                  </ThemedText>
-                </View>
-                <View style={[styles.summaryDivider, { backgroundColor: theme.balanceRule }]} />
-                <View style={[styles.flex, styles.summaryRight]}>
-                  <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>
-                    Owed to you
-                  </ThemedText>
-                  <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
-                    {formatPaise(owedTotal)}
-                  </ThemedText>
-                </View>
-              </View>
-            ) : null}
-          </View>
+          </Appear>
         ) : null}
 
         {/* Money somebody says they sent you. Above the plan, because it is the
@@ -443,7 +445,7 @@ export default function SettleScreen() {
             You are asked because you are the one who was paid — you can see it
             arrive; nobody else can. */}
         {toConfirm.length > 0 ? (
-          <View style={styles.section}>
+          <Appear index={1} style={styles.section}>
             <SectionTitle title={`Did you get this? (${toConfirm.length})`} />
 
             {toConfirm.map((q) => (
@@ -482,14 +484,14 @@ export default function SettleScreen() {
                 </View>
               </Card>
             ))}
-          </View>
+          </Appear>
         ) : null}
 
         {/* Payments waiting on somebody else. Shown so a payer can see their
             entry did register, and so the owner can unstick one whose payee is
             a placeholder with no account to confirm from. */}
         {watching.length > 0 ? (
-          <View style={styles.section}>
+          <Appear index={2} style={styles.section}>
             <SectionTitle title={`Waiting to be confirmed (${watching.length})`} />
 
             {watching.map((q) => (
@@ -531,17 +533,19 @@ export default function SettleScreen() {
                 ) : null}
               </Card>
             ))}
-          </View>
+          </Appear>
         ) : null}
 
         {pairs.drift ? (
-          <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-            <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-              The itemised lists do not add up to your balance ({pairs.drift}). The plan below is
-              still correct — please report this.
-            </ThemedText>
-          </View>
+          <Appear index={3}>
+            <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
+              <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
+              <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
+                The itemised lists do not add up to your balance ({pairs.drift}). The plan below is
+                still correct — please report this.
+              </ThemedText>
+            </View>
+          </Appear>
         ) : null}
 
         {/* "All square" told people their household was settled while the
@@ -550,88 +554,96 @@ export default function SettleScreen() {
             to arrive. */}
         {queryState(balances, 'the balances', 'Working out who owes what…') ??
           (visible.length === 0 ? (
-          <Card style={styles.empty}>
-            <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
-              <Ionicons name="checkmark-done" size={22} color={theme.primary} />
-            </View>
-            <ThemedText style={Type.title}>All square</ThemedText>
-            <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-              Nobody owes anybody anything.
-            </ThemedText>
-          </Card>
+          <Appear index={4}>
+            <Card style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
+                <Ionicons name="checkmark-done" size={22} color={theme.primary} />
+              </View>
+              <ThemedText style={Type.title}>All square</ThemedText>
+              <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
+                Nobody owes anybody anything.
+              </ThemedText>
+            </Card>
+          </Appear>
         ) : (
           <>
             {/* Two views, not a stack: your balances person by person, or the
                 household's plan. They are different arithmetic on the same
                 money, and side by side their amounts looked contradictory. */}
-            <Segmented
-              options={[
-                { value: 'balances', label: 'Balances' },
-                { value: 'plan', label: 'Best plan' },
-              ]}
-              value={view}
-              onChange={show}
-            />
+            <Appear index={4}>
+              <Segmented
+                options={[
+                  { value: 'balances', label: 'Balances' },
+                  { value: 'plan', label: 'Best plan' },
+                ]}
+                value={view}
+                onChange={show}
+              />
+            </Appear>
 
-            {view === 'balances' ? (
-              pairs.rows.length > 0 ? (
-                <>
-                  {/* "Since" once, under whichever heading comes first. */}
-                  {renderPairs('Owed to you', owedToMe, true)}
-                  {renderPairs('You owe', iOwe, owedToMe.length === 0)}
-                </>
-              ) : (
-                <EmptyView icon="thumbs-up-outline" text="You're square with everyone." />
-              )
-            ) : null}
+            <Appear index={5} style={styles.views}>
+              {view === 'balances' ? (
+                pairs.rows.length > 0 ? (
+                  <>
+                    {/* "Since" once, under whichever heading comes first. */}
+                    {renderPairs('Owed to you', owedToMe, true)}
+                    {renderPairs('You owe', iOwe, owedToMe.length === 0)}
+                  </>
+                ) : (
+                  <EmptyView icon="thumbs-up-outline" text="You're square with everyone." />
+                )
+              ) : null}
 
-            {view === 'plan' ? (
-              <View style={styles.section}>
-                {/* The heading and a ? -- the explanation is a popup, not a
-                    paragraph on the screen that most people read once and then
-                    scroll past for good. */}
-                <View style={styles.titleRow}>
-                  <ThemedText style={styles.sectionTitle}>
-                    {`Square up in ${visible.length} payment${visible.length === 1 ? '' : 's'}`}
-                  </ThemedText>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="How the plan works"
-                    hitSlop={10}
-                    onPress={() =>
-                      void dialog.alert({
-                        tone: 'info',
-                        icon: 'help-circle-outline',
-                        title: 'Fewest payments',
-                        message:
-                          'Fewer transfers than everyone paying everyone, with the same totals. ' +
-                          'Amounts here will not match Balances, because a payment can ' +
-                          'be routed through somebody else.',
-                        buttonLabel: 'Got it',
-                      })
-                    }
-                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-                    <Ionicons name="help-circle-outline" size={20} color={theme.textTertiary} />
-                  </Pressable>
+              {view === 'plan' ? (
+                <View style={styles.section}>
+                  {/* The heading and a ? -- the explanation is a popup, not a
+                      paragraph on the screen that most people read once and then
+                      scroll past for good. */}
+                  <View style={styles.titleRow}>
+                    <ThemedText style={styles.sectionTitle}>
+                      {`Square up in ${visible.length} payment${visible.length === 1 ? '' : 's'}`}
+                    </ThemedText>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="How the plan works"
+                      hitSlop={10}
+                      onPress={() =>
+                        void dialog.alert({
+                          tone: 'info',
+                          icon: 'help-circle-outline',
+                          title: 'Fewest payments',
+                          message:
+                            'Fewer transfers than everyone paying everyone, with the same totals. ' +
+                            'Amounts here will not match Balances, because a payment can ' +
+                            'be routed through somebody else.',
+                          buttonLabel: 'Got it',
+                        })
+                      }
+                      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                      <Ionicons name="help-circle-outline" size={20} color={theme.textTertiary} />
+                    </Pressable>
+                  </View>
+                  {renderSection(visible)}
                 </View>
-                {renderSection(visible)}
-              </View>
-            ) : null}
+              ) : null}
+            </Appear>
           </>
           ))}
 
         {(error ?? ledgerError) ? (
-          <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-            <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
-            <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
-              {error ?? ledgerError}
-            </ThemedText>
-          </View>
+          <Appear index={6}>
+            <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
+              <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
+              <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
+                {error ?? ledgerError}
+              </ThemedText>
+            </View>
+          </Appear>
         ) : null}
 
         {/* Links to other screens, grouped like a settings list: grey icons
             and chevrons, so nothing here competes with the money above. */}
-        <View style={styles.section}>
+        <Appear index={7} style={styles.section}>
           <SectionTitle title="More" />
 
           <Card padded={false}>
@@ -672,7 +684,7 @@ export default function SettleScreen() {
               );
             })()}
           </Card>
-        </View>
+        </Appear>
       </ScrollView>
 
       <Sheet visible={payFor != null} title="Pay with" onClose={() => setPayFor(null)}>
@@ -1407,6 +1419,9 @@ function EmptyView({
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
+  // Both tabs' content in one entrance, so switching tab does not replay it;
+  // the same gap as content, so the lists sit exactly where they did.
+  views: { gap: Spacing.three },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
   semi: { fontWeight: '600' },

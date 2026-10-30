@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDialog, type Tone } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -310,7 +311,7 @@ export default function ExpenseDetailScreen() {
               {/* The expense itself, on the page rather than in a card: it is
                   the whole point of the screen, and a box around it only
                   added an edge. */}
-              <View style={styles.hero}>
+              <Appear index={0} style={styles.hero}>
                 <View style={[styles.heroTile, { backgroundColor: theme.backgroundSelected }]}>
                   <ThemedText allowFontScaling={false} style={styles.heroGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
                 </View>
@@ -325,9 +326,10 @@ export default function ExpenseDetailScreen() {
                 <ThemedText themeColor="textTertiary" style={Type.caption}>
                   {e.categoryName} · {formatRange(e.expenseDate, e.expenseDate)}
                 </ThemedText>
-              </View>
+              </Appear>
 
               {e.approvalStatus === 'rejected' ? (
+                <Appear index={1}>
                 <Note
                   tone="danger"
                   icon="close-circle-outline"
@@ -345,7 +347,9 @@ export default function ExpenseDetailScreen() {
                     )
                   }
                 />
+                </Appear>
               ) : e.voidedAt ? (
+                <Appear index={1}>
                 <Note
                   tone="danger"
                   icon="trash-outline"
@@ -359,9 +363,11 @@ export default function ExpenseDetailScreen() {
                     )
                   }
                 />
+                </Appear>
               ) : null}
 
               {e.approvalStatus === 'pending' && !e.voidedAt ? (
+                <Appear index={2}>
                 <Note
                   tone="warning"
                   icon="time-outline"
@@ -377,12 +383,13 @@ export default function ExpenseDetailScreen() {
                     )
                   }
                 />
+                </Appear>
               ) : null}
 
               {/* The approver's place to answer, right under the notice that
                   asks: Home's "Needs you" card leads here too. */}
               {e.canReview ? (
-                <View style={styles.reviewActions}>
+                <Appear index={3} style={styles.reviewActions}>
                   <Button
                     title="Approve"
                     onPress={() => review.mutate({ approve: true, note: null })}
@@ -397,10 +404,11 @@ export default function ExpenseDetailScreen() {
                     disabled={review.isPending}
                     style={styles.flex}
                   />
-                </View>
+                </Appear>
               ) : null}
 
               {locked ? (
+                <Appear index={4}>
                 <Note
                   tone="neutral"
                   icon="lock-closed-outline"
@@ -414,9 +422,11 @@ export default function ExpenseDetailScreen() {
                     )
                   }
                 />
+                </Appear>
               ) : null}
 
               {pendingOnThis ? (
+                <Appear index={5}>
                 <Note
                   tone="warning"
                   icon="time-outline"
@@ -432,9 +442,10 @@ export default function ExpenseDetailScreen() {
                     )
                   }
                 />
+                </Appear>
               ) : null}
 
-              <View style={styles.section}>
+              <Appear index={6} style={styles.section}>
                 <ThemedText style={styles.sectionTitle}>Split between {e.splits.length}</ThemedText>
                 <Card padded={false}>
                   {e.splits.map((s, i) => (
@@ -476,8 +487,9 @@ export default function ExpenseDetailScreen() {
                     Paid by {e.paidByName}
                   </ThemedText>
                 ) : null}
-              </View>
+              </Appear>
 
+              <Appear index={7}>
               <Card padded={false}>
                 <View
                   accessible
@@ -508,20 +520,29 @@ export default function ExpenseDetailScreen() {
                   </View>
                 ) : null}
               </Card>
+              </Appear>
 
-              <ExpensePhotos expenseId={id} canAdd={!e.voidedAt} />
+              <Appear index={8}>
+                <ExpensePhotos expenseId={id} canAdd={!e.voidedAt} />
+              </Appear>
 
-              {error ? <Note tone="danger" icon="alert-circle-outline" text={error} /> : null}
+              {error ? (
+                <Appear index={9}>
+                  <Note tone="danger" icon="alert-circle-outline" text={error} />
+                </Appear>
+              ) : null}
 
               {/* Restoring a rejected expense sends it back for approval
                   rather than straight into the balances (0039). */}
               {e.voidedAt && canEditNow && !locked ? (
+                <Appear index={10}>
                 <Button
                   title={e.approvalStatus === 'rejected' ? 'Send for approval again' : 'Restore this expense'}
                   variant="secondary"
                   loading={restore.isPending}
                   onPress={() => restore.mutate()}
                 />
+                </Appear>
               ) : null}
             </>
           )}

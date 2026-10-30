@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
+import { Appear } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
@@ -44,6 +46,9 @@ const LOOK: Record<
   deleted: { icon: 'trash-outline', verb: 'deleted', tone: 'danger' },
   restored: { icon: 'refresh-outline', verb: 'restored', tone: 'info' },
 };
+
+const ENTRANCE_STEPS = 10;
+const SETTLE_MS = 800;
 
 function relative(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -89,6 +94,15 @@ export default function EditHistoryScreen() {
     danger: { soft: theme.dangerSoft, ink: theme.danger },
   };
 
+  // As on History: only the first screenful rises in; after SETTLE_MS days mount still.
+  const hasData = !!log.data;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!hasData) return;
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [hasData]);
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Edit history" />
@@ -112,20 +126,22 @@ export default function EditHistoryScreen() {
         }
         ListEmptyComponent={
           queryState(log, 'the change history') ?? (
-            <Card style={styles.empty}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
-                <Ionicons name="document-text-outline" size={22} color={theme.textTertiary} />
-              </View>
-              <ThemedText style={Type.title}>Nothing changed yet</ThemedText>
-              <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-                Expenses, payments, housemates, categories and recurring bills all show up here
-                when they change.
-              </ThemedText>
-            </Card>
+            <Appear>
+              <Card style={styles.empty}>
+                <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
+                  <Ionicons name="document-text-outline" size={22} color={theme.textTertiary} />
+                </View>
+                <ThemedText style={Type.title}>Nothing changed yet</ThemedText>
+                <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
+                  Expenses, payments, housemates, categories and recurring bills all show up here
+                  when they change.
+                </ThemedText>
+              </Card>
+            </Appear>
           )
         }
-        renderItem={({ item: group }) => (
-          <View style={styles.day}>
+        renderItem={({ item: group, index }) => (
+          <Appear index={index} still={settled || index > ENTRANCE_STEPS} style={styles.day}>
             <ThemedText style={styles.dayTitle}>{dayLabel(group.day)}</ThemedText>
             <Card padded={false}>
               {group.entries.map((e, i) => {
@@ -207,16 +223,19 @@ export default function EditHistoryScreen() {
                 );
               })}
             </Card>
-          </View>
+          </Appear>
         )}
         ListFooterComponent={
           entries.length > 0 ? (
-            <View style={styles.footer}>
+            <Appear
+              index={Math.min(days.length, ENTRANCE_STEPS + 1)}
+              still={settled || days.length > ENTRANCE_STEPS}
+              style={styles.footer}>
               <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
               <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
                 Written by the database. Nobody can change this list
               </ThemedText>
-            </View>
+            </Appear>
           ) : null
         }
       />

@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useMembers } from '@/lib/queries';
@@ -148,39 +149,41 @@ Running ${buildLabel()}.`;
             line of sight and costs a third of the height. */}
         {/* The identity block opens Your details. A separate row would be a
             second thing to find for the same job. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Your details"
-          onPress={() => router.push('/account-edit')}>
-          {/* Pressed is a tint, not a fade: opacity on an elevated card fades
-              the Android shadow and the contents separately, leaving a pale
-              band across a grey card. */}
-          {({ pressed }) => (
-            <Card
-              padded={false}
-              style={[styles.profile, pressed && { backgroundColor: theme.backgroundSelected }]}>
-              <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={48} />
+        <Appear index={0}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Your details"
+            onPress={() => router.push('/account-edit')}>
+            {/* Pressed is a tint, not a fade: opacity on an elevated card fades
+                the Android shadow and the contents separately, leaving a pale
+                band across a grey card. */}
+            {({ pressed }) => (
+              <Card
+                padded={false}
+                style={[styles.profile, pressed && { backgroundColor: theme.backgroundSelected }]}>
+                <Avatar name={member?.display_name ?? '?'} seed={member?.id} size={48} />
 
-              {/* The role sits beside the email as plain words, not a coloured
-                  pill: green on this screen is kept for things that are on. */}
-              <View style={styles.identity}>
-                <ThemedText style={styles.name} numberOfLines={1}>
-                  {member?.display_name}
-                </ThemedText>
-                <ThemedText themeColor="textTertiary" style={Type.caption} numberOfLines={1}>
-                  {isOwner ? 'Owner' : 'Member'} · {session?.user.email}
-                </ThemedText>
-              </View>
+                {/* The role sits beside the email as plain words, not a coloured
+                    pill: green on this screen is kept for things that are on. */}
+                <View style={styles.identity}>
+                  <ThemedText style={styles.name} numberOfLines={1}>
+                    {member?.display_name}
+                  </ThemedText>
+                  <ThemedText themeColor="textTertiary" style={Type.caption} numberOfLines={1}>
+                    {isOwner ? 'Owner' : 'Member'} · {session?.user.email}
+                  </ThemedText>
+                </View>
 
-              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-            </Card>
-          )}
-        </Pressable>
+                <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+              </Card>
+            )}
+          </Pressable>
+        </Appear>
 
         {/* Account is who you are, not a second navigation menu. Owner tools,
             Household, Recurring, Away and Settle all live in More; listing
             them here as well made three ways to reach one screen. */}
-        <Group title="Household">
+        <Group title="Household" index={1}>
           <Row
             icon="home-outline"
             label={household.data?.name ?? '…'}
@@ -192,7 +195,7 @@ Running ${buildLabel()}.`;
         {/* Its own group: the free tier has no point-in-time recovery, so this
             file is the only thing standing between a mistake and a lost
             ledger. */}
-        <Group title="Your data">
+        <Group title="Your data" index={2}>
           <Row
             icon="download-outline"
             label={exporting ? 'Preparing…' : 'Export a backup'}
@@ -201,7 +204,7 @@ Running ${buildLabel()}.`;
           />
         </Group>
 
-        <Group title="App">
+        <Group title="App" index={3}>
           {/* Registration is silent by design, so this is the only place that
               distinguishes "push is off" from "push is quietly broken". The
               explanation is a tap away rather than a line under every row. */}
@@ -238,9 +241,11 @@ Running ${buildLabel()}.`;
         {/* A row like the rest, in red because it is the one thing here that
             ends something; alone in its group so it is never tapped by
             accident on the way to another row. */}
-        <Card padded={false}>
-          <Row icon="log-out-outline" label="Sign out" tone="danger" onPress={confirmSignOut} />
-        </Card>
+        <Appear index={4}>
+          <Card padded={false}>
+            <Row icon="log-out-outline" label="Sign out" tone="danger" onPress={confirmSignOut} />
+          </Card>
+        </Appear>
       </ScrollView>
     </SafeAreaView>
   );
@@ -251,16 +256,25 @@ Running ${buildLabel()}.`;
  * spaced capitals these were (Type.label) read as quiet as the values and
  * clipped their last letter on Android.
  */
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+function Group({
+  title,
+  index,
+  children,
+}: {
+  title: string;
+  /** Its place in the screen's entrance order. */
+  index: number;
+  children: React.ReactNode;
+}) {
   const rows = Children.toArray(children).filter(isValidElement<RowPosition>);
 
   return (
-    <View style={styles.group}>
+    <Appear index={index} style={styles.group}>
       <ThemedText style={styles.groupTitle}>{title}</ThemedText>
       <Card padded={false}>
         {rows.map((row, i) => cloneElement(row, { first: i === 0, last: i === rows.length - 1 }))}
       </Card>
-    </View>
+    </Appear>
   );
 }
 

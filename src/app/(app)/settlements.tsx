@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -19,6 +20,9 @@ import { formatPaise } from '@/lib/money';
 import { usePairwiseLedger, useSettlements, type Settlement } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+
+const ENTRANCE_STEPS = 10;
+const SETTLE_MS = 800;
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -111,6 +115,25 @@ export default function SettlementsScreen() {
       };
     });
 
+  // As on History: only the first screenful rises in; after SETTLE_MS rows mount still.
+  const order = new Map<string, number>();
+  let step = 2;
+  for (const s of sections) {
+    order.set(`m${s.title}`, step++);
+    for (const item of s.data) order.set(item.id, step++);
+  }
+  const hasData = !!settlements.data;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!hasData) return;
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [hasData]);
+  const entrance = (key: string) => {
+    const index = order.get(key) ?? 0;
+    return { index, still: settled || index > ENTRANCE_STEPS };
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScreenHeader title="Payments" />
@@ -127,7 +150,7 @@ export default function SettlementsScreen() {
           <>
             {/* On the page, not in a card -- as on Expense details. */}
             {live.length > 0 ? (
-              <View style={styles.hero}>
+              <Appear index={0} still={settled} style={styles.hero}>
                 <ThemedText themeColor="textSecondary" style={Type.caption}>
                   Settled so far
                 </ThemedText>
@@ -141,34 +164,40 @@ export default function SettlementsScreen() {
                 <ThemedText themeColor="textTertiary" style={Type.caption}>
                   {live.length} payment{live.length === 1 ? '' : 's'}
                 </ThemedText>
-              </View>
+              </Appear>
             ) : null}
 
-            {error ? <Notice tone="danger" message={error} /> : null}
+            {error ? (
+              <Appear index={1}>
+                <Notice tone="danger" message={error} />
+              </Appear>
+            ) : null}
           </>
         }
         ListEmptyComponent={
           queryState(settlements, 'the payment history') ?? (
-            <Card style={styles.empty}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
-                <Ionicons name="swap-horizontal" size={22} color={theme.textTertiary} />
-              </View>
-              <ThemedText style={Type.headline}>No payments yet</ThemedText>
-              <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
-                When someone marks a payment on Settle up, it appears here so nobody has to
-                remember whether it happened.
-              </ThemedText>
-            </Card>
+            <Appear>
+              <Card style={styles.empty}>
+                <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
+                  <Ionicons name="swap-horizontal" size={22} color={theme.textTertiary} />
+                </View>
+                <ThemedText style={Type.headline}>No payments yet</ThemedText>
+                <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
+                  When someone marks a payment on Settle up, it appears here so nobody has to
+                  remember whether it happened.
+                </ThemedText>
+              </Card>
+            </Appear>
           )
         }
         renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
+          <Appear {...entrance(`m${section.title}`)} style={styles.sectionHeader}>
             {/* Sentence case at heading size, as on History. */}
             <ThemedText style={styles.sectionTitle}>{section.title}</ThemedText>
             <ThemedText themeColor="textTertiary" style={Type.caption}>
               {formatPaise(section.total)}
             </ThemedText>
-          </View>
+          </Appear>
         )}
         renderItem={({ item, index, section }) => {
           const voided = !!item.voidedAt;
@@ -183,80 +212,82 @@ export default function SettlementsScreen() {
           const undoable = isOwner && !voided;
 
           return (
-            <Pressable
-              disabled={!undoable}
-              onPress={() => confirmUndo(item)}
-              accessibilityRole={undoable ? 'button' : 'text'}
-              accessibilityHint={undoable ? 'Opens undo' : undefined}
-              accessibilityLabel={
-                `${item.fromName} paid ${item.toName}, ${formatPaise(item.amountPaise)}, ${day}` +
-                (voided ? ', undone, no longer counted' : `, recorded by ${item.recordedByName}`) +
-                (routed && !voided
-                  ? `. ${formatPaise(routed.directPaise)} settled up, ${formatPaise(routed.routedPaise)} routed onward`
-                  : '')
-              }
-              style={({ pressed }) => [
-                styles.row,
-                {
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                  opacity: pressed ? 0.7 : 1,
-                },
-                index === 0 && styles.first,
-                last && styles.last,
-                !last && { borderBottomWidth: 0 },
-              ]}>
-              {/* Payer over payee, overlapping: who to whom at a glance. */}
-              <View style={[styles.pair, voided && styles.faded]}>
-                <Avatar name={item.fromName} seed={item.fromMember} size={30} ring ringColor={theme.backgroundElement} />
-                <Avatar
-                  name={item.toName}
-                  seed={item.toMember}
-                  size={30}
-                  ring
-                  ringColor={theme.backgroundElement}
-                  style={styles.overlap}
-                />
-              </View>
-
-              <View style={styles.flex}>
-                <ThemedText
-                  themeColor={voided ? 'textTertiary' : 'text'}
-                  style={Type.body}
-                  numberOfLines={1}>
-                  {item.fromName} → {item.toName}
-                </ThemedText>
-                <View style={styles.subRow}>
-                  <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
-                    {/* The date alone beside a tag: there is room for one or
-                        the other, and the tag is the one that explains the
-                        amount. */}
-                    {voided || (routed && !voided) ? day : `${day} · by ${item.recordedByName}`}
-                  </ThemedText>
-                  {voided ? (
-                    <View style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText themeColor="textSecondary" style={styles.tagText}>
-                        Undone
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                  {/* The figure on the right is what left somebody's bank, and
-                      on a plan payment that is not the same as what it
-                      settled between these two. Yellow, as on Person details. */}
-                  {routed && !voided ? (
-                    <View style={[styles.tag, { backgroundColor: theme.warningSoft }]}>
-                      <ThemedText style={[styles.tagText, { color: theme.warning }]}>
-                        {formatPaise(routed.routedPaise)} onward
-                      </ThemedText>
-                    </View>
-                  ) : null}
+            <Appear {...entrance(item.id)}>
+              <Pressable
+                disabled={!undoable}
+                onPress={() => confirmUndo(item)}
+                accessibilityRole={undoable ? 'button' : 'text'}
+                accessibilityHint={undoable ? 'Opens undo' : undefined}
+                accessibilityLabel={
+                  `${item.fromName} paid ${item.toName}, ${formatPaise(item.amountPaise)}, ${day}` +
+                  (voided ? ', undone, no longer counted' : `, recorded by ${item.recordedByName}`) +
+                  (routed && !voided
+                    ? `. ${formatPaise(routed.directPaise)} settled up, ${formatPaise(routed.routedPaise)} routed onward`
+                    : '')
+                }
+                style={({ pressed }) => [
+                  styles.row,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                  index === 0 && styles.first,
+                  last && styles.last,
+                  !last && { borderBottomWidth: 0 },
+                ]}>
+                {/* Payer over payee, overlapping: who to whom at a glance. */}
+                <View style={[styles.pair, voided && styles.faded]}>
+                  <Avatar name={item.fromName} seed={item.fromMember} size={30} ring ringColor={theme.backgroundElement} />
+                  <Avatar
+                    name={item.toName}
+                    seed={item.toMember}
+                    size={30}
+                    ring
+                    ringColor={theme.backgroundElement}
+                    style={styles.overlap}
+                  />
                 </View>
-              </View>
 
-              <ThemedText themeColor={voided ? 'textTertiary' : 'text'} style={Type.amount}>
-                {formatPaise(item.amountPaise)}
-              </ThemedText>
-            </Pressable>
+                <View style={styles.flex}>
+                  <ThemedText
+                    themeColor={voided ? 'textTertiary' : 'text'}
+                    style={Type.body}
+                    numberOfLines={1}>
+                    {item.fromName} → {item.toName}
+                  </ThemedText>
+                  <View style={styles.subRow}>
+                    <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
+                      {/* The date alone beside a tag: there is room for one or
+                          the other, and the tag is the one that explains the
+                          amount. */}
+                      {voided || (routed && !voided) ? day : `${day} · by ${item.recordedByName}`}
+                    </ThemedText>
+                    {voided ? (
+                      <View style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
+                        <ThemedText themeColor="textSecondary" style={styles.tagText}>
+                          Undone
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                    {/* The figure on the right is what left somebody's bank, and
+                        on a plan payment that is not the same as what it
+                        settled between these two. Yellow, as on Person details. */}
+                    {routed && !voided ? (
+                      <View style={[styles.tag, { backgroundColor: theme.warningSoft }]}>
+                        <ThemedText style={[styles.tagText, { color: theme.warning }]}>
+                          {formatPaise(routed.routedPaise)} onward
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+
+                <ThemedText themeColor={voided ? 'textTertiary' : 'text'} style={Type.amount}>
+                  {formatPaise(item.amountPaise)}
+                </ThemedText>
+              </Pressable>
+            </Appear>
           );
         }}
       />

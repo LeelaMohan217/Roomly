@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
-import { Reveal } from '@/components/ui/motion';
+import { Appear, Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -79,24 +79,24 @@ export default function CategoriesScreen() {
         {/* Members may add; changing one in use is the owner's, because the
             kind decides how its expenses split. */}
         {!isOwner ? (
-          <View style={styles.aside}>
+          <Appear index={0} style={styles.aside}>
             <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
             <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
               Only the owner can change one in use
             </ThemedText>
-          </View>
+          </Appear>
         ) : null}
 
         {/* A blank page used to stand in for the list while it loaded, and
             for good if it could not. */}
         {queryState(categories, 'the categories')}
 
-        {GROUPS.map((g) => {
+        {GROUPS.map((g, gi) => {
           const rows = live.filter((c) => c.kind === g.kind);
           if (rows.length === 0) return null;
 
           return (
-            <View key={g.kind} style={styles.section}>
+            <Appear key={g.kind} index={gi + 1} style={styles.section}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${g.title}, how it splits`}
@@ -121,52 +121,54 @@ export default function CategoriesScreen() {
                   />
                 ))}
               </Card>
-            </View>
+            </Appear>
           );
         })}
 
         {/* One row that opens, rather than a whole section with its own
             heading and paragraph. */}
         {archived.length > 0 ? (
-          <Card padded={false}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showArchived }}
-              accessibilityHint="Hidden when adding an expense; old expenses still show them"
-              onPress={() => setShowArchived((v) => !v)}
-              style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
-              <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                <Ionicons name="archive-outline" size={17} color={theme.text} />
-              </View>
-              <ThemedText style={[Type.body, styles.flex]}>Archived</ThemedText>
-              <ThemedText themeColor="textSecondary" style={Type.body}>
-                {archived.length}
-              </ThemedText>
-              <Ionicons
-                name={showArchived ? 'chevron-up' : 'chevron-down'}
-                size={15}
-                color={theme.textTertiary}
-              />
-            </Pressable>
-            {/* Fades open as a block rather than row by row. */}
-            {showArchived ? (
-              <Reveal>
-                {archived.map((c) => (
-                  <Row
-                    key={c.id}
-                    category={c}
-                    first={false}
-                    dim
-                    onPress={
-                      isOwner
-                        ? () => router.push({ pathname: '/category-edit', params: { id: c.id } })
-                        : undefined
-                    }
-                  />
-                ))}
-              </Reveal>
-            ) : null}
-          </Card>
+          <Appear index={GROUPS.length + 1}>
+            <Card padded={false}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showArchived }}
+                accessibilityHint="Hidden when adding an expense; old expenses still show them"
+                onPress={() => setShowArchived((v) => !v)}
+                style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
+                <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                  <Ionicons name="archive-outline" size={17} color={theme.text} />
+                </View>
+                <ThemedText style={[Type.body, styles.flex]}>Archived</ThemedText>
+                <ThemedText themeColor="textSecondary" style={Type.body}>
+                  {archived.length}
+                </ThemedText>
+                <Ionicons
+                  name={showArchived ? 'chevron-up' : 'chevron-down'}
+                  size={15}
+                  color={theme.textTertiary}
+                />
+              </Pressable>
+              {/* Fades open as a block rather than row by row. */}
+              {showArchived ? (
+                <Reveal>
+                  {archived.map((c) => (
+                    <Row
+                      key={c.id}
+                      category={c}
+                      first={false}
+                      dim
+                      onPress={
+                        isOwner
+                          ? () => router.push({ pathname: '/category-edit', params: { id: c.id } })
+                          : undefined
+                      }
+                    />
+                  ))}
+                </Reveal>
+              ) : null}
+            </Card>
+          </Appear>
         ) : null}
       </ScrollView>
     </SafeAreaView>

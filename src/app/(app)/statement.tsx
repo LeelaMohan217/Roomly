@@ -10,6 +10,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
+import { Appear } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet } from '@/components/ui/sheet';
@@ -213,7 +214,7 @@ export default function StatementScreen() {
       <ScreenHeader title="Statement" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
+        <Appear index={0} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Period</ThemedText>
           <Segmented
             options={[
@@ -279,9 +280,9 @@ export default function StatementScreen() {
               />
             </Card>
           )}
-        </View>
+        </Appear>
 
-        <View style={styles.section}>
+        <Appear index={1} style={styles.section}>
           <View style={styles.headRow}>
             <ThemedText style={[styles.sectionTitle, styles.flex]}>Whose expenses</ThemedText>
             {/* One tap to tick everyone, or to clear them all and pick one. */}
@@ -332,9 +333,9 @@ export default function StatementScreen() {
             })}
           </Card>
           )}
-        </View>
+        </Appear>
 
-        <View style={styles.section}>
+        <Appear index={2} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>File type</ThemedText>
           <Card padded={false}>
             <Option
@@ -357,7 +358,7 @@ export default function StatementScreen() {
               onPress={() => setFormat('csv')}
             />
           </Card>
-        </View>
+        </Appear>
       </ScrollView>
 
       {/* Pinned, so the button is where the thumb is however long the month

@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -132,7 +133,7 @@ export default function MonthStatementScreen() {
         ) : (
           <>
         {/* On the page, not in a card -- as on Expense details. */}
-        <View style={styles.hero}>
+        <Appear index={0} style={styles.hero}>
           <ThemedText themeColor="textSecondary" style={Type.caption}>
             Household spent
           </ThemedText>
@@ -142,9 +143,10 @@ export default function MonthStatementScreen() {
           <ThemedText themeColor="textTertiary" style={Type.caption}>
             {s?.expenseCount ?? 0} expense{s?.expenseCount === 1 ? '' : 's'}
           </ThemedText>
-        </View>
+        </Appear>
 
         {(s?.expenseCount ?? 0) === 0 ? (
+          <Appear index={1}>
           <Card style={styles.empty}>
             <Ionicons name="calendar-outline" size={22} color={theme.textTertiary} />
             <ThemedText style={Type.headline}>Nothing this month</ThemedText>
@@ -152,9 +154,10 @@ export default function MonthStatementScreen() {
               No expenses were recorded in {label}.
             </ThemedText>
           </Card>
+          </Appear>
         ) : (
           <>
-            <View style={styles.section}>
+            <Appear index={1} style={styles.section}>
               <View>
                 <ThemedText style={styles.sectionTitle}>Who paid what</ThemedText>
                 {/* This is the month in isolation, not the running balance —
@@ -216,9 +219,9 @@ export default function MonthStatementScreen() {
                   </View>
                 ))}
               </Card>
-            </View>
+            </Appear>
 
-            <View style={styles.section}>
+            <Appear index={2} style={styles.section}>
               <ThemedText style={styles.sectionTitle}>Where it went</ThemedText>
               <Card padded={false}>
                 {s?.byCategory.map((c, i) => (
@@ -242,13 +245,13 @@ export default function MonthStatementScreen() {
                   </View>
                 ))}
               </Card>
-            </View>
+            </Appear>
           </>
         )}
 
         {/* The same rows as Payment history, and the way there is the last
             row of the list rather than a separate button under it. */}
-        <View style={styles.section}>
+        <Appear index={3} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Payments</ThemedText>
           <Card padded={false}>
             {s && s.settlements.length > 0 ? (
@@ -296,17 +299,22 @@ export default function MonthStatementScreen() {
               <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
             </Pressable>
           </Card>
-        </View>
+        </Appear>
 
           </>
         )}
 
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Appear index={4}>
+            <Notice tone="danger" message={error} />
+          </Appear>
+        ) : null}
 
         {/* One pill for the owner. What closing or reopening does is said in
             the confirm popup, at the moment it matters, rather than in a
             paragraph above the button on every visit. */}
         {isOwner && period && (s?.status === 'open' || s?.status === 'closed') ? (
+          <Appear index={5}>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ busy: close.isPending || reopen.isPending }}
@@ -335,6 +343,7 @@ export default function MonthStatementScreen() {
               </>
             )}
           </Pressable>
+          </Appear>
         ) : null}
       </ScrollView>
     </SafeAreaView>

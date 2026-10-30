@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -19,6 +20,9 @@ import { formatPaise } from '@/lib/money';
 import { pairRouting, pairSummary, type PairLine } from '@/lib/pairwise';
 import { useMembers, usePairwiseLedger } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+
+const ENTRANCE_STEPS = 10;
+const SETTLE_MS = 800;
 
 /**
  * Everything between you and one other person.
@@ -101,6 +105,16 @@ export default function PairHistoryScreen() {
     });
   }
 
+  // As on History: only the first screenful of days rises in, and only until
+  // the list has settled; anything later appears in place.
+  const hasData = !!pair;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!hasData) return;
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [hasData]);
+
   const state = queryState(pairwise, 'this history', `Working out you and ${them}…`);
   const tone = owesMe ? theme.primary : theme.negative;
 
@@ -139,6 +153,7 @@ export default function PairHistoryScreen() {
         <View style={styles.content}>{state}</View>
       ) : !pair ? (
         <View style={styles.content}>
+          <Appear index={0}>
           <Card style={styles.empty}>
             <Ionicons name="checkmark-done" size={22} color={theme.primary} />
             <ThemedText style={Type.headline}>Nothing between you</ThemedText>
@@ -148,6 +163,7 @@ export default function PairHistoryScreen() {
                 : `You have not shared an expense with ${them} yet.`}
             </ThemedText>
           </Card>
+          </Appear>
         </View>
       ) : (
         <FlatList
@@ -156,7 +172,7 @@ export default function PairHistoryScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <View style={styles.header}>
+            <Appear index={0} style={styles.header}>
               {/* On the page, not in a card -- as on Expense details. */}
               <View style={styles.hero}>
                 <Avatar name={them} seed={pair.memberId} size={52} />
@@ -227,10 +243,10 @@ export default function PairHistoryScreen() {
               ) : null}
 
               {error ? <Notice tone="danger" message={error} /> : null}
-            </View>
+            </Appear>
           }
-          renderItem={({ item: group }) => (
-            <View style={styles.day}>
+          renderItem={({ item: group, index }) => (
+            <Appear index={index + 1} still={settled || index + 1 > ENTRANCE_STEPS} style={styles.day}>
               <ThemedText style={styles.dayTitle}>{dayLabel(group.day)}</ThemedText>
               <Card padded={false}>
                 {group.lines.map((l, i) => (
@@ -243,7 +259,7 @@ export default function PairHistoryScreen() {
                   />
                 ))}
               </Card>
-            </View>
+            </Appear>
           )}
         />
       )}

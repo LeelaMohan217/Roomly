@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Appear } from '@/components/ui/motion';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -115,7 +116,7 @@ export default function RecurringScreen() {
         keyboardShouldPersistTaps="handled">
         {/* On the page, not in a card -- as on Expense details. */}
         {monthlyTotal > 0 ? (
-          <View style={styles.hero}>
+          <Appear index={0} style={styles.hero}>
             <ThemedText themeColor="textSecondary" style={Type.caption}>
               Every month
             </ThemedText>
@@ -125,7 +126,7 @@ export default function RecurringScreen() {
             <ThemedText themeColor="textTertiary" style={Type.caption}>
               {rules.length} bill{rules.length === 1 ? '' : 's'}
             </ThemedText>
-          </View>
+          </Appear>
         ) : null}
 
         {/* Everything waiting on an amount, in one list: bills from earlier
@@ -133,7 +134,7 @@ export default function RecurringScreen() {
             month's. A missed bill says so with a yellow tag, and still posts
             on the day it fell due. */}
         {missed.length + needsConfirming.length > 0 ? (
-          <View style={styles.section}>
+          <Appear index={1} style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Needs an amount</ThemedText>
             <Card padded={false}>
               {missed.map((m, i) => {
@@ -171,12 +172,16 @@ export default function RecurringScreen() {
                 );
               })}
             </Card>
-          </View>
+          </Appear>
         ) : null}
 
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Appear index={2}>
+            <Notice tone="danger" message={error} />
+          </Appear>
+        ) : null}
 
-        <View style={styles.section}>
+        <Appear index={3} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Every month</ThemedText>
 
           {/* "Nothing recurring yet" is a claim about the data: it used to
@@ -215,7 +220,7 @@ export default function RecurringScreen() {
               ) : null}
             </Card>
           ))}
-        </View>
+        </Appear>
       </ScrollView>
     </SafeAreaView>
   );

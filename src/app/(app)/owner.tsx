@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
+import { Appear } from '@/components/ui/motion';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -127,23 +128,25 @@ export default function OwnerScreen() {
             navigate for exactly this reason.
             Yellow, one line: it is waiting on you, not an error. */}
         {pending > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityHint="Approvals are on Home"
-            onPress={() => router.navigate('/')}
-            style={({ pressed }) => [
-              styles.alert,
-              { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
-            ]}>
-            <Ionicons name="alert-circle-outline" size={16} color={theme.warning} />
-            <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
-              {pending} thing{pending === 1 ? '' : 's'} waiting on you
-            </ThemedText>
-            <Ionicons name="chevron-forward" size={14} color={theme.warning} />
-          </Pressable>
+          <Appear index={0}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityHint="Approvals are on Home"
+              onPress={() => router.navigate('/')}
+              style={({ pressed }) => [
+                styles.alert,
+                { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
+              ]}>
+              <Ionicons name="alert-circle-outline" size={16} color={theme.warning} />
+              <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
+                {pending} thing{pending === 1 ? '' : 's'} waiting on you
+              </ThemedText>
+              <Ionicons name="chevron-forward" size={14} color={theme.warning} />
+            </Pressable>
+          </Appear>
         ) : null}
 
-        <View style={styles.section}>
+        <Appear index={1} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Household</ThemedText>
           <Card padded={false}>
             <Row
@@ -158,9 +161,9 @@ export default function OwnerScreen() {
             <Row icon="repeat-outline" label="Bills" value={activeRecurring} href="/recurring" />
             <Row icon="airplane-outline" label="Away" href="/away" />
           </Card>
-        </View>
+        </Appear>
 
-        <View style={styles.section}>
+        <Appear index={2} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Money</ThemedText>
           <Card padded={false}>
             <Row
@@ -173,9 +176,9 @@ export default function OwnerScreen() {
             <Row icon="stats-chart-outline" label="Reports" href="/reports" />
             <Row icon="document-text-outline" label="Edit history" href="/edit-history" />
           </Card>
-        </View>
+        </Appear>
 
-        <View style={styles.section}>
+        <Appear index={3} style={styles.section}>
           <ThemedText style={styles.sectionTitle}>If you&apos;re away</ThemedText>
           <Card padded={false}>
             {/* Greyed, and saying why, when there is nobody to hand it to --
@@ -203,17 +206,17 @@ export default function OwnerScreen() {
               )}
             </Pressable>
           </Card>
-        </View>
+        </Appear>
 
         {/* Being explicit about what the owner cannot do matters as much as
             what they can — it's what keeps four friends trusting the ledger.
             One line now; the rest of it is true of every screen. */}
-        <View style={styles.trust}>
+        <Appear index={4} style={styles.trust}>
           <Ionicons name="shield-checkmark-outline" size={14} color={theme.textTertiary} />
           <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
             Every edit you make is visible to everyone
           </ThemedText>
-        </View>
+        </Appear>
       </ScrollView>
 
       {/* The explanation lives here, where the decision is made. */}
