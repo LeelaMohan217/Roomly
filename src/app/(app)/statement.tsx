@@ -10,6 +10,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
+import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -105,7 +106,11 @@ export default function StatementScreen() {
   const [payers, setPayers] = useState<string[] | null>(null);
   const everyone = (members.data ?? []).map((m) => m.id);
   const picked = payers ?? everyone;
-  const allPicked = everyone.length > 0 && everyone.every((id) => picked.includes(id));
+  // null is everyone whether or not the list has loaded. Deriving it from the
+  // list alone made "everyone" read as "nobody" until members arrived: the
+  // footer said "Pick at least one person" and Download was greyed.
+  const allPicked =
+    payers === null || (everyone.length > 0 && everyone.every((id) => picked.includes(id)));
 
   function togglePayer(id: string) {
     const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
@@ -140,14 +145,19 @@ export default function StatementScreen() {
 
   const needsDates = tab === 'range' && rangeKey === 'custom' && !custom.from;
   const canDownload =
-    !busy && !needsDates && !!member && picked.length > 0 && (format === 'csv' || pdfReady);
+    !busy &&
+    !needsDates &&
+    !!member &&
+    (allPicked || picked.length > 0) &&
+    (format === 'csv' || pdfReady);
 
   // In words, for the line above the button and the PDF's header.
   const nameOf = (id: string) =>
     id === member?.id ? 'you' : (members.data?.find((m) => m.id === id)?.displayName ?? '—');
+  const nobody = !allPicked && picked.length === 0;
   const whose = allPicked
     ? 'everyone'
-    : picked.length === 0
+    : nobody
       ? 'nobody'
       : `paid by ${picked.map(nameOf).join(', ')}`;
 
@@ -275,16 +285,19 @@ export default function StatementScreen() {
           <View style={styles.headRow}>
             <ThemedText style={[styles.sectionTitle, styles.flex]}>Whose expenses</ThemedText>
             {/* One tap to tick everyone, or to clear them all and pick one. */}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setPayers(allPicked ? [] : null)}
-              hitSlop={8}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-              <ThemedText style={[Type.caption, { color: theme.brandInk }]}>
-                {allPicked ? 'Clear all' : 'Select all'}
-              </ThemedText>
-            </Pressable>
+            {members.data ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPayers(allPicked ? [] : null)}
+                hitSlop={8}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                <ThemedText style={[Type.caption, { color: theme.brandInk }]}>
+                  {allPicked ? 'Clear all' : 'Select all'}
+                </ThemedText>
+              </Pressable>
+            ) : null}
           </View>
+          {queryState(members, 'the household') ?? (
           <Card padded={false}>
             {(members.data ?? []).map((m, i) => {
               const on = picked.includes(m.id);
@@ -318,6 +331,7 @@ export default function StatementScreen() {
               );
             })}
           </Card>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -350,7 +364,7 @@ export default function StatementScreen() {
           list grows. The line above it says exactly what will come out. */}
       <View style={[styles.footer, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
         <ThemedText themeColor="textTertiary" style={[Type.caption, styles.centered]} numberOfLines={1}>
-          {picked.length === 0
+          {nobody
             ? 'Pick at least one person'
             : `${period.label} · ${format === 'pdf' ? 'PDF' : 'CSV'} · ${whose}`}
         </ThemedText>

@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
 import { Notice } from '@/components/ui/notice';
+import { queryState } from '@/components/ui/query-state';
 import { Sheet } from '@/components/ui/sheet';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -134,11 +135,18 @@ export default function HouseholdScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScreenHeader title="Household" subtitle={`${list.length} people`} />
+      {/* No count until the list is read: "0 people" used to show first. */}
+      <ScreenHeader
+        title="Household"
+        subtitle={
+          members.data ? (list.length === 1 ? '1 person' : `${list.length} people`) : undefined
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* The list is the screen. Everything else is an action below it. */}
         <View style={styles.section}>
+          {queryState(members, 'the household') ?? (
           <Card padded={false}>
             {list.map((m, i) => {
               const joined = !!m.userId;
@@ -183,6 +191,7 @@ export default function HouseholdScreen() {
               );
             })}
           </Card>
+          )}
           {isOwner && list.length > 1 ? (
             <ThemedText themeColor="textTertiary" style={[Type.caption, styles.aside]}>
               Tap a housemate to remove them

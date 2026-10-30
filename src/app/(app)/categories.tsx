@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { Reveal } from '@/components/ui/motion';
+import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { iconFor } from '@/lib/icons';
@@ -85,6 +86,10 @@ export default function CategoriesScreen() {
             </ThemedText>
           </View>
         ) : null}
+
+        {/* A blank page used to stand in for the list while it loaded, and
+            for good if it could not. */}
+        {queryState(categories, 'the categories')}
 
         {GROUPS.map((g) => {
           const rows = live.filter((c) => c.kind === g.kind);

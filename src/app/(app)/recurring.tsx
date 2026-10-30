@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/ui/app-bar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
+import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -178,7 +179,11 @@ export default function RecurringScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Every month</ThemedText>
 
-          {rules.length > 0 ? (
+          {/* "Nothing recurring yet" is a claim about the data: it used to
+              show while the bills loaded, and for good when they could not,
+              telling a household with rent set up that it had none. */}
+          {queryState(recurring, 'your bills') ??
+          (rules.length > 0 ? (
             <Card padded={false}>
               {rules.map((r, i) => (
                 <RuleRow
@@ -209,7 +214,7 @@ export default function RecurringScreen() {
                 />
               ) : null}
             </Card>
-          )}
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>

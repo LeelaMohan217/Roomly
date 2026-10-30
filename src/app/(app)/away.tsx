@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { MonthCalendar } from '@/components/ui/month-calendar';
 import { Notice } from '@/components/ui/notice';
+import { queryState } from '@/components/ui/query-state';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -365,7 +366,10 @@ export default function AwayScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Trips</ThemedText>
 
-          {away.data && away.data.length > 0 ? (
+          {/* Loading is not "no trips": that used to show until the list
+              arrived, and for good if it never did. */}
+          {queryState(away, 'the trips') ??
+          (away.data && away.data.length > 0 ? (
             <Card padded={false}>
               {away.data.map((a, i) => {
                 const current = withinRange(today, a.startDate, a.endDate);
@@ -426,7 +430,7 @@ export default function AwayScreen() {
                 No trips marked yet.
               </ThemedText>
             </Card>
-          )}
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>

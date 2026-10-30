@@ -103,9 +103,15 @@ export default function OwnerScreen() {
     );
   }
 
+  // Each count is undefined until its list is read, and a row with no value
+  // shows just its chevron. They all read 0 first, which is a claim: a
+  // household with rent set up was shown "Bills 0".
+  const countOf = <T,>(list: T[] | undefined, keep: (item: T) => boolean = () => true) =>
+    list ? `${list.filter(keep).length}` : undefined;
+
   const pending = (requests.data?.length ?? 0) + (changes.data?.length ?? 0);
-  const activeRecurring = (recurring.data ?? []).filter((r) => r.isActive).length;
-  const liveCategories = (categories.data ?? []).filter((c) => !c.isArchived).length;
+  const activeRecurring = countOf(recurring.data, (r) => r.isActive);
+  const liveCategories = countOf(categories.data, (c) => !c.isArchived);
   const openMonths = (periods.data ?? []).filter((p) => p.status === 'open').length;
   const placeholders = (members.data ?? []).filter((m) => !m.userId).length;
 
@@ -143,13 +149,13 @@ export default function OwnerScreen() {
             <Row
               icon="people-outline"
               label="Roommates"
-              value={`${members.data?.length ?? 0}`}
+              value={countOf(members.data)}
               a11y={placeholders > 0 ? `${placeholders} still to claim their account` : undefined}
               href="/household"
               first
             />
-            <Row icon="pricetags-outline" label="Categories" value={`${liveCategories}`} href="/categories" />
-            <Row icon="repeat-outline" label="Bills" value={`${activeRecurring}`} href="/recurring" />
+            <Row icon="pricetags-outline" label="Categories" value={liveCategories} href="/categories" />
+            <Row icon="repeat-outline" label="Bills" value={activeRecurring} href="/recurring" />
             <Row icon="airplane-outline" label="Away" href="/away" />
           </Card>
         </View>
@@ -172,7 +178,9 @@ export default function OwnerScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>If you&apos;re away</ThemedText>
           <Card padded={false}>
-            {/* Greyed, and saying why, when there is nobody to hand it to. */}
+            {/* Greyed, and saying why, when there is nobody to hand it to --
+                but only once the members are read. Before that it is greyed
+                with no reason, rather than "No one yet" in a full house. */}
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ disabled: candidates.length === 0 }}
@@ -186,7 +194,7 @@ export default function OwnerScreen() {
                 <Ionicons name="key-outline" size={17} color={theme.text} />
               </View>
               <ThemedText style={[Type.body, styles.flex]}>Hand over ownership</ThemedText>
-              {candidates.length === 0 ? (
+              {!members.data ? null : candidates.length === 0 ? (
                 <ThemedText themeColor="textTertiary" style={Type.caption}>
                   No one yet
                 </ThemedText>
