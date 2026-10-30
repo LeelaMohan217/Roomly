@@ -157,6 +157,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (online && (cameBack || firstLook)) {
       void drain();
     }
+
+    // Back online: everything shown was read before the drop, and Realtime
+    // does not replay what housemates changed in between. drain() only
+    // refreshes when it had something to send, so an empty outbox used to
+    // leave Home on the old numbers until a pull.
+    if (cameBack) void queryClient.invalidateQueries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, pending.length]);
 

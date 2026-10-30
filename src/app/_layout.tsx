@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { QueryClient } from '@tanstack/react-query';
+import { focusManager, QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as Linking from 'expo-linking';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
@@ -19,6 +19,24 @@ import { SessionProvider, useSession } from '@/lib/session';
 import { SyncProvider } from '@/lib/sync';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Tell React Query when the app comes back to the foreground, so anything
+ * stale (older than staleTime) refetches.
+ *
+ * Its default focus signal is the browser's visibilitychange event, which
+ * React Native never fires -- so on a phone it never refetched on return.
+ * Android drops the Realtime socket in the background and nothing replays
+ * what housemates did meanwhile, and the tab screens stay mounted, so Home,
+ * History and Reports kept showing the numbers from before you left until a
+ * pull to refresh. The web build keeps the browser's own signal.
+ */
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((handleFocus) => {
+    const sub = AppState.addEventListener('change', (state) => handleFocus(state === 'active'));
+    return () => sub.remove();
+  });
+}
 
 const DAY = 1000 * 60 * 60 * 24;
 
