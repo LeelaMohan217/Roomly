@@ -1333,6 +1333,28 @@ check(
   'only the per-schema revoke exists, which cannot remove PUBLIC’s global grant'
 );
 
+// ---- an update says so ------------------------------------------------------
+// expo-updates applies a downloaded update only on the next cold start, and
+// silently, so housemates ran old versions for days without knowing.
+{
+  const prompt = read('src', 'components', 'update-prompt.tsx');
+  check(
+    'the update prompt is mounted for the whole tab shell',
+    /<UpdatePrompt \/>/.test(tabsLayout),
+    'nothing tells anyone a new version has downloaded'
+  );
+  check(
+    'the update prompt never lands on a form',
+    /TAB_PATHS/.test(prompt) && /!onTab/.test(prompt) && !/'\/add-expense'/.test(prompt),
+    'the restart popup can appear over a half-typed expense'
+  );
+  check(
+    'a phone left open for days still hears about updates',
+    /AppState\.addEventListener/.test(prompt) && /fetchUpdateAsync/.test(prompt),
+    'only a cold start ever checks, so a backgrounded app never prompts'
+  );
+}
+
 // ---- bill photos (migration 0040) ------------------------------------------
 {
   const att = read('src', 'lib', 'attachments.ts');

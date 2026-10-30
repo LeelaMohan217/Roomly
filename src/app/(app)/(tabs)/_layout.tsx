@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 
 import { PhoneNudge } from '@/components/phone-nudge';
+import { UpdatePrompt } from '@/components/update-prompt';
 import { SyncBanner } from '@/components/ui/sync-banner';
 import { Spacing, TabBar } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -279,6 +280,10 @@ export default function TabsLayout() {
       {/* Mounted once for the tab shell, like the banner: it asks accounts
           made before phone sign-in to add a number, wherever they land. */}
       <PhoneNudge />
+
+      {/* "Update ready -- Restart now" once a new version has downloaded,
+          shown only on the tabs so it never lands on a half-typed form. */}
+      <UpdatePrompt />
     </View>
   );
 }
