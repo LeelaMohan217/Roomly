@@ -25,7 +25,6 @@ const ICONS: Record<string, string> = {
   vegetables: '🥬',
   fruit: '🍎',
   dining: '🍽️',
-  snacks: '🍪',
   water_can: '💧',
   cook: '👨‍🍳',
 
@@ -72,7 +71,6 @@ const LINE_ICONS: Record<string, string> = {
   vegetables: 'carrot',
   fruit: 'food-apple-outline',
   dining: 'silverware-fork-knife',
-  snacks: 'cookie-outline',
   water_can: 'cup-water',
   cook: 'chef-hat',
 
