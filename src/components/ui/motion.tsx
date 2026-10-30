@@ -1,10 +1,11 @@
+import { useEffect } from 'react';
 import type { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
+  Easing,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -18,9 +19,13 @@ import Animated, {
  * nothing scales past a hair, and nothing waits on an animation before it can
  * be tapped -- entering animations never block touches.
  *
- * Reanimated's declarative `entering` throughout: it runs on the UI thread,
- * and its default `ReduceMotion.System` means anyone who has asked their phone
- * for less motion simply gets the finished layout.
+ * Entrances are a shared value driving opacity and translateY, not
+ * Reanimated's layout-animation `entering`. On Android `entering` was cut
+ * short whenever a section moved while it played -- which on Home is every
+ * section under the quick actions, pushed down by a note or a refetch landing
+ * above it -- so only the top two ever visibly rose. A transform is not layout,
+ * so nothing a later commit does can cancel it. Anyone who has asked their
+ * phone for less motion gets the finished layout.
  */
 export const Motion = {
   /** One section's fade-and-rise. */
@@ -34,8 +39,35 @@ export const Motion = {
   pressOut: 160,
 } as const;
 
+/** How far, in dp, a section rises as it enters. */
+const RISE = 14;
+
 /**
- * A screen section that fades and rises 10dp into place on mount.
+ * 0 → 1 once, on mount, after `delay`. Starts at 1 under reduced motion.
+ *
+ * The effect's deps never change for a mounted section, so it runs once; even
+ * if one did, the value is already 1 and there is nothing left to move.
+ */
+function useEntrance(delay: number, duration: number) {
+  const reduced = useReducedMotion();
+  const progress = useSharedValue(reduced ? 1 : 0);
+
+  useEffect(() => {
+    if (reduced) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = withDelay(
+      delay,
+      withTiming(1, { duration, easing: Easing.out(Easing.cubic) })
+    );
+  }, [delay, duration, progress, reduced]);
+
+  return progress;
+}
+
+/**
+ * A screen section that fades and rises into place on mount.
  *
  * `index` is its place in the screen's top-to-bottom order. Keep a screen to
  * four or five steps, so the last section has landed in well under half a
@@ -51,13 +83,13 @@ export function Appear({
   index?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeInDown.duration(Motion.enter).delay(index * Motion.stagger)}>
-      {children}
-    </Animated.View>
-  );
+  const progress = useEntrance(index * Motion.stagger, Motion.enter);
+  const enter = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ translateY: (1 - progress.value) * RISE }],
+  }));
+
+  return <Animated.View style={[style, enter]}>{children}</Animated.View>;
 }
 
 /**
@@ -75,11 +107,10 @@ export function Reveal({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
-    <Animated.View style={style} entering={FadeIn.duration(Motion.fade)}>
-      {children}
-    </Animated.View>
-  );
+  const progress = useEntrance(0, Motion.fade);
+  const fade = useAnimatedStyle(() => ({ opacity: progress.value }));
+
+  return <Animated.View style={[style, fade]}>{children}</Animated.View>;
 }
 
 /**
