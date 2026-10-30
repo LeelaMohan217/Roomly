@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { usePressFeedback } from '@/components/ui/motion';
+import { Appear, usePressFeedback } from '@/components/ui/motion';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -30,11 +30,20 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
  * loud discs right under the green balance card and left the eye no single
  * place to land; solid green is kept for that card and the Add button.
  */
-export function QuickActions({ actions }: { actions: QuickAction[] }) {
+export function QuickActions({
+  actions,
+  enterIndex = 0,
+}: {
+  actions: QuickAction[];
+  /** The first action's step in the screen's entrance; each next one follows. */
+  enterIndex?: number;
+}) {
   return (
     <View style={styles.row}>
-      {actions.map((a) => (
-        <Action key={a.key} action={a} />
+      {actions.map((a, i) => (
+        <Appear key={a.key} index={enterIndex + i} style={styles.slot}>
+          <Action action={a} />
+        </Appear>
       ))}
     </View>
   );
@@ -65,6 +74,7 @@ function Action({ action: a }: { action: QuickAction }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.two },
+  slot: { flex: 1 },
   item: { flex: 1, alignItems: 'center', gap: Spacing.two },
   circle: {
     width: SIZE,

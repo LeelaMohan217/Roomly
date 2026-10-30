@@ -451,17 +451,24 @@ export default function HomeScreen() {
             which had to share one height and so left the shorter card half
             empty. Each small card's second line is the whole of last
             month, labelled as such. */}
-        <Appear style={styles.cards}>
-          <BalanceCard
-            householdName={household.data?.name}
-            people={members.data?.length}
-            balancePaise={balances.data ? myBalance : undefined}
-          />
+        {/* Every card rises on its own, top to bottom and left to right:
+            balance, the two small cards, each quick action, the notes,
+            Balances, then each recent expense. Everything draws at once --
+            skeletons included -- and only its arrival is staggered. */}
+        <View style={styles.cards}>
+          <Appear index={0}>
+            <BalanceCard
+              householdName={household.data?.name}
+              people={members.data?.length}
+              balancePaise={balances.data ? myBalance : undefined}
+            />
+          </Appear>
 
           <View style={styles.smallCards}>
             {/* Each label says what the number is and when: someone shown
                 the cards cold read "Household ₹40,969" and "Sept ₹68,825"
                 and could not tell what either meant. */}
+            <Appear index={1} style={styles.flex}>
             <SmallCard
               tone="house"
               icon="home-outline"
@@ -473,6 +480,8 @@ export default function HomeScreen() {
                   : undefined
               }
             />
+            </Appear>
+            <Appear index={2} style={styles.flex}>
             <SmallCard
               tone="share"
               icon="account-outline"
@@ -484,14 +493,13 @@ export default function HomeScreen() {
                   : undefined
               }
             />
+            </Appear>
           </View>
-        </Appear>
+        </View>
 
-        {/* Top to bottom, one step each: cards, actions, notes, Balances,
-            Recent. Every section draws at once -- skeletons included -- and
-            only its arrival is staggered. */}
-        <Appear index={1}>
+        {/* Steps 3 to 6, one per action. */}
         <QuickActions
+          enterIndex={3}
           // No Add here: the Add button in the tab bar already adds an
           // expense, and two Add buttons on one screen left recurring bills
           // with no way in from Home.
@@ -524,12 +532,11 @@ export default function HomeScreen() {
             },
           ]}
         />
-        </Appear>
 
         {/* Notes, one line each, coloured by what they are: yellow for
             something to keep in mind, never green, which means money in. */}
         {awayToday.length > 0 ? (
-          <Appear index={2}>
+          <Appear index={7}>
             <Note
               tone="warning"
               icon="airplane-outline"
@@ -542,7 +549,7 @@ export default function HomeScreen() {
         {/* Varying bills can't be auto-posted, so they surface here rather
             than silently not happening. */}
         {dueForAmount > 0 ? (
-          <Appear index={2}>
+          <Appear index={7}>
             <Note
               tone="warning"
               icon="repeat"
@@ -553,7 +560,7 @@ export default function HomeScreen() {
         ) : null}
 
         {isOwner && approvalCount > 0 ? (
-          <Appear index={2}>
+          <Appear index={8}>
           <Section title="Needs you" count={approvalCount}>
             {changes.data?.map((c) => (
               <Card key={c.id} style={styles.approval}>
@@ -624,7 +631,7 @@ export default function HomeScreen() {
         {/* No category breakdown on Home: the Reports tab has it, and Home
             stays on where you stand and what just happened. */}
 
-        <Appear index={3}>
+        <Appear index={9}>
         <Section
           // No "Manage" link: the People quick action above goes to the same
           // screen, and two doors to one place on a single screen is just
@@ -701,7 +708,7 @@ export default function HomeScreen() {
         </Section>
         </Appear>
 
-        <Appear index={4}>
+        <Appear index={10}>
         <Section
           title="Recent"
           action={
@@ -724,11 +731,14 @@ export default function HomeScreen() {
               ))}
             </View>
           ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
-            <Reveal style={styles.recentList}>
+            <View style={styles.recentList}>
               {/* Queued entries sit at the top marked as sending, so what you
-                  just typed is visibly there rather than seeming lost. */}
-              {pending.map((p) => (
-                <Card key={p.id} padded={false}>
+                  just typed is visibly there rather than seeming lost. Each
+                  card is its own step; one added later rises in by itself,
+                  and the ones already there stay put. */}
+              {pending.map((p, i) => (
+                <Appear key={p.id} index={11 + i}>
+                <Card padded={false}>
                   <View style={styles.row}>
                     <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
                       <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
@@ -755,10 +765,12 @@ export default function HomeScreen() {
                     </ThemedText>
                   </View>
                 </Card>
+                </Appear>
               ))}
 
-              {expenses.data?.map((e) => (
-                <Card key={e.id} padded={false}>
+              {expenses.data?.map((e, i) => (
+                <Appear key={e.id} index={11 + pending.length + i}>
+                <Card padded={false}>
                   <Pressable
                     onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
                     // Pressed is a tint, not a fade: lowering opacity under a
@@ -788,8 +800,9 @@ export default function HomeScreen() {
                     </View>
                   </Pressable>
                 </Card>
+                </Appear>
               ))}
-            </Reveal>
+            </View>
           ) : (
             <Card style={styles.empty}>
               <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,6 +17,11 @@ import { activeFilterCount, useHistoryFilters } from '@/lib/history-filters';
 import { iconFor } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import { useCategories, useExpenses, useMembers, type Expense } from '@/lib/queries';
+
+/** A screenful: month headings and days past this are below the fold. */
+const ENTRANCE_STEPS = 10;
+/** After this the entrance is over; the longest one has finished by then. */
+const SETTLE_MS = 800;
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -79,6 +84,32 @@ export default function HistoryScreen() {
       data: byKey(rows, (e) => e.expenseDate).map(([day, items]) => ({ day, items })),
     };
   });
+
+  // The entrance order: search bar (0), then each month's total followed by
+  // its days, as they appear down the list.
+  const order = new Map<string, number>();
+  let step = 1;
+  for (const s of sections) {
+    order.set(`m${s.key}`, step++);
+    for (const d of s.data) order.set(`d${d.day}`, step++);
+  }
+
+  // Only what is on screen when the list first lands rises in, one after
+  // another. Anything that mounts after that -- rows scrolled into view, a
+  // search narrowing the list, a refetch -- appears in place, so nothing
+  // animates under someone reading or scrolling.
+  const hasData = !!expenses.data;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!hasData) return;
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [hasData]);
+
+  const entrance = (key: string) => {
+    const index = order.get(key) ?? 0;
+    return { index, still: settled || index > ENTRANCE_STEPS };
+  };
 
   // The applied filters in words, so a short list never looks like lost data.
   const filterSummary = [
@@ -190,12 +221,6 @@ export default function HistoryScreen() {
         ) : null}
       </Appear>
 
-      {/* Keyed on the first load, so the list is drawn twice at most: once
-          over its skeleton, and once more -- rising in -- when the expenses
-          land. A pull-to-refresh or a background refetch keeps isLoading
-          false, so the list is never re-faded under someone reading it, and
-          no row animates on its own as it scrolls into view. */}
-      <Appear index={1} key={expenses.isLoading ? 'loading' : 'ready'} style={styles.flex}>
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.day}
@@ -233,6 +258,7 @@ export default function HistoryScreen() {
           // Plain text, the month on the left and its total in grey on the
           // right; tapping it opens that month's statement. Sentence case, as
           // on Home -- spaced capitals clipped the last letter on Android.
+          <Appear {...entrance(`m${section.key}`)}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${section.title}, ${formatPaise(section.total)}. Open statement`}
@@ -250,11 +276,12 @@ export default function HistoryScreen() {
             </ThemedText>
             <Ionicons name="chevron-forward" size={14} color={theme.textTertiary} />
           </Pressable>
+          </Appear>
         )}
         // One grouped list per day, under the day's name: the date lives in
         // the heading, so the rows carry only what differs between them.
         renderItem={({ item: day }) => (
-          <View style={styles.day}>
+          <Appear {...entrance(`d${day.day}`)} style={styles.day}>
             <ThemedText themeColor="textTertiary" style={Type.caption}>
               {dayLabel(day.day)}
             </ThemedText>
@@ -293,10 +320,9 @@ export default function HistoryScreen() {
                 </Pressable>
               ))}
             </Card>
-          </View>
+          </Appear>
         )}
       />
-      </Appear>
     </SafeAreaView>
   );
 }

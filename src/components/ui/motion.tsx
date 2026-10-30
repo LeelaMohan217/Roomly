@@ -30,8 +30,11 @@ import Animated, {
 export const Motion = {
   /** One section's fade-and-rise. */
   enter: 260,
-  /** The gap between one section and the next in a screen's stagger. */
-  stagger: 50,
+  /** The gap between one card and the next in a screen's stagger. */
+  stagger: 35,
+  /** No card waits longer than this, however far down the order it is, so a
+   *  long screen still settles in well under a second. */
+  maxDelay: 420,
   /** A placeholder giving way to content, or a row opening. */
   fade: 200,
   /** Press in fast so it feels immediate; release a little slower. */
@@ -48,12 +51,12 @@ const RISE = 14;
  * The effect's deps never change for a mounted section, so it runs once; even
  * if one did, the value is already 1 and there is nothing left to move.
  */
-function useEntrance(delay: number, duration: number) {
+function useEntrance(delay: number, duration: number, still = false) {
   const reduced = useReducedMotion();
-  const progress = useSharedValue(reduced ? 1 : 0);
+  const progress = useSharedValue(reduced || still ? 1 : 0);
 
   useEffect(() => {
-    if (reduced) {
+    if (reduced || still) {
       progress.value = 1;
       return;
     }
@@ -61,29 +64,37 @@ function useEntrance(delay: number, duration: number) {
       delay,
       withTiming(1, { duration, easing: Easing.out(Easing.cubic) })
     );
-  }, [delay, duration, progress, reduced]);
+  }, [delay, duration, progress, reduced, still]);
 
   return progress;
 }
 
 /**
- * A screen section that fades and rises into place on mount.
+ * A card or section that fades and rises into place on mount.
  *
- * `index` is its place in the screen's top-to-bottom order. Keep a screen to
- * four or five steps, so the last section has landed in well under half a
- * second. It only plays on mount: tab screens stay mounted, so switching tabs
- * or a background refetch never replays it.
+ * `index` is its place in the screen's top-to-bottom order; delays are capped
+ * at Motion.maxDelay. It only plays on mount: tab screens stay mounted, so
+ * switching tabs or a background refetch never replays it.
+ *
+ * `still` mounts it already in place -- for list items that render after the
+ * screen's entrance is over, such as rows scrolled into view.
  */
 export function Appear({
   children,
   index = 0,
+  still = false,
   style,
 }: {
   children: React.ReactNode;
   index?: number;
+  still?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const progress = useEntrance(index * Motion.stagger, Motion.enter);
+  const progress = useEntrance(
+    Math.min(index * Motion.stagger, Motion.maxDelay),
+    Motion.enter,
+    still
+  );
   const enter = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ translateY: (1 - progress.value) * RISE }],
