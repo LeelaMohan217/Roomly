@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthButton, AuthHeader, AuthResult, authStyles } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
+import { Appear } from '@/components/ui/motion';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
@@ -70,29 +71,39 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.backgroundElement }]}>
+      {/* A newcomer's first look at Roomly rises in like Home does: the
+          greeting, each way in, then the way out. */}
       <View style={authStyles.content}>
-        <AuthHeader
-          icon="home"
-          title={name ? `Welcome, ${name}` : 'Welcome to Roomly'}
-          subtitle="Start a household for your flat, or join one a housemate has already made."
-        />
+        <Appear index={0}>
+          <AuthHeader
+            icon="home"
+            title={name ? `Welcome, ${name}` : 'Welcome to Roomly'}
+            subtitle="Start a household for your flat, or join one a housemate has already made."
+          />
+        </Appear>
 
         <View style={styles.options}>
-          <Choice
-            icon="add-circle-outline"
-            title="Create a household"
-            hint="Start fresh and invite your housemates."
-            onPress={() => router.push('/create-household')}
-          />
-          <Choice
-            icon="enter-outline"
-            title="Join a household"
-            hint="Use the invite code a housemate sent you."
-            onPress={() => router.push('/join-household')}
-          />
+          <Appear index={1}>
+            <Choice
+              icon="add-circle-outline"
+              title="Create a household"
+              hint="Start fresh and invite your housemates."
+              onPress={() => router.push('/create-household')}
+            />
+          </Appear>
+          <Appear index={2}>
+            <Choice
+              icon="enter-outline"
+              title="Join a household"
+              hint="Use the invite code a housemate sent you."
+              onPress={() => router.push('/join-household')}
+            />
+          </Appear>
         </View>
 
-        <SignOutLink email={email} onPress={() => void signOut()} />
+        <Appear index={3}>
+          <SignOutLink email={email} onPress={() => void signOut()} />
+        </Appear>
       </View>
     </SafeAreaView>
   );

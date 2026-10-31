@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Appear } from '@/components/ui/motion';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -61,9 +62,12 @@ export default function WaitingScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
-        <ActivityIndicator size="large" color={theme.primary} />
+        {/* Rises in like the rest of the app: spinner, message, then buttons. */}
+        <Appear index={0}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </Appear>
 
-        <View style={styles.header}>
+        <Appear index={1} style={styles.header}>
           <ThemedText type="subtitle" style={styles.centeredText}>
             Waiting for approval
           </ThemedText>
@@ -72,7 +76,7 @@ export default function WaitingScreen() {
               ? `You asked to join as ${pending.display_name}. The household owner needs to approve it — we'll let you in the moment they do.`
               : "The household owner needs to approve your request. We'll let you in the moment they do."}
           </ThemedText>
-        </View>
+        </Appear>
 
         {error ? (
           <ThemedText themeColor="danger" style={[Type.caption, styles.centeredText]}>
@@ -80,7 +84,7 @@ export default function WaitingScreen() {
           </ThemedText>
         ) : null}
 
-        <View style={styles.actions}>
+        <Appear index={2} style={styles.actions}>
           <Button
             title="Check now"
             variant="secondary"
@@ -101,7 +105,7 @@ export default function WaitingScreen() {
             onPress={() => void signOut()}
             disabled={busy || checking}
           />
-        </View>
+        </Appear>
       </View>
     </SafeAreaView>
   );
