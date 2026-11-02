@@ -172,7 +172,7 @@ export default function AwayScreen() {
       const { error: delError } = await supabase.from('away_periods').delete().eq('id', id);
       if (delError) throw delError;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (e) => setError(humanError(e)),
   });
 

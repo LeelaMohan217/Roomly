@@ -76,7 +76,7 @@ export default function SettlementsScreen() {
         .eq('id', id);
       if (upError) throw upError;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (e) => setError(humanError(e)),
   });
 

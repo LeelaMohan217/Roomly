@@ -61,7 +61,7 @@ export default function RecurringScreen() {
       });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (e) => setError(humanError(e)),
   });
 

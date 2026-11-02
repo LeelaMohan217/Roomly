@@ -25,6 +25,7 @@ import { humanError } from '@/lib/errors';
  */
 
 type QueryLike = {
+  data: unknown;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -90,7 +91,10 @@ export function queryState(
   what: string,
   loadingLabel?: string
 ): React.ReactElement | null {
-  if (query.isError) {
+  // Only when there is nothing to show. A background refresh that fails --
+  // returning to the app on a weak signal -- also sets isError, and swapped a
+  // list that was right a moment ago for "Couldn't load" until a retry.
+  if (query.isError && query.data === undefined) {
     return <LoadFailed what={what} error={query.error} onRetry={() => void query.refetch()} />;
   }
   if (query.isLoading) {

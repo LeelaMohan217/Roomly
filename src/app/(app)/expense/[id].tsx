@@ -163,7 +163,9 @@ export default function ExpenseDetailScreen() {
         message: approve ? 'Approved. It counts now.' : 'Rejected. It won’t count.',
         tone: approve ? 'success' : 'info',
       });
-      void queryClient.invalidateQueries();
+      // Returned, so the buttons stay busy until the expense shows its new
+      // state, rather than inviting a second tap the server would refuse.
+      return queryClient.invalidateQueries();
     },
     onError: (err) => {
       setRejecting(false);
@@ -208,7 +210,7 @@ export default function ExpenseDetailScreen() {
       const { error: rpcError } = await supabase.rpc('unvoid_expense', { p_expense: id });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (err) => setError(humanError(err)),
   });
 

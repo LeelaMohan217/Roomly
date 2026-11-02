@@ -408,7 +408,7 @@ export default function HomeScreen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
   });
 
   // A housemate's new expense, which counts nowhere until someone other than
@@ -422,7 +422,7 @@ export default function HomeScreen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (e) =>
       void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
   });
@@ -447,7 +447,7 @@ export default function HomeScreen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
   });
 
   const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise ?? 0;

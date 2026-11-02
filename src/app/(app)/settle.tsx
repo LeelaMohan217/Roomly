@@ -245,10 +245,14 @@ export default function SettleScreen() {
     // screen under the next one that succeeded -- which is how a single
     // failure came to look like "settle up is broken for everybody".
     onMutate: () => setError(null),
+    // Returned, so the button keeps spinning until the lists have caught up.
+    // It used to stop as soon as the server said yes, and for the moment
+    // before the pending list arrived the card offered "I have paid this"
+    // again -- a second tap is a real duplicate.
     onSuccess: () => {
       committed();
       setError(null);
-      void queryClient.invalidateQueries();
+      return queryClient.invalidateQueries();
     },
     onError: (e) => {
       rejected();
@@ -266,10 +270,12 @@ export default function SettleScreen() {
       if (rpcError) throw rpcError;
     },
     onMutate: () => setError(null),
+    // Returned for the same reason: "Got it" stayed tappable on a payment
+    // already confirmed, and a second tap came back as a red refusal.
     onSuccess: () => {
       committed();
       setError(null);
-      void queryClient.invalidateQueries();
+      return queryClient.invalidateQueries();
     },
     onError: (e) => {
       rejected();

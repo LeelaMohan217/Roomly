@@ -52,7 +52,7 @@ export default function MonthStatementScreen() {
       const { error: rpcError } = await supabase.rpc('close_period', { p_period: period!.id });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (e) => setError(humanError(e)),
   });
 
@@ -71,7 +71,7 @@ export default function MonthStatementScreen() {
       const { error: rpcError } = await supabase.rpc('reopen_period', { p_period: period!.id });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => void queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.invalidateQueries(),
     onError: (e) => setError(humanError(e)),
   });
 
@@ -128,9 +128,7 @@ export default function MonthStatementScreen() {
             and offered "Nothing this month" underneath. That is a false
             statement about money, not a blank space — and on the one screen
             people open to agree on the figures. */}
-        {statement.isLoading || statement.isError ? (
-          queryState(statement, 'this month', `Adding up ${label}…`)
-        ) : (
+        {queryState(statement, 'this month', `Adding up ${label}…`) ?? (
           <>
         {/* On the page, not in a card -- as on Expense details. */}
         <Appear index={0} style={styles.hero}>
