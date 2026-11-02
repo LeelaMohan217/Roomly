@@ -8,7 +8,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { PhoneNudge } from '@/components/phone-nudge';
 import { UpdatePrompt } from '@/components/update-prompt';
 import { SyncBanner } from '@/components/ui/sync-banner';
-import { Spacing, TabBar } from '@/constants/theme';
+import { MaxContentWidth, Spacing, TabBar } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { tapped } from '@/lib/haptics';
 import { usePushRegistration } from '@/lib/push';
@@ -146,7 +146,9 @@ export default function TabsLayout() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  // The app's centred column, not the whole window: on a tablet the bar
+  // spans the column the screens are drawn in.
+  const barWidth = Math.min(useWindowDimensions().width, MaxContentWidth);
 
   // Mounted once for the whole tab shell rather than per screen.
   useHouseholdRealtime();
@@ -180,7 +182,7 @@ export default function TabsLayout() {
             elevation: 0,
             shadowOpacity: 0,
           },
-          tabBarBackground: () => <TabBarBackground width={screenWidth} footer={footer} />,
+          tabBarBackground: () => <TabBarBackground width={barWidth} footer={footer} />,
           tabBarButton: (props) => <TabButton {...props} />,
           tabBarLabel: ({ focused, color, children }) => (
             <Text

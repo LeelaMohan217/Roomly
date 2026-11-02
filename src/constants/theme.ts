@@ -308,4 +308,11 @@ export const TabBar = {
  * empty page above the bar.)
  */
 export const TabBarClearance = TabBar.margin + TabBar.body + TabBar.hump + 12;
-export const MaxContentWidth = 800;
+
+/**
+ * The widest the app is ever drawn. Every screen is laid out for a phone, so
+ * on a tablet, an unfolded foldable or a landscape window the whole app sits
+ * in a centred column this wide rather than stretching rows, cards and the
+ * tab bar across the full screen. A big phone (~430) is untouched.
+ */
+export const MaxContentWidth = 640;

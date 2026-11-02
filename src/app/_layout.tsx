@@ -10,10 +10,12 @@ import { AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
+import { MaxContentWidth } from '@/constants/theme';
 // One source of truth for the colour scheme. The navigator theme and the
 // design tokens reading different hooks is how you get light cards on a dark
 // page.
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/hooks/use-theme';
 import { recoveryStarted, setRecoveryPending, useRecoveryPending } from '@/lib/recovery';
 import { SessionProvider, useSession } from '@/lib/session';
 import { SyncProvider } from '@/lib/sync';
@@ -95,6 +97,7 @@ function RootNavigator() {
   const url = Linking.useURL();
   const handledUrl = useRef<string | null>(null);
   const recoveryPending = useRecoveryPending();
+  const theme = useTheme();
   // The reset flag is read from storage at launch; until it is known the app
   // cannot tell whether to land on the new-password form.
   const booting = status === 'loading' || recoveryPending === null;
@@ -169,6 +172,13 @@ function RootNavigator() {
 
   return (
     <>
+    {/* Every screen is drawn in one centred column, capped at MaxContentWidth,
+        with the page colour either side. On a phone the column is the whole
+        screen; on a tablet or a landscape window it stops the phone layouts
+        stretching edge to edge. Done here once, not per screen, so a new
+        screen can't forget it. */}
+    <View style={[styles.page, { backgroundColor: theme.background }]}>
+    <View style={styles.column}>
     <Stack screenOptions={{ headerShown: false }}>
       {/* The first screen declared under a passing guard is where the app
           lands. React Navigation's StackRouter falls back to routeNames[0]
@@ -207,6 +217,8 @@ function RootNavigator() {
           also survives the guard swap when verification signs the user in. */}
       <Stack.Screen name="reset-password" />
     </Stack>
+    </View>
+    </View>
 
     {/* Just signed in, household not known yet: the brand screen over the
         Stack while the guards settle underneath, so sign in goes straight to
@@ -222,3 +234,8 @@ function RootNavigator() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  page: { flex: 1, alignItems: 'center' },
+  column: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+});

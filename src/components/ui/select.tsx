@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SelectOption = {
@@ -211,7 +211,12 @@ const styles = StyleSheet.create({
   },
   glyph: { fontSize: 17 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  // A Modal draws over the whole window, outside the app's centred column,
+  // so the sheet caps itself to the same width.
   sheet: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     maxHeight: '78%',
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
