@@ -81,7 +81,7 @@ export const Colors = {
     // purpose: on #087F5B the pale label measured 4.41:1, under the 4.5 a
     // small label needs; here white is 6.5:1 and the label 5.8:1. On a green
     // card the amount can't be green, so it is white either way: a pale red
-    // read as a washed-out pink, and the label above already says which way.
+    // read as a washed-out pink. Its + or − and the chip below say which way.
     balanceCard: '#066B4C',
     balanceEdge: '#066B4C',
     onBalance: '#FFFFFF',
@@ -90,6 +90,13 @@ export const Colors = {
     balanceRule: 'rgba(255,255,255,0.2)',
     balancePositive: '#FFFFFF',
     balanceNegative: '#FFFFFF',
+    // The chip under the amount, the shape that says the direction at a
+    // glance: pale mint "You get back", pale coral "You pay". Solid pale
+    // fills, so the dark ink reads on them whatever the card behind.
+    balanceIn: '#D1FAE5',
+    onBalanceIn: '#065F46',
+    balanceOut: '#FDE4DE',
+    onBalanceOut: '#9A2F1C',
 
     // Home's two small cards, two greens so they stay on-brand yet read as
     // different things: mint for the household, a soft lime for you. Each
@@ -180,6 +187,12 @@ export const Colors = {
     balanceRule: 'rgba(255,255,255,0.16)',
     balancePositive: '#FFFFFF',
     balanceNegative: '#FFFFFF',
+    // A step deeper than light mode's, so the chips don't glare on the dark
+    // green card.
+    balanceIn: '#A7F3D0',
+    onBalanceIn: '#064E3B',
+    balanceOut: '#FBCFC4',
+    onBalanceOut: '#7F2414',
 
     // Deep green and deep olive, with pale ink (12:1+) and brighter icons.
     houseCard: '#10281F',

@@ -133,14 +133,45 @@ function BalanceCard({
           style={[styles.balanceValue, { color: ink }]}
           numberOfLines={1}
           adjustsFontSizeToFit
-          minimumFontScale={0.7}>
-          {formatPaise(Math.abs(balancePaise))}
+          minimumFontScale={0.7}
+          accessibilityLabel={
+            owed
+              ? `You get back ${formatPaise(balancePaise)}`
+              : owing
+                ? `You pay ${formatPaise(-balancePaise)}`
+                : formatPaise(0)
+          }>
+          {/* The same + and − as the Balances list below, so one glance at
+              either says which way the money goes. */}
+          {`${owed ? '+ ' : owing ? '− ' : ''}${formatPaise(Math.abs(balancePaise))}`}
         </ThemedText>
       ) : (
         <View style={styles.balanceSkeleton}>
           <Skeleton width="55%" height={28} radius={Radius.sm} tint={theme.balanceRing} />
         </View>
       )}
+
+      {/* The direction as a shape and a colour, not only words: an arrow in
+          on mint when it comes back to you, out on coral when you pay. All
+          square has nothing to show. The amount's label already says it to a
+          screen reader. */}
+      {owed || owing ? (
+        <View
+          style={[styles.balanceChip, { backgroundColor: owed ? theme.balanceIn : theme.balanceOut }]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants">
+          <Ionicons
+            name={owed ? 'arrow-down' : 'arrow-up'}
+            size={13}
+            color={owed ? theme.onBalanceIn : theme.onBalanceOut}
+            style={styles.chipArrow}
+          />
+          <ThemedText
+            style={[Type.caption, styles.semi, { color: owed ? theme.onBalanceIn : theme.onBalanceOut }]}>
+            {owed ? 'You get back' : 'You pay'}
+          </ThemedText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1006,6 +1037,19 @@ const styles = StyleSheet.create({
   balanceValue: { fontSize: 32, lineHeight: 40, fontWeight: '600', letterSpacing: -1 },
   // The same line height as the figure it stands in for, so nothing moves.
   balanceSkeleton: { height: 40, justifyContent: 'center' },
+  balanceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.one,
+    marginTop: Spacing.one,
+    paddingHorizontal: Spacing.two + Spacing.one,
+    paddingVertical: 3,
+    borderRadius: Radius.pill,
+  },
+  // Ionicons has no plain diagonal arrow. Turned 45° clockwise, the down
+  // arrow points down-left (in, to you) and the up arrow up-right (out).
+  chipArrow: { transform: [{ rotate: '45deg' }] },
 
   // Two equal halves; the row stretches both to the taller one's height.
   smallCards: { flexDirection: 'row', gap: Spacing.two + Spacing.one },
