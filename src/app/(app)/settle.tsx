@@ -103,18 +103,25 @@ export default function SettleScreen() {
    * member_balances and the settle plan. Every consequential bug in this
    * project came from two such views drifting apart, so this one is checked
    * against the balance rather than trusted.
+   *
+   * Only once neither is refetching. Confirming a payment refetches both, and
+   * they land a moment apart: for that moment the new list sat against the old
+   * balance, and the red "do not add up" warning flashed up and went away.
    */
+  const settling = pairwise.isFetching || balances.isFetching;
   const pairs = useMemo(() => {
     const rows = pairwise.data?.pairs ?? [];
     const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise;
-    if (rows.length === 0 || myBalance === undefined) return { rows, drift: null as string | null };
+    if (rows.length === 0 || myBalance === undefined || settling) {
+      return { rows, drift: null as string | null };
+    }
     try {
       assertPairwiseReconciles(rows, myBalance);
     } catch (e) {
       return { rows: [] as PairNet[], drift: humanError(e) };
     }
     return { rows, drift: null as string | null };
-  }, [pairwise.data, balances.data, member?.id]);
+  }, [pairwise.data, balances.data, member?.id, settling]);
 
   // Shown on the two pairwise tabs, because "48 things between you" turning
   // into "3 things" after a settle-up needs saying, not discovering.
