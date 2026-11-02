@@ -116,15 +116,39 @@ function BalanceCard({
 
       <View style={[styles.balanceRule, { backgroundColor: theme.balanceRule }]} />
 
-      <ThemedText style={[Type.caption, { color: theme.onBalanceMuted }]} numberOfLines={1}>
-        {balancePaise === undefined
-          ? 'Your balance'
-          : owed
-            ? 'The house owes you'
-            : owing
-              ? 'You owe the house'
-              : 'You’re all square'}
-      </ThemedText>
+      <View style={styles.balanceCaptionRow}>
+        <ThemedText style={[Type.caption, styles.flex, { color: theme.onBalanceMuted }]} numberOfLines={1}>
+          {balancePaise === undefined
+            ? 'Your balance'
+            : owed
+              ? 'The house owes you'
+              : owing
+                ? 'You owe the house'
+                : 'You’re all square'}
+        </ThemedText>
+
+        {/* The direction as a shape, not only words: an arrow in when it comes
+            back to you, out when you pay. One frosted chip either way, since
+            a red or coral on the green card clashed. On the caption's line so
+            it costs no height. All square has nothing to show. The amount's
+            label already says it to a screen reader. */}
+        {owed || owing ? (
+          <View
+            style={[styles.balanceChip, { backgroundColor: theme.balanceChip }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
+            <Ionicons
+              name={owed ? 'arrow-down' : 'arrow-up'}
+              size={13}
+              color={theme.onBalance}
+              style={styles.chipArrow}
+            />
+            <ThemedText style={[Type.caption, styles.semi, { color: theme.onBalance }]}>
+              {owed ? 'You get back' : 'You pay'}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
 
       {/* No Settle up link here: the Settle quick action just below goes to
           the same screen. */}
@@ -150,28 +174,6 @@ function BalanceCard({
           <Skeleton width="55%" height={28} radius={Radius.sm} tint={theme.balanceRing} />
         </View>
       )}
-
-      {/* The direction as a shape and a colour, not only words: an arrow in
-          on mint when it comes back to you, out on coral when you pay. All
-          square has nothing to show. The amount's label already says it to a
-          screen reader. */}
-      {owed || owing ? (
-        <View
-          style={[styles.balanceChip, { backgroundColor: owed ? theme.balanceIn : theme.balanceOut }]}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants">
-          <Ionicons
-            name={owed ? 'arrow-down' : 'arrow-up'}
-            size={13}
-            color={owed ? theme.onBalanceIn : theme.onBalanceOut}
-            style={styles.chipArrow}
-          />
-          <ThemedText
-            style={[Type.caption, styles.semi, { color: owed ? theme.onBalanceIn : theme.onBalanceOut }]}>
-            {owed ? 'You get back' : 'You pay'}
-          </ThemedText>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1037,14 +1039,13 @@ const styles = StyleSheet.create({
   balanceValue: { fontSize: 32, lineHeight: 40, fontWeight: '600', letterSpacing: -1 },
   // The same line height as the figure it stands in for, so nothing moves.
   balanceSkeleton: { height: 40, justifyContent: 'center' },
+  balanceCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   balanceChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     gap: Spacing.one,
-    marginTop: Spacing.one,
     paddingHorizontal: Spacing.two + Spacing.one,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: Radius.pill,
   },
   // Ionicons has no plain diagonal arrow. Turned 45° clockwise, the down
