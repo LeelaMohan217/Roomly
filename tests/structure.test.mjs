@@ -1324,6 +1324,28 @@ check(
   );
 }
 
+// ---- an expense that is only yours needs nobody (migration 0042) -----------
+// Paid by you and split only to you moves no balance, so it must not sit on
+// "Waiting for approval" -- its author can never approve it themselves. The
+// check has to run at commit: when the row is inserted no split exists yet.
+check(
+  'an expense only its author is in is approved at commit',
+  /create constraint trigger expenses_approve_only_authors[\s\S]*?deferrable initially deferred/.test(migAll) &&
+    /e\.paid_by = e\.created_by[\s\S]*?s\.member_id <> e\.created_by/.test(
+      latestDefinitionOf('expense_is_only_its_authors')?.body ?? ''
+    ),
+  'a self-only expense waits forever for an approval nobody can give'
+);
+check(
+  'the "to approve" message goes out after that decision, not before',
+  /expenses_approve_only_authors/.test(migAll) &&
+    'expenses_approve_only_authors' < 'expenses_notify_waiting' &&
+    !/when new\.approval_status = 'pending' then 'expense_pending'/.test(
+      latestDefinitionOf('notify_expense')?.body ?? ''
+    ),
+  'housemates are asked to approve an expense that approves itself a moment later'
+);
+
 // ---- new functions start closed (migration 0041) ---------------------------
 // A per-schema default privilege cannot take away PUBLIC's global EXECUTE, so
 // 0034's `in schema public` revoke left every later function open to anon.
