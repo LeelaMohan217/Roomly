@@ -143,7 +143,7 @@ function BalanceCard({
               color={theme.onBalance}
               style={styles.chipArrow}
             />
-            <ThemedText style={[Type.caption, styles.semi, { color: theme.onBalance }]}>
+            <ThemedText style={[Type.caption, styles.semi, { color: theme.onBalance }]} numberOfLines={1}>
               {owed ? 'You get back' : 'You pay'}
             </ThemedText>
           </View>
@@ -1040,9 +1040,12 @@ const styles = StyleSheet.create({
   // The same line height as the figure it stands in for, so nothing moves.
   balanceSkeleton: { height: 40, justifyContent: 'center' },
   balanceCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  // Never shrinks: as wide as its words, which stay on one line. The caption
+  // beside it gives way instead. Squeezed, "You get back" broke over two.
   balanceChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     gap: Spacing.one,
     paddingHorizontal: Spacing.two + Spacing.one,
     paddingVertical: 2,
