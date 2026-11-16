@@ -196,8 +196,8 @@ export default function NotificationsScreen() {
           queryState(notifications, 'your activity') ?? (
             <Appear>
               <Card style={styles.empty}>
-                <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
-                  <Ionicons name="notifications-outline" size={20} color={theme.textTertiary} />
+                <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
+                  <Ionicons name="notifications-outline" size={20} color={theme.brandInk} />
                 </View>
                 <ThemedText style={Type.headline}>Nothing yet</ThemedText>
                 <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
 
   day: { gap: Spacing.two },
   // Sentence case at heading size, as on History.
-  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  dayTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

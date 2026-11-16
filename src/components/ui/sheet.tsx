@@ -3,7 +3,7 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
+import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -92,7 +92,7 @@ export function Sheet({ visible, title, subtitle, onClose, children }: Props) {
             hitSlop={10}
             style={({ pressed }) => [
               styles.close,
-              { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
+              { backgroundColor: theme.liftTile, opacity: pressed ? 0.7 : 1 },
             ]}>
             <Ionicons name="close" size={17} color={theme.textSecondary} />
           </Pressable>
@@ -120,8 +120,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   grabber: {

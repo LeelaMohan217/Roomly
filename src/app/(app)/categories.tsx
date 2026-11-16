@@ -65,11 +65,16 @@ export default function CategoriesScreen() {
             <Pressable
               onPress={() => router.push('/category-edit')}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="New category"
+              // A dark green pill with a word, not a pale +: it is the way to
+              // add here, so it reads as a button at a glance.
               style={({ pressed }) => [
                 styles.addButton,
-                { backgroundColor: theme.primarySoft, opacity: pressed ? 0.7 : 1 },
+                { backgroundColor: theme.fab, opacity: pressed ? 0.8 : 1 },
               ]}>
-              <Ionicons name="add" size={20} color={theme.primary} />
+              <Ionicons name="add" size={18} color={theme.onFab} />
+              <ThemedText style={[styles.addLabel, { color: theme.onFab }]}>New</ThemedText>
             </Pressable>
           )
         }
@@ -136,8 +141,8 @@ export default function CategoriesScreen() {
                 accessibilityHint="Hidden when adding an expense; old expenses still show them"
                 onPress={() => setShowArchived((v) => !v)}
                 style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
-                <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                  <Ionicons name="archive-outline" size={17} color={theme.text} />
+                <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
+                  <Ionicons name="archive-outline" size={17} color={theme.brandInk} />
                 </View>
                 <ThemedText style={[Type.body, styles.flex]}>Archived</ThemedText>
                 <ThemedText themeColor="textSecondary" style={Type.body}>
@@ -205,7 +210,7 @@ function Row({
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
         { opacity: (pressed && onPress ? 0.6 : 1) * (dim ? 0.5 : 1) },
       ]}>
-      <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+      <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
         <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(category.icon)}</ThemedText>
       </View>
 
@@ -241,17 +246,20 @@ const styles = StyleSheet.create({
 
   // Round, like the other header icons.
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    height: 38,
+    paddingLeft: Spacing.two + 2,
+    paddingRight: Spacing.three,
+    borderRadius: Radius.pill,
   },
+  addLabel: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
 
   section: { gap: Spacing.two },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, alignSelf: 'flex-start' },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   aside: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.one },
 
   row: {

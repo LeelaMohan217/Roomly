@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/card';
 import { useDialog, type Tone } from '@/components/ui/dialog';
 import { Appear } from '@/components/ui/motion';
 import { Sheet } from '@/components/ui/sheet';
+import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_PHOTOS, uploadBillPhotos } from '@/lib/attachments';
@@ -314,7 +315,7 @@ export default function ExpenseDetailScreen() {
                   the whole point of the screen, and a box around it only
                   added an edge. */}
               <Appear index={0} style={styles.hero}>
-                <View style={[styles.heroTile, { backgroundColor: theme.backgroundSelected }]}>
+                <View style={[styles.heroTile, { backgroundColor: theme.liftTile }]}>
                   <ThemedText allowFontScaling={false} style={styles.heroGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
                 </View>
                 <ThemedText
@@ -566,6 +567,7 @@ export default function ExpenseDetailScreen() {
               multiline
               style={[
                 Type.body,
+                appFontFor(Type.body),
                 styles.rejectInput,
                 { color: theme.text, backgroundColor: theme.backgroundSunken, borderColor: theme.border },
               ]}
@@ -715,7 +717,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   aside: { paddingHorizontal: Spacing.one },
   row: {
     flexDirection: 'row',

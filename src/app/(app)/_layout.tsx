@@ -12,12 +12,10 @@ export default function AppLayout() {
       <Stack.Screen name="household" />
       <Stack.Screen name="expense/[id]" />
       <Stack.Screen name="pair/[id]" />
-      <Stack.Screen name="settings" />
       <Stack.Screen name="account-edit" />
       <Stack.Screen name="edit-history" />
       <Stack.Screen name="recurring" />
       <Stack.Screen name="recurring-edit" />
-      <Stack.Screen name="owner" />
       <Stack.Screen name="categories" />
       <Stack.Screen name="category-edit" />
       <Stack.Screen name="history-filters" />

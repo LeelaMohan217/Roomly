@@ -14,7 +14,7 @@ import Animated, { FadeInUp, FadeOutUp, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Elevation, Radius, Spacing, Type, type Colors } from '@/constants/theme';
+import { Radius, Spacing, Type, type Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { committed, rejected, tapped } from '@/lib/haptics';
 
@@ -229,12 +229,13 @@ function DialogCard({ request, onClose }: { request: Request; onClose: (ok: bool
         accessibilityViewIsModal
         accessibilityRole="alert"
         style={[
+          // No drop shadow: the dimmed backdrop already lifts it, and a
+          // shadow on a view that animates in drew a grey band on Android.
           styles.card,
-          Elevation.raised,
           {
             width: Math.min(width - Spacing.four * 2, 380),
             backgroundColor: theme.backgroundElement,
-            borderColor: theme.border,
+            borderColor: theme.liftEdge,
           },
         ]}>
         <View style={[styles.iconRing, { backgroundColor: colors.soft }]}>
@@ -290,7 +291,8 @@ function Toast({
         onPress={onDismiss}
         style={[
           styles.toast,
-          Elevation.raised,
+          styles.toastEdge,
+          { borderColor: theme.liftEdge },
           { backgroundColor: theme.backgroundElement, borderColor: colors.fg },
         ]}>
         <View style={[styles.toastIcon, { backgroundColor: colors.soft }]}>
@@ -317,7 +319,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four + Spacing.one,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.four,
-    borderRadius: Radius.xl,
+    borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
   },
   iconRing: {
@@ -331,8 +333,9 @@ const styles = StyleSheet.create({
   buttonsRow: { flexDirection: 'row', gap: Spacing.two, alignSelf: 'stretch', marginTop: Spacing.two },
   buttonsStacked: { gap: Spacing.two, alignSelf: 'stretch', marginTop: Spacing.two },
   button: {
-    minHeight: 48,
-    borderRadius: Radius.md,
+    // Pills, like every other button now.
+    minHeight: 50,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
@@ -351,6 +354,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderWidth: 1,
   },
+  toastEdge: { borderWidth: StyleSheet.hairlineWidth },
   toastIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   toastText: { flexShrink: 1, fontWeight: '500' },
 });

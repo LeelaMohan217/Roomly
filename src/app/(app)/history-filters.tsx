@@ -293,11 +293,11 @@ export default function HistoryFiltersScreen() {
                   // Grey tiles and avatars: green on this screen means only
                   // "picked" -- the ticks, the current filter and its count.
                   lead={
-                    <View style={[styles.lead, { backgroundColor: theme.backgroundSelected }]}>
+                    <View style={[styles.lead, { backgroundColor: theme.primarySoft }]}>
                       <MaterialCommunityIcons
                         name={lineIconFor(c.icon) as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
                         size={16}
-                        color={theme.textSecondary}
+                        color={theme.brandInk}
                       />
                     </View>
                   }

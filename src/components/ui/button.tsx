@@ -88,8 +88,9 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
-    borderRadius: Radius.md,
+    // A pill, as on the expense form's Save.
+    minHeight: 52,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
@@ -99,7 +100,7 @@ const styles = StyleSheet.create({
   // fontSize without it gave every label a 24dp line box, so a two-line label
   // was 48dp of text and grew the button instead of being visibly wrong.
   label: {
-    fontSize: 14.5,
+    fontSize: 15,
     lineHeight: 20,
     fontWeight: '600',
     letterSpacing: -0.1,

@@ -178,8 +178,8 @@ export default function SettlementsScreen() {
           queryState(settlements, 'the payment history') ?? (
             <Appear>
               <Card style={styles.empty}>
-                <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
-                  <Ionicons name="swap-horizontal" size={22} color={theme.textTertiary} />
+                <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
+                  <Ionicons name="swap-horizontal" size={22} color={theme.brandInk} />
                 </View>
                 <ThemedText style={Type.headline}>No payments yet</ThemedText>
                 <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four,
     paddingBottom: Spacing.two,
   },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   overlap: { marginLeft: -10 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   tag: { borderRadius: Radius.pill, paddingHorizontal: Spacing.two, paddingVertical: 1 },
@@ -327,8 +327,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 12,
   },
-  first: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
-  last: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  first: { borderTopLeftRadius: 22, borderTopRightRadius: 22 },
+  last: { borderBottomLeftRadius: 22, borderBottomRightRadius: 22 },
   pair: { flexDirection: 'row', alignItems: 'center' },
 
   empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },

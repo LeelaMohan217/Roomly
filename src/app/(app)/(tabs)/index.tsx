@@ -695,7 +695,7 @@ export default function HomeScreen() {
                   <Pressable
                     onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
                     style={styles.approvalHead}>
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                    <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
                       <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
                         {iconFor(e.categoryIcon)}
                       </ThemedText>
@@ -801,7 +801,9 @@ export default function HomeScreen() {
         <Appear index={9}>
         <Section
           title="Balances"
-          action={<SectionLink label="All" onPress={() => router.push('/household')} />}>
+          // Settle up lists every balance, owed to you and owed by you, a row
+          // per person; Household is about members, not money.
+          action={<SectionLink label="All" onPress={() => router.push('/settle')} />}>
           {/* Other people, and only those with something open, largest
               first, as a sideways row of small cards. Your own balance is
               the big figure at the top, and a settled housemate answers
@@ -960,8 +962,8 @@ export default function HomeScreen() {
             </View>
           ) : (
             <Card style={styles.empty}>
-              <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                <Ionicons name="receipt-outline" size={18} color={theme.textSecondary} />
+              <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
+                <Ionicons name="receipt-outline" size={18} color={theme.brandInk} />
               </View>
               <ThemedText style={Type.headline}>Nothing logged yet</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>

@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Logo } from '@/components/brand/logo';
 import { ThemedText } from '@/components/themed-text';
 import { Avatar } from '@/components/ui/avatar';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/lib/queries';
 import { useSession } from '@/lib/session';
@@ -54,8 +54,10 @@ export function AppBar({
       {action !== undefined ? action : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Your account and settings"
-          onPress={() => router.push('/settings')}
+          accessibilityLabel="More: your account and settings"
+          // More holds your account and every setting; there is no separate
+          // Account screen any more.
+          onPress={() => router.navigate('/more')}
           hitSlop={8}
           style={({ pressed }) => [styles.avatarWrap, { opacity: pressed ? 0.7 : 1 }]}>
           <Avatar
@@ -146,10 +148,12 @@ export function HomeHeader({
           accessibilityRole="button"
           accessibilityLabel={
             badge > 0
-              ? `Your account and settings, ${badge} waiting for you`
-              : 'Your account and settings'
+              ? `More: your account and settings, ${badge} waiting for you`
+              : 'More: your account and settings'
           }
-          onPress={() => router.push('/settings')}
+          // More: your account card at the top, Owner tools (what the badge
+          // counts) and every setting. There is no separate Account screen.
+          onPress={() => router.navigate('/more')}
           hitSlop={8}
           style={({ pressed }) => [styles.avatarWrap, { opacity: pressed ? 0.7 : 1 }]}>
           {/* A person glyph, not initials: this button means "you", not one
@@ -203,8 +207,8 @@ export function ScreenHeader({
           style={({ pressed }) => [
             styles.backButton,
             {
-              backgroundColor: theme.backgroundElement,
-              borderColor: theme.border,
+              backgroundColor: theme.lift,
+              borderColor: theme.liftEdge,
               opacity: pressed ? 0.7 : 1,
             },
           ]}>
@@ -255,16 +259,17 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600', lineHeight: 14 },
   unreadDot: { position: 'absolute', top: 9, right: 10, width: 8, height: 8, borderRadius: 4 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flex: 1 },
+  // A round soft-white button, like the ✕ on New expense.
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: { flex: 1, gap: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
+  headerTitle: { fontSize: 20, lineHeight: 26, fontWeight: '600', letterSpacing: -0.5 },
   titleBlock: { flex: 1, gap: 1 },
   homeText: { flex: 1, gap: 2 },
   // On Home the header scrolls with the wash, so the screen's own padding

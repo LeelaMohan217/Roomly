@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { appFontFor } from '@/constants/fonts';
+import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = TextInputProps & {
@@ -34,12 +35,12 @@ export function TextField({ label, hint, error, secure = false, style, ...rest }
             backgroundColor: theme.backgroundElement,
             // A focus ring instead of a colour change: it reads as an overlay
             // rather than the field itself becoming a different component.
-            borderColor: error ? theme.danger : focused ? theme.primary : theme.border,
+            borderColor: error ? theme.danger : focused ? theme.primary : theme.liftEdge,
             borderWidth: focused || error ? 1.4 : StyleSheet.hairlineWidth,
           },
         ]}>
         <TextInput
-          style={[styles.input, Type.body, { color: theme.text }, style]}
+          style={[styles.input, Type.body, appFontFor(Type.body), { color: theme.text }, style]}
           placeholderTextColor={theme.textTertiary}
           secureTextEntry={secure && !revealed}
           onFocus={() => setFocused(true)}
@@ -78,8 +79,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    minHeight: 50,
-    borderRadius: Radius.md,
+    minHeight: 52,
+    borderRadius: 16,
     paddingHorizontal: Spacing.three,
   },
   // minWidth 0 so the input can shrink below its intrinsic width on web.

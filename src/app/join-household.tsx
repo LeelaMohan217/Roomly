@@ -136,7 +136,7 @@ export default function JoinHouseholdScreen() {
           ) : (
             <>
               {/* What the code found, before anything else is asked. */}
-              <View style={[styles.found, { backgroundColor: theme.backgroundSelected }]}>
+              <View style={[styles.found, { backgroundColor: theme.lift, borderColor: theme.liftEdge }]}>
                 <View style={[styles.foundIcon, { backgroundColor: theme.primarySoft }]}>
                   <Ionicons name="home-outline" size={20} color={theme.primary} />
                 </View>
@@ -267,7 +267,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     padding: Spacing.three,
-    borderRadius: Radius.md,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   foundIcon: {
     width: 40,

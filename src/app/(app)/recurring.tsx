@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Appear } from '@/components/ui/motion';
 import { Notice } from '@/components/ui/notice';
 import { queryState } from '@/components/ui/query-state';
+import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -97,11 +98,16 @@ export default function RecurringScreen() {
             <Pressable
               onPress={() => router.push('/recurring-edit')}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="New bill"
+              // A dark green pill with a word, not a pale +: it is the way to
+              // add here, so it reads as a button at a glance.
               style={({ pressed }) => [
                 styles.addButton,
-                { backgroundColor: theme.primarySoft, opacity: pressed ? 0.7 : 1 },
+                { backgroundColor: theme.fab, opacity: pressed ? 0.8 : 1 },
               ]}>
-              <Ionicons name="add" size={20} color={theme.primary} />
+              <Ionicons name="add" size={18} color={theme.onFab} />
+              <ThemedText style={[styles.addLabel, { color: theme.onFab }]}>New</ThemedText>
             </Pressable>
           )
         }
@@ -246,7 +252,7 @@ function RuleRow({
         !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
         { opacity: (pressed && onPress ? 0.6 : 1) * (rule.isActive ? 1 : 0.5) },
       ]}>
-      <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+      <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
         <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(rule.categoryIcon)}</ThemedText>
       </View>
 
@@ -317,7 +323,7 @@ function PostRow({
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
       ]}>
       <View style={styles.rowHead}>
-        <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+        <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
           <ThemedText allowFontScaling={false} style={styles.glyph}>
             {iconFor(rule.categoryIcon)}
           </ThemedText>
@@ -348,7 +354,7 @@ function PostRow({
               placeholderTextColor={theme.textTertiary}
               keyboardType="decimal-pad"
               accessibilityLabel={`Amount for ${rule.description || rule.categoryName}`}
-              style={[styles.amountInput, { color: theme.text }]}
+              style={[styles.amountInput, appFontFor(styles.amountInput), { color: theme.text }]}
             />
           </View>
         ) : (
@@ -396,12 +402,15 @@ const styles = StyleSheet.create({
 
   // Round, like the other header icons.
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    height: 38,
+    paddingLeft: Spacing.two + 2,
+    paddingRight: Spacing.three,
+    borderRadius: Radius.pill,
   },
+  addLabel: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
 
   shrink: { flexShrink: 1 },
 
@@ -410,7 +419,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   rowHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
 
   postRow: { gap: Spacing.two + 2, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },

@@ -157,7 +157,7 @@ export function Select({
                     },
                   ]}>
                   {o.glyph ? (
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                    <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
                       <ThemedText style={styles.glyph}>{o.glyph}</ThemedText>
                     </View>
                   ) : null}
@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     maxHeight: '78%',
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   grabber: {
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    borderRadius: Radius.md,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
   },

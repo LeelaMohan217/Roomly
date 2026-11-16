@@ -163,7 +163,7 @@ export default function CategoryEditScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
           <Card style={styles.preview}>
-            <View style={[styles.previewTile, { backgroundColor: theme.backgroundSelected }]}>
+            <View style={[styles.previewTile, { backgroundColor: theme.liftTile }]}>
               <ThemedText style={styles.previewGlyph}>{iconFor(icon)}</ThemedText>
             </View>
             <ThemedText style={Type.title}>{name.trim() || 'New category'}</ThemedText>

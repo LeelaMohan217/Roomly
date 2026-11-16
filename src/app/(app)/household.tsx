@@ -373,8 +373,8 @@ function LinkRow({
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
         { opacity: pressed ? 0.7 : 1 },
       ]}>
-      <View style={[styles.linkIcon, { backgroundColor: theme.backgroundSelected }]}>
-        <Ionicons name={icon} size={17} color={theme.text} />
+      <View style={[styles.linkIcon, { backgroundColor: theme.primarySoft }]}>
+        <Ionicons name={icon} size={17} color={theme.brandInk} />
       </View>
       <ThemedText style={[Type.body, styles.flex]}>{label}</ThemedText>
       <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   aside: { paddingHorizontal: Spacing.one },
   row: {
     flexDirection: 'row',

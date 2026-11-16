@@ -174,9 +174,9 @@ export default function HistoryScreen() {
           theme.washMint,
           theme.background,
         ]}
-        // The mockup's stops: bright green by the search bar, fading through
-        // mint behind the top of the month card.
-        locations={[0, 0.3, 0.52, 0.72, 0.86, 1]}
+        // Green held down past the chips, so they sit on green rather than
+        // on the pale mint, then fading behind the top of the month card.
+        locations={[0, 0.34, 0.62, 0.8, 0.92, 1]}
         style={[styles.wash, { top: -insets.top, height: washHeight }]}
       />
 
@@ -202,19 +202,21 @@ export default function HistoryScreen() {
 
       <Appear style={styles.top}>
         {/* Search and filter share one bar: the two ways of narrowing the
-            same list, side by side. */}
-        <View
-          style={[styles.search, { backgroundColor: theme.washField, borderColor: theme.washFieldEdge }]}>
-          <Ionicons name="search" size={18} color={theme.textTertiary} />
+            same list, side by side. Transparent -- no fill, only its outline
+            -- with white text and icons, so the wash shows straight through
+            instead of a solid white block. */}
+        <View style={[styles.search, { backgroundColor: 'transparent', borderColor: theme.frostStrongEdge }]}>
+          <Ionicons name="search" size={18} color={theme.onWash} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search expenses"
-            placeholderTextColor={theme.textTertiary}
+            placeholderTextColor={theme.onWashMuted}
+            selectionColor={theme.onWash}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
-            style={[styles.searchInput, Type.body, appFontFor(Type.body), { color: theme.text }]}
+            style={[styles.searchInput, Type.body, appFontFor(Type.body), { color: theme.onWash }]}
           />
           {query.length > 0 ? (
             <Pressable
@@ -222,10 +224,10 @@ export default function HistoryScreen() {
               accessibilityLabel="Clear search"
               onPress={() => setQuery('')}
               hitSlop={10}>
-              <Ionicons name="close-circle" size={17} color={theme.textTertiary} />
+              <Ionicons name="close-circle" size={17} color={theme.onWashMuted} />
             </Pressable>
           ) : null}
-          <View style={[styles.searchDivider, { backgroundColor: theme.border }]} />
+          <View style={[styles.searchDivider, { backgroundColor: theme.frostStrongEdge }]} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} on` : 'Filter expenses'}
@@ -233,17 +235,18 @@ export default function HistoryScreen() {
             hitSlop={8}
             style={({ pressed }) => [
               styles.filterButton,
-              filterCount > 0 && { backgroundColor: theme.primary },
+              // On: a solid white disc, like a chip that is on.
+              filterCount > 0 && { backgroundColor: theme.washField },
               { opacity: pressed ? 0.7 : 1 },
             ]}>
             <Ionicons
               name="options-outline"
               size={19}
-              color={filterCount > 0 ? theme.onPrimary : theme.brandInk}
+              color={filterCount > 0 ? theme.tabActiveInk : theme.onWash}
             />
             {filterCount > 0 ? (
               <View
-                style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.backgroundElement }]}>
+                style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.washTop }]}>
                 <ThemedText style={styles.badgeText} allowFontScaling={false}>
                   {filterCount}
                 </ThemedText>
@@ -466,9 +469,11 @@ function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
+        // The one that is on is solid white; the rest are transparent -- an
+        // outline and white words -- like the search bar above them.
         on
           ? { backgroundColor: theme.washField, borderColor: theme.washField }
-          : { backgroundColor: theme.frost, borderColor: theme.frostEdge },
+          : { backgroundColor: 'transparent', borderColor: theme.frostStrongEdge },
         { opacity: pressed ? 0.7 : 1 },
       ]}>
       <ThemedText
@@ -511,7 +516,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     paddingLeft: Spacing.three,
     paddingRight: Spacing.one + 2,
     minHeight: 50,

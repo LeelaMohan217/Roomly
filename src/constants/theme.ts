@@ -136,6 +136,9 @@ export const Colors = {
     frostEdge: 'rgba(255,255,255,0.26)',
     // A stronger frost, for Home's quick-action discs on the brighter green.
     frostStrong: 'rgba(255,255,255,0.24)',
+    // Half that fill, under the same crisp edge: Home's quick actions, airy
+    // but still clearly buttons.
+    frostLight: 'rgba(255,255,255,0.12)',
     frostStrongEdge: 'rgba(255,255,255,0.42)',
     frostIcon: '#FFFFFF',
     // The unread dot on the bell.
@@ -259,6 +262,7 @@ export const Colors = {
     frost: 'rgba(255,255,255,0.07)',
     frostEdge: 'rgba(255,255,255,0.12)',
     frostStrong: 'rgba(255,255,255,0.12)',
+    frostLight: 'rgba(255,255,255,0.06)',
     frostStrongEdge: 'rgba(255,255,255,0.22)',
     frostIcon: '#FFFFFF',
     alertDot: '#FFB547',

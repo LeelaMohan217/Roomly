@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isProperEmail, isValidEmail } from '@/lib/email';
@@ -117,15 +118,16 @@ export function AuthField({
             // "this email is right". Red (wrong) and amber (careful) are the
             // only colours a field takes, and they always agree with the
             // message under it.
-            backgroundColor:
-              focused || invalid || cautious ? theme.backgroundElement : theme.backgroundSelected,
+            // A soft-white field with a thin edge at rest, as everywhere
+            // else in the app now; the edge darkens while typing.
+            backgroundColor: theme.backgroundElement,
             borderColor: invalid
               ? theme.danger
               : cautious
                 ? theme.warning
                 : focused
                   ? theme.textSecondary
-                  : 'transparent',
+                  : theme.liftEdge,
           },
         ]}>
         <Ionicons
@@ -149,7 +151,7 @@ export function AuthField({
           </View>
         ) : null}
         <TextInput
-          style={[styles.input, NO_WEB_OUTLINE, { color: theme.text }, inputStyle]}
+          style={[styles.input, appFontFor(styles.input), NO_WEB_OUTLINE, { color: theme.text }, inputStyle]}
           placeholderTextColor={theme.textTertiary}
           secureTextEntry={secure && !revealed}
           onFocus={() => setFocused(true)}
@@ -236,7 +238,7 @@ export function AuthButton({
       style={({ pressed }) => [
         styles.button,
         {
-          backgroundColor: primary ? theme.primary : theme.backgroundSelected,
+          backgroundColor: primary ? theme.primary : theme.liftTile,
           opacity: disabled && !busy ? 0.4 : pressed ? 0.88 : 1,
           transform: [{ scale: pressed ? 0.99 : 1 }],
         },
@@ -301,7 +303,7 @@ export function AuthResult({
       </View>
 
       {address ? (
-        <View style={[styles.address, { backgroundColor: theme.backgroundSelected }]}>
+        <View style={[styles.address, { backgroundColor: theme.liftTile }]}>
           <Ionicons name="mail-outline" size={18} color={theme.textSecondary} />
           <ThemedText style={styles.addressText} numberOfLines={2}>
             {address}
@@ -408,7 +410,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '600', letterSpacing: -0.3, textAlign: 'center' },
+  title: { fontSize: 26, lineHeight: 32, fontWeight: '600', letterSpacing: -0.7, textAlign: 'center' },
   subtitle: { fontSize: 14, lineHeight: 20, fontWeight: '400', textAlign: 'center' },
 
   fieldWrap: { gap: 6 },
@@ -417,10 +419,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two + 2,
-    height: 50,
-    paddingHorizontal: 14,
-    borderRadius: Radius.sm,
-    borderWidth: 1.5,
+    height: 52,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1.2,
   },
   // minWidth 0 so the input can shrink below its intrinsic width on web.
   input: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '400', paddingVertical: Spacing.two },
@@ -434,8 +436,9 @@ const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
     gap: Spacing.two,
-    height: 50,
-    borderRadius: Radius.sm,
+    // A pill, like every other button in the app.
+    height: 52,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'stretch',
@@ -467,7 +470,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingVertical: 14,
     paddingHorizontal: Spacing.three,
-    borderRadius: Radius.sm,
+    borderRadius: 16,
     marginTop: -Spacing.two,
   },
   addressText: { fontSize: 16, lineHeight: 22, fontWeight: '500', flexShrink: 1, textAlign: 'center' },

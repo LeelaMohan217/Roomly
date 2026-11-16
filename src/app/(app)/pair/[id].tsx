@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
 
   day: { gap: Spacing.two },
   // Sentence case at heading size, as on History.
-  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  dayTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

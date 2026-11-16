@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on Settle up and History.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   peopleRow: { gap: Spacing.four, paddingVertical: Spacing.one, paddingRight: Spacing.four },
   person: { alignItems: 'center', gap: Spacing.two, width: 58 },
 

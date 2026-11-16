@@ -20,6 +20,7 @@ import { useDialog } from '@/components/ui/dialog';
 import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { TextField } from '@/components/ui/text-field';
+import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
@@ -229,7 +230,7 @@ export default function RecurringEditScreen() {
                   placeholder="0"
                   placeholderTextColor={theme.textTertiary}
                   keyboardType="decimal-pad"
-                  style={[styles.amountInput, { color: theme.text }]}
+                  style={[styles.amountInput, appFontFor(styles.amountInput), { color: theme.text }]}
                 />
               </View>
             )}

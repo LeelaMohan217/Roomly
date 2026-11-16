@@ -13,13 +13,15 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatPhone } from '@/lib/phone';
 import { canPickPhoto, pickAndUploadPhoto, removePhoto, type PhotoResult } from '@/lib/photo';
-import { useMemberPhotos, useMyPhone } from '@/lib/queries';
+import { useMemberPhotos, useMembers, useMyPhone } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
 /**
- * Your details, read-only: photo or person glyph, your name, and what you
- * sign in with.
+ * Your details, read-only: photo or person glyph, your name, what you sign
+ * in with, your role, and the household you are in. Opened from the card at
+ * the top of More; everything else that used to sit on an Account screen
+ * lives in More itself.
  *
  * Rows carry an icon and the value, no label -- an envelope beside an address
  * says "email" already. The photo is the one thing you can change here:
@@ -33,6 +35,7 @@ export default function AccountEditScreen() {
   const { member, session } = useSession();
   const isOwner = member?.role === 'owner';
   const myPhone = useMyPhone(session?.user.id);
+  const members = useMembers();
 
   const household = useQuery({
     queryKey: ['household', member?.household_id],
@@ -139,10 +142,24 @@ export default function AccountEditScreen() {
             label="Phone"
             value={myPhone.data ? formatPhone(myPhone.data) : 'No number added'}
           />
-          {isOwner ? (
-            <Detail icon="home-outline" label="Household" value={household.data?.name ?? '…'} />
-          ) : null}
+          <Detail icon="shield-checkmark-outline" label="Role" value={isOwner ? 'Owner' : 'Member'} />
         </Card>
+
+        {/* The household you are in: the facts the old Account screen showed,
+            here with the rest of who you are. */}
+        <View style={styles.group}>
+          <ThemedText style={styles.groupTitle}>Household</ThemedText>
+          <Card padded={false}>
+            <Detail
+              icon="home-outline"
+              label="Household"
+              value={household.data?.name ?? '…'}
+              trail={`${members.data?.length ?? 0} people`}
+              first
+            />
+            <Detail icon="cash-outline" label="Currency" value={household.data?.currency ?? 'INR'} />
+          </Card>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -153,11 +170,14 @@ function Detail({
   icon,
   label,
   value,
+  trail,
   first = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  /** A quiet second fact at the right: "4 people". */
+  trail?: string;
   first?: boolean;
 }) {
   const theme = useTheme();
@@ -165,17 +185,22 @@ function Detail({
   return (
     <View
       accessible
-      accessibilityLabel={`${label}, ${value}`}
+      accessibilityLabel={`${label}, ${value}${trail ? `, ${trail}` : ''}`}
       style={[
         styles.row,
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
       ]}>
-      <View style={[styles.rowIcon, { backgroundColor: theme.backgroundSelected }]}>
-        <Ionicons name={icon} size={17} color={theme.text} />
+      <View style={[styles.rowIcon, { backgroundColor: theme.liftTile }]}>
+        <Ionicons name={icon} size={18} color={theme.brandInk} />
       </View>
       <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
         {value}
       </ThemedText>
+      {trail ? (
+        <ThemedText themeColor="textTertiary" style={Type.caption}>
+          {trail}
+        </ThemedText>
+      ) : null}
     </View>
   );
 }
@@ -220,11 +245,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 2,
   },
-  // The same soft square as Account's rows.
+  group: { gap: Spacing.two + 2 },
+  groupTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4, paddingLeft: Spacing.half },
+  // A soft square, as on More's rows.
   rowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

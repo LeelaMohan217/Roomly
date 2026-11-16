@@ -70,7 +70,7 @@ function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean })
           style={[
             styles.circle,
             styles.frosted,
-            { backgroundColor: theme.frostStrong, borderColor: theme.frostStrongEdge },
+            { backgroundColor: theme.frostLight, borderColor: theme.frostStrongEdge },
           ]}>
           <Ionicons name={a.icon} size={22} color={theme.frostIcon} />
         </View>

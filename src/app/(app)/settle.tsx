@@ -1356,10 +1356,10 @@ function SectionTitle({ title, hint }: { title: string; hint?: string }) {
  */
 function rowEdge(index: number, count: number) {
   return {
-    ...(index === 0 && { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg }),
+    ...(index === 0 && { borderTopLeftRadius: 22, borderTopRightRadius: 22 }),
     ...(index === count - 1 && {
-      borderBottomLeftRadius: Radius.lg,
-      borderBottomRightRadius: Radius.lg,
+      borderBottomLeftRadius: 22,
+      borderBottomRightRadius: 22,
     }),
   };
 }
@@ -1392,8 +1392,8 @@ function LinkRow({
         },
         pressed && [{ backgroundColor: theme.backgroundSelected }, edge],
       ]}>
-      <View style={[styles.periodIcon, { backgroundColor: theme.backgroundSelected }]}>
-        <Ionicons name={icon} size={16} color={theme.textSecondary} />
+      <View style={[styles.periodIcon, { backgroundColor: theme.primarySoft }]}>
+        <Ionicons name={icon} size={16} color={theme.brandInk} />
       </View>
       <View style={styles.flex}>
         <ThemedText style={Type.body}>{title}</ThemedText>
@@ -1451,7 +1451,7 @@ const styles = StyleSheet.create({
   },
 
   section: { gap: Spacing.two },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
 
   summary: {
     borderRadius: Radius.xl,

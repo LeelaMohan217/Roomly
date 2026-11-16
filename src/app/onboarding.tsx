@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthButton, AuthHeader, AuthResult, authStyles } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
 import { Appear } from '@/components/ui/motion';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
 
@@ -150,7 +150,9 @@ function Choice({
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: theme.backgroundSelected,
+          // A soft-white card with a thin edge, like the cards in the app.
+          backgroundColor: theme.lift,
+          borderColor: theme.liftEdge,
           transform: [{ scale: pressed ? 0.99 : 1 }],
           opacity: pressed ? 0.9 : 1,
         },
@@ -180,7 +182,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: Radius.md,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.three,
   },

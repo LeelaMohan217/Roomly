@@ -58,7 +58,7 @@ export function Segmented<T extends string>({
 
   return (
     <View
-      style={[styles.row, { backgroundColor: theme.backgroundSunken }]}
+      style={[styles.row, { backgroundColor: theme.liftTile }]}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {segment > 0 ? (
         <Animated.View
@@ -98,14 +98,15 @@ const PAD = 3;
 const GAP = 3;
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', borderRadius: Radius.md, padding: PAD, gap: GAP },
-  thumb: { position: 'absolute', top: PAD, bottom: PAD, left: PAD, borderRadius: Radius.sm },
+  // A pill switch: the chosen option is a soft-white pill inside it.
+  row: { flexDirection: 'row', borderRadius: Radius.pill, padding: PAD, gap: GAP },
+  thumb: { position: 'absolute', top: PAD, bottom: PAD, left: PAD, borderRadius: Radius.pill },
   item: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.one,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
   },
   selected: { fontWeight: '600' },
 });

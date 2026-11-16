@@ -464,8 +464,8 @@ function Option({
         { opacity: disabled ? 0.5 : pressed ? 0.6 : 1 },
       ]}>
       {icon ? (
-        <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-          <Ionicons name={icon} size={17} color={theme.text} />
+        <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
+          <Ionicons name={icon} size={17} color={theme.brandInk} />
         </View>
       ) : null}
       <View style={styles.flex}>
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
 
   section: { gap: Spacing.two },
   // Sentence case at heading size, as on the other redesigned screens.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
 
   row: {
     flexDirection: 'row',

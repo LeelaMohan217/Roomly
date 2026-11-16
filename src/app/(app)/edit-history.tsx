@@ -128,8 +128,8 @@ export default function EditHistoryScreen() {
           queryState(log, 'the change history') ?? (
             <Appear>
               <Card style={styles.empty}>
-                <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
-                  <Ionicons name="document-text-outline" size={22} color={theme.textTertiary} />
+                <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
+                  <Ionicons name="document-text-outline" size={22} color={theme.brandInk} />
                 </View>
                 <ThemedText style={Type.title}>Nothing changed yet</ThemedText>
                 <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
 
   day: { gap: Spacing.two },
   // Sentence case at heading size, as on Activity and History.
-  dayTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  dayTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
