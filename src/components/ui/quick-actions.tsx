@@ -33,16 +33,19 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export function QuickActions({
   actions,
   enterIndex = 0,
+  onWash = false,
 }: {
   actions: QuickAction[];
   /** The first action's step in the screen's entrance; each next one follows. */
   enterIndex?: number;
+  /** Frosted discs and white labels, for sitting on Home's green wash. */
+  onWash?: boolean;
 }) {
   return (
     <View style={styles.row}>
       {actions.map((a, i) => (
         <Appear key={a.key} index={enterIndex + i} style={styles.slot}>
-          <Action action={a} />
+          <Action action={a} onWash={onWash} />
         </Appear>
       ))}
     </View>
@@ -50,9 +53,33 @@ export function QuickActions({
 }
 
 /** Its own component so each action has its own press animation. */
-function Action({ action: a }: { action: QuickAction }) {
+function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean }) {
   const theme = useTheme();
   const press = usePressFeedback({ dim: 0.35, squash: 0.04 });
+
+  if (onWash) {
+    return (
+      <AnimatedPressable
+        accessibilityRole="button"
+        accessibilityLabel={a.label}
+        onPress={a.onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={[styles.item, press.style]}>
+        <View
+          style={[
+            styles.circle,
+            styles.frosted,
+            { backgroundColor: theme.frost, borderColor: theme.frostEdge },
+          ]}>
+          <Ionicons name={a.icon} size={22} color={theme.frostIcon} />
+        </View>
+        <ThemedText style={[Type.micro, styles.label, { color: theme.onWashMuted }]} numberOfLines={1}>
+          {a.label}
+        </ThemedText>
+      </AnimatedPressable>
+    );
+  }
 
   return (
     <AnimatedPressable
@@ -83,5 +110,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  frosted: { width: 54, height: 54, borderRadius: 27, borderWidth: 1 },
   label: { fontWeight: '500' },
 });

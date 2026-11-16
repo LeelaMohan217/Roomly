@@ -76,13 +76,15 @@ export function Select({
                 opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
               },
         ]}>
+        {/* Bare rows sit in a white card, with the same green-tinted tile
+            as the rows around them. */}
         {selected?.glyph ? (
-          <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+          <View style={[styles.tile, bare && styles.bareTile, { backgroundColor: bare ? theme.primarySoft : theme.backgroundSelected }]}>
             <ThemedText style={styles.glyph}>{selected.glyph}</ThemedText>
           </View>
         ) : bare ? (
-          <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-            <Ionicons name={icon} size={16} color={theme.textSecondary} />
+          <View style={[styles.tile, styles.bareTile, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name={icon} size={18} color={theme.brandInk} />
           </View>
         ) : null}
 
@@ -209,6 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bareTile: { width: 38, height: 38, borderRadius: 12 },
   glyph: { fontSize: 17 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   // A Modal draws over the whole window, outside the app's centred column,

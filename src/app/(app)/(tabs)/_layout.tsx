@@ -1,105 +1,57 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs, useRouter } from 'expo-router';
 import type { BottomTabBarButtonProps } from 'expo-router/tabs';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Rect } from 'react-native-svg';
 
 import { PhoneNudge } from '@/components/phone-nudge';
 import { UpdatePrompt } from '@/components/update-prompt';
 import { SyncBanner } from '@/components/ui/sync-banner';
-import { MaxContentWidth, Spacing, TabBar } from '@/constants/theme';
+import { appFontFor } from '@/constants/fonts';
+import { Spacing, TabBar } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { tapped } from '@/lib/haptics';
 import { usePushRegistration } from '@/lib/push';
 import { useHouseholdRealtime } from '@/lib/realtime';
 
 const BODY_HEIGHT = TabBar.body;
-// The hump's proportions are traced from the design reference: about twice
-// the Add button's width, and a fifth of its height.
-const HUMP_HEIGHT = TabBar.hump;
-/** Half the hump's width, from its centre to where it meets the flat top. */
-const HUMP_HALF_WIDTH = 42;
-/** How far the drawn shadow steps down below the body. */
-const SHADOW_DEPTH = 6;
-const BAR_RADIUS = 24;
 const BAR_MARGIN = TabBar.margin;
-const ADD_SIZE = 40;
+/** The Add disc is as tall as the pill beside it. */
+const ADD_SIZE = BODY_HEIGHT;
+/** Room the pill leaves on its right for the Add disc and the gap before it. */
+const ADD_ROOM = ADD_SIZE + TabBar.gap;
 
 /**
- * The outline of the bar: a rounded rectangle whose top edge swells into a
- * low hump over the middle, around the Add button. `top` is where the flat
- * part of the top edge sits; the hump rises to y = 0.
- */
-function barPath(width: number, top: number, bottom: number): string {
-  const r = BAR_RADIUS;
-  const cx = width / 2;
-  const hw = HUMP_HALF_WIDTH;
-  return [
-    `M ${r} ${top}`,
-    `L ${cx - hw} ${top}`,
-    // Each half is a smoothstep: both handles sit at the half's midpoint,
-    // one level with the flat top and one level with the crest. That eases
-    // out of the edge and into a rounded crest with no flat run between --
-    // the traced reference outline fits this curve to within a pixel. The
-    // handles must never cross (an earlier 0.5 / 0.55 pair did), or the
-    // sides steepen and the top flattens into a plateau.
-    `C ${cx - hw / 2} ${top} ${cx - hw / 2} 0 ${cx} 0`,
-    `C ${cx + hw / 2} 0 ${cx + hw / 2} ${top} ${cx + hw} ${top}`,
-    `L ${width - r} ${top}`,
-    `A ${r} ${r} 0 0 1 ${width} ${top + r}`,
-    `L ${width} ${bottom - r}`,
-    `A ${r} ${r} 0 0 1 ${width - r} ${bottom}`,
-    `L ${r} ${bottom}`,
-    `A ${r} ${r} 0 0 1 0 ${bottom - r}`,
-    `L 0 ${top + r}`,
-    `A ${r} ${r} 0 0 1 ${r} ${top}`,
-    'Z',
-  ].join(' ');
-}
-
-/**
- * The bar's surface, drawn rather than styled: a View can only be a
- * rectangle, and the hump is the point. The shadow is drawn too -- Android's
- * elevation shadows a view's rectangle, never a drawn shape, so it would have
- * outlined the empty corners instead of the bar.
+ * The bar’s surface: a floating pill for the four tabs, with the Add disc
+ * beside it on the right (drawn separately, in the layout, so it can take
+ * its own taps).
  *
- * Below the bar's middle, the full width down to the bottom of the screen is
+ * Below the bar’s middle, the full width down to the bottom of the screen is
  * painted in the page colour. Screens scroll behind the bar, and without this
  * their rows showed through the gap under it and beside its lower half.
  */
-function TabBarBackground({ width, footer }: { width: number; footer: number }) {
+function TabBarBackground({ footer }: { footer: number }) {
   const theme = useTheme();
-  const bodyBottom = HUMP_HEIGHT + BODY_HEIGHT;
-  // Inset half a pixel on every side so the 1px stroke isn't clipped.
-  const outline = barPath(width - BAR_MARGIN * 2 - 1, HUMP_HEIGHT + 0.5, bodyBottom - 0.5);
-  const x = BAR_MARGIN + 0.5;
-
   return (
-    <Svg
-      width={width}
-      height={bodyBottom + footer}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none">
-      <Rect
-        x={0}
-        y={HUMP_HEIGHT + BODY_HEIGHT / 2}
-        width={width}
-        height={BODY_HEIGHT / 2 + footer}
-        fill={theme.background}
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View
+        style={[
+          styles.mask,
+          { top: BODY_HEIGHT / 2, height: BODY_HEIGHT / 2 + footer, backgroundColor: theme.background },
+        ]}
       />
-      {/* Two faint copies stepping down below the bar: the cheap stand-in
-          for a blurred shadow that draws the same on every platform. */}
-      <Path d={outline} fill={theme.barShadow} transform={`translate(${x} ${SHADOW_DEPTH})`} />
-      <Path d={outline} fill={theme.barShadow} transform={`translate(${x} ${SHADOW_DEPTH / 2})`} />
-      <Path
-        d={outline}
-        transform={`translate(${x} 0)`}
-        fill={theme.backgroundElement}
-        stroke={theme.border}
-        strokeWidth={1}
+      <View
+        style={[
+          styles.pill,
+          {
+            right: BAR_MARGIN + ADD_ROOM,
+            backgroundColor: theme.tabBar,
+            borderColor: theme.tabBarEdge,
+            shadowColor: theme.liftShadow,
+          },
+        ]}
       />
-    </Svg>
+    </View>
   );
 }
 
@@ -111,6 +63,7 @@ function TabBarBackground({ width, footer }: { width: number; footer: number }) 
  * the bar whenever a tab was tapped.
  */
 function TabButton({ children, onPress, onLongPress, style, ...rest }: BottomTabBarButtonProps) {
+  const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -120,21 +73,26 @@ function TabButton({ children, onPress, onLongPress, style, ...rest }: BottomTab
       aria-selected={rest['aria-selected']}
       testID={rest.testID}
       style={({ pressed }) => [style, styles.tab, { opacity: pressed ? 0.6 : 1 }]}>
-      {children}
+      {/* The current tab sits in a soft pill of its own, inside the bar. */}
+      <View
+        style={[
+          styles.tabInner,
+          rest['aria-selected'] ? { backgroundColor: theme.tabActive } : null,
+        ]}>
+        {children}
+      </View>
     </Pressable>
   );
 }
 
 /**
- * A floating tab bar: a rounded bar detached from the screen's edges, with
- * four tabs and a round Add button in the middle.
+ * A floating tab bar: a pill detached from the screen's edges holding four
+ * tabs, and a round Add button of its own beside it on the right.
  *
  * Add Expense is not a tab: it's a task you start and finish, not a place you
  * navigate to, so it opens as a modal. Its slot is a tab in name only (the
- * "add" route): the slot's button never navigates, it pushes the modal. The
- * disc and the hump around it sit wholly inside the tab bar's own box, so
- * every part takes a tap -- on Android a view poking out above its parent
- * doesn't.
+ * "add" route) and draws no button in the bar; the disc beside the pill
+ * pushes the modal.
  *
  * The tab bar's box spans the full width down to the bottom of the screen,
  * with the floating bar drawn inside it, so its background can also mask
@@ -146,9 +104,6 @@ export default function TabsLayout() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // The app's centred column, not the whole window: on a tablet the bar
-  // spans the column the screens are drawn in.
-  const barWidth = Math.min(useWindowDimensions().width, MaxContentWidth);
 
   // Mounted once for the whole tab shell rather than per screen.
   useHouseholdRealtime();
@@ -162,18 +117,20 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: theme.primary,
+          tabBarActiveTintColor: theme.tabActiveInk,
           tabBarInactiveTintColor: theme.textTertiary,
           tabBarStyle: {
             position: 'absolute',
             left: 0,
             right: 0,
             bottom: 0,
-            height: HUMP_HEIGHT + BODY_HEIGHT + footer,
+            height: BODY_HEIGHT + footer,
             paddingTop: 0,
             // Keeps the tabs inside the drawn bar, off the footer and sides.
             paddingBottom: footer,
-            paddingHorizontal: BAR_MARGIN + Spacing.one,
+            // The right side also clears the Add disc beside the pill.
+            paddingLeft: BAR_MARGIN + Spacing.one,
+            paddingRight: BAR_MARGIN + ADD_ROOM + Spacing.one,
             // The surface is TabBarBackground's drawing; the box itself is
             // invisible. Android's default bar carries elevation 8 and the
             // web one a top border, either of which would outline the box.
@@ -182,11 +139,11 @@ export default function TabsLayout() {
             elevation: 0,
             shadowOpacity: 0,
           },
-          tabBarBackground: () => <TabBarBackground width={barWidth} footer={footer} />,
+          tabBarBackground: () => <TabBarBackground footer={footer} />,
           tabBarButton: (props) => <TabButton {...props} />,
           tabBarLabel: ({ focused, color, children }) => (
             <Text
-              style={[styles.label, { color, fontWeight: focused ? '700' : '500' }]}
+              style={[styles.label, { color }, appFontFor({ fontWeight: focused ? '600' : '500' })]}
               numberOfLines={1}>
               {children}
             </Text>
@@ -197,7 +154,7 @@ export default function TabsLayout() {
           options={{
             title: 'Home',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={21} color={color} />
             ),
           }}
         />
@@ -206,7 +163,7 @@ export default function TabsLayout() {
           options={{
             title: 'History',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={22} color={color} />
+              <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={21} color={color} />
             ),
           }}
         />
@@ -214,28 +171,11 @@ export default function TabsLayout() {
           name="add"
           options={{
             title: 'Add expense',
-            // Opens the modal instead of switching to this slot's (empty)
-            // screen, so the tab you were on stays the current one.
-            tabBarButton: () => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Add expense"
-                onPress={() => {
-                  tapped();
-                  router.push('/add-expense');
-                }}
-                style={({ pressed }) => [
-                  styles.addSlot,
-                  { transform: [{ scale: pressed ? 0.94 : 1 }] },
-                ]}>
-                <View style={[styles.addButton, { backgroundColor: theme.primary }]}>
-                  <Ionicons name="add" size={26} color={theme.onPrimary} />
-                </View>
-                <Text style={[styles.label, { color: theme.primary, fontWeight: '600' }]}>
-                  Add
-                </Text>
-              </Pressable>
-            ),
+            // No button in the bar: Add is its own disc beside the pill,
+            // drawn below in the layout, and opens the modal from there. The
+            // route stays only because a tab needs a screen behind it.
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
@@ -244,8 +184,8 @@ export default function TabsLayout() {
             title: 'Reports',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
-                name={focused ? 'stats-chart' : 'stats-chart-outline'}
-                size={22}
+                name={focused ? 'bar-chart' : 'bar-chart-outline'}
+                size={21}
                 color={color}
               />
             ),
@@ -257,14 +197,36 @@ export default function TabsLayout() {
             title: 'More',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
-                name={focused ? 'ellipsis-horizontal-circle' : 'ellipsis-horizontal-circle-outline'}
-                size={22}
+                name={focused ? 'menu' : 'menu-outline'}
+                size={21}
                 color={color}
               />
             ),
           }}
         />
       </Tabs>
+
+      {/* Add expense: its own round disc beside the pill, as tall as it.
+          It opens the modal instead of switching tabs, so the tab you were on
+          stays the current one. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add expense"
+        onPress={() => {
+          tapped();
+          router.push('/add-expense');
+        }}
+        style={({ pressed }) => [
+          styles.addButton,
+          {
+            bottom: footer,
+            backgroundColor: theme.fab,
+            shadowColor: theme.liftShadow,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          },
+        ]}>
+        <Ionicons name="add" size={26} color={theme.onFab} />
+      </Pressable>
 
       {/* Mounted once for the whole tab shell, floating above the bar so it
           disturbs no layout and returns null when there is nothing to say.
@@ -274,7 +236,7 @@ export default function TabsLayout() {
       <View
         style={[
           styles.bannerWrap,
-          { bottom: footer + BODY_HEIGHT + HUMP_HEIGHT + 12 },
+          { bottom: footer + BODY_HEIGHT + 12 },
         ]}>
         <SyncBanner />
       </View>
@@ -297,29 +259,45 @@ const styles = StyleSheet.create({
     left: Spacing.four,
     right: Spacing.four,
   },
-  // Tabs and the Add slot are both laid out from the bottom up, with the same
-  // bottom padding, so every label sits on one line and the taller Add disc
-  // grows upward instead of pushing its label down.
+  // Fills the strip under the pill’s lower half, edge to edge.
+  mask: { position: 'absolute', left: 0, right: 0 },
+  pill: {
+    position: 'absolute',
+    top: 0,
+    left: BAR_MARGIN,
+    height: BODY_HEIGHT,
+    borderRadius: BODY_HEIGHT / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
   tab: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 11,
-    gap: 4,
+    justifyContent: 'center',
+  },
+  // The highlight around the current tab’s icon and label.
+  tabInner: {
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: Spacing.three - 2,
+    paddingVertical: 6,
+    borderRadius: 22,
   },
   label: { fontSize: 11, lineHeight: 14, letterSpacing: 0.1 },
-  addSlot: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 11,
-    gap: 3,
-  },
   addButton: {
+    position: 'absolute',
+    right: BAR_MARGIN,
     width: ADD_SIZE,
     height: ADD_SIZE,
     borderRadius: ADD_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
   },
 });

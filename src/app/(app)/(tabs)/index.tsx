@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
   AppState,
@@ -11,8 +13,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApprovalTag, approvalAmountStyle } from '@/components/approval-tag';
 import { ThemedText } from '@/components/themed-text';
@@ -23,9 +24,10 @@ import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 
 import { Appear, Reveal } from '@/components/ui/motion';
+import { Money } from '@/components/ui/money';
 import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
+import { Radius, Spacing, TabBarClearance, Type, washLocations } from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, todayIso } from '@/lib/dates';
@@ -56,68 +58,31 @@ type JoinRequest = {
 
 
 /**
- * The big card: the household, then where you stand with it. A panel in the
- * brand green -- deep green in light mode, dark green in dark -- with faint
- * rings in the bottom right corner, after the design reference.
+ * Where you stand, written straight onto the green wash at the top of Home
+ * rather than boxed in a card: what the balance means, and the amount.
  *
- * The top row names the household and its head-count, a rule splits it from
- * the balance below. The amount's colour comes from the balance tokens (on a
- * green card, "owed to you" can't itself be green), and the words always say
- * the direction, so colour is never the only signal. Anything still loading
- * shows a skeleton -- a ₹0.00 before the data arrives would be a claim.
+ * The amount is white whichever way it goes (on green, "owed to you" can't
+ * itself be green); the caption, the frosted chip and the + or − all say the
+ * direction, so colour is never the only signal. Anything still loading shows
+ * a skeleton -- a ₹0.00 before the data arrives would be a claim.
  */
-function BalanceCard({
+function BalanceHero({
   householdName,
-  people,
   balancePaise,
 }: {
+  /** Not drawn -- the mockup keeps the wash to the balance -- but read out
+   *  first, so a screen reader still hears which household this is. */
   householdName?: string;
-  people?: number;
   balancePaise?: number;
 }) {
   const theme = useTheme();
   const owed = balancePaise !== undefined && balancePaise > 0;
   const owing = balancePaise !== undefined && balancePaise < 0;
-  const ink = owed ? theme.balancePositive : owing ? theme.balanceNegative : theme.onBalance;
 
   return (
-    <View style={[styles.balanceCard, { backgroundColor: theme.balanceCard, borderColor: theme.balanceEdge }]}>
-      {/* Three rings centred off the corner, so only their arcs show. */}
-      <Svg style={styles.balanceRings} width={170} height={170} pointerEvents="none">
-        {[28, 52, 76].map((r) => (
-          <Circle key={r} cx={120} cy={120} r={r} fill="none" stroke={theme.balanceRing} strokeWidth={2} />
-        ))}
-      </Svg>
-
-      <View style={styles.householdRow}>
-        {householdName ? (
-          <ThemedText
-            style={[Type.headline, styles.flex, { color: theme.onBalance }]}
-            numberOfLines={1}>
-            {householdName}
-          </ThemedText>
-        ) : (
-          <View style={styles.flex}>
-            <Skeleton width={150} height={14} tint={theme.balanceRing} />
-          </View>
-        )}
-        {people ? (
-          <View
-            style={styles.peopleCount}
-            accessible
-            accessibilityLabel={people === 1 ? '1 person' : `${people} people`}>
-            <Ionicons name="people" size={16} color={theme.onBalanceMuted} />
-            <ThemedText style={[Type.caption, styles.semi, { color: theme.onBalanceMuted }]}>
-              {people}
-            </ThemedText>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={[styles.balanceRule, { backgroundColor: theme.balanceRule }]} />
-
+    <View style={styles.hero}>
       <View style={styles.balanceCaptionRow}>
-        <ThemedText style={[Type.caption, styles.flex, { color: theme.onBalanceMuted }]} numberOfLines={1}>
+        <ThemedText style={[Type.caption, styles.flexShrink, { color: theme.onWashMuted }]} numberOfLines={1}>
           {balancePaise === undefined
             ? 'Your balance'
             : owed
@@ -127,51 +92,45 @@ function BalanceCard({
                 : 'You’re all square'}
         </ThemedText>
 
-        {/* The direction as a shape, not only words: an arrow in when it comes
-            back to you, out when you pay. One frosted chip either way, since
-            a red or coral on the green card clashed. On the caption's line so
-            it costs no height. All square has nothing to show. The amount's
-            label already says it to a screen reader. */}
+        {/* The direction as a shape too: an arrow in when it comes back to
+            you, out when you pay. The amount's label already says it to a
+            screen reader. */}
         {owed || owing ? (
           <View
-            style={[styles.balanceChip, { backgroundColor: theme.balanceChip }]}
+            style={[styles.balanceChip, { backgroundColor: theme.frost, borderColor: theme.frostEdge }]}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants">
             <Ionicons
               name={owed ? 'arrow-down' : 'arrow-up'}
-              size={13}
-              color={theme.onBalance}
+              size={12}
+              color={theme.onWash}
               style={styles.chipArrow}
             />
-            <ThemedText style={[Type.caption, styles.semi, { color: theme.onBalance }]} numberOfLines={1}>
+            <ThemedText style={[Type.micro, styles.semi, { color: theme.onWash }]} numberOfLines={1}>
               {owed ? 'You get back' : 'You pay'}
             </ThemedText>
           </View>
         ) : null}
       </View>
 
-      {/* No Settle up link here: the Settle quick action just below goes to
-          the same screen. */}
       {balancePaise !== undefined ? (
-        <ThemedText
-          style={[styles.balanceValue, { color: ink }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
-          accessibilityLabel={
+        // No + or − here, as in the mockup: the caption and the chip right
+        // above already say which way it goes, and the label reads it out.
+        <Money
+          paise={Math.abs(balancePaise)}
+          size="hero"
+          color={theme.onWash}
+          accessibilityLabel={`${householdName ? `${householdName}: ` : ''}${
             owed
               ? `You get back ${formatPaise(balancePaise)}`
               : owing
                 ? `You pay ${formatPaise(-balancePaise)}`
                 : formatPaise(0)
-          }>
-          {/* The same + and − as the Balances list below, so one glance at
-              either says which way the money goes. */}
-          {`${owed ? '+ ' : owing ? '− ' : ''}${formatPaise(Math.abs(balancePaise))}`}
-        </ThemedText>
+          }`}
+        />
       ) : (
         <View style={styles.balanceSkeleton}>
-          <Skeleton width="55%" height={28} radius={Radius.sm} tint={theme.balanceRing} />
+          <Skeleton width="55%" height={30} radius={Radius.sm} tint={theme.frost} />
         </View>
       )}
     </View>
@@ -179,99 +138,140 @@ function BalanceCard({
 }
 
 /**
- * One of the two small cards under the balance: whose money with its icon on
- * the same line, this month's figure, a rule, and last month's figure.
+ * This month's spending, in the one white card lifted over the bottom of the
+ * wash: the household's figure and yours side by side, each with last month's
+ * under it.
  *
- * Two greens, one per card -- mint for the household, a soft lime for you --
- * so the pair stays on-brand yet reads as two different things; each tone
- * carries its own darker ink from the theme. The label names the month ("Household
- * · Oct") and the footnote says "Last month": without them a cold
- * reader could not tell what either figure was. Whole rupees here
+ * Each figure's second line names last month ("Oct ₹38,110"). Whole rupees here
  * (formatWholeRupees): it's a glance at a month's spending. History has the
  * exact figures.
  */
-function SmallCard({
-  tone,
-  icon,
+function MonthCard({
+  month,
+  prevMonth,
+  housePaise,
+  housePrevPaise,
+  minePaise,
+  minePrevPaise,
+}: {
+  /** "November" */
+  month: string;
+  /** "Oct" */
+  prevMonth: string;
+  housePaise?: number;
+  housePrevPaise?: number;
+  minePaise?: number;
+  minePrevPaise?: number;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[
+        styles.lift,
+        { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow },
+      ]}>
+      <View style={styles.liftHead}>
+        <ThemedText style={[Type.caption, styles.semi]}>This month</ThemedText>
+        <ThemedText themeColor="textSecondary" style={Type.caption}>
+          {month}
+        </ThemedText>
+      </View>
+
+      <View style={styles.tiles}>
+        <MonthTile
+          emoji="🏠"
+          label="Household"
+          value={housePaise !== undefined ? formatWholeRupees(housePaise) : undefined}
+          compare={
+            housePrevPaise !== undefined ? `${prevMonth} ${formatWholeRupees(housePrevPaise)}` : undefined
+          }
+        />
+        <MonthTile
+          emoji="👤"
+          label="Your share"
+          value={minePaise !== undefined ? formatWholeRupees(minePaise) : undefined}
+          compare={
+            minePrevPaise !== undefined ? `${prevMonth} ${formatWholeRupees(minePrevPaise)}` : undefined
+          }
+        />
+      </View>
+    </View>
+  );
+}
+
+function MonthTile({
+  emoji,
   label,
   value,
   compare,
 }: {
-  tone: 'house' | 'share';
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  /** What and when: "Household · Oct", "Your share · Oct". */
+  emoji: string;
   label: string;
   value?: string;
-  /** Last month's figure: "Last month ₹68,825". */
   compare?: string;
 }) {
   const theme = useTheme();
-  const c =
-    tone === 'house'
-      ? {
-          card: theme.houseCard,
-          edge: theme.houseEdge,
-          ink: theme.houseInk,
-          muted: theme.houseMuted,
-          icon: theme.houseIcon,
-          chip: theme.houseChip,
-          rule: theme.houseRule,
-        }
-      : {
-          card: theme.shareCard,
-          edge: theme.shareEdge,
-          ink: theme.shareInk,
-          muted: theme.shareMuted,
-          icon: theme.shareIcon,
-          chip: theme.shareChip,
-          rule: theme.shareRule,
-        };
-
   return (
-    <View style={[styles.smallCard, { backgroundColor: c.card, borderColor: c.edge }]}>
-      {/* Label left, icon right, tops level: one line, not a tile stacked
-          over the text. */}
-      <View style={styles.smallHead}>
-        {/* Shrinks rather than cut off: the month at the end is the point. */}
-        <ThemedText
-          style={[styles.smallLabel, { color: c.muted }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}>
+    <View style={[styles.tile2, { backgroundColor: theme.liftTile }]}>
+      <View style={styles.tileHead}>
+        <ThemedText allowFontScaling={false} style={styles.tileEmoji}>{emoji}</ThemedText>
+        <ThemedText themeColor="textSecondary" style={[Type.micro, styles.flexShrink]} numberOfLines={1}>
           {label}
         </ThemedText>
-        <View style={[styles.smallIcon, { backgroundColor: c.chip }]}>
-          <MaterialCommunityIcons name={icon} size={16} color={c.icon} />
-        </View>
       </View>
       {value ? (
-        <ThemedText
-          style={[styles.smallValue, { color: c.ink }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}>
+        <ThemedText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
           {value}
         </ThemedText>
       ) : (
-        <View style={styles.smallValueSkeleton}>
-          <Skeleton width="70%" height={22} radius={Radius.sm} tint={c.edge} />
+        <View style={styles.tileValueSkeleton}>
+          <Skeleton width="70%" height={20} radius={Radius.sm} />
         </View>
       )}
-      <View style={[styles.smallRule, { backgroundColor: c.rule }]} />
       {compare ? (
-        <ThemedText style={[styles.smallFoot, { color: c.muted }]} numberOfLines={1}>
+        <ThemedText themeColor="textSecondary" style={Type.micro} numberOfLines={1}>
           {compare}
         </ThemedText>
       ) : (
-        <View style={styles.smallFootSkeleton}>
-          <Skeleton width={70} height={11} tint={c.edge} />
+        <View style={styles.tileFootSkeleton}>
+          <Skeleton width={70} height={10} />
         </View>
       )}
     </View>
   );
 }
 
-/** A section's "go further" link. Green, but regular weight: it's a way on, not a headline. */
+/**
+ * One housemate's open balance, as a small card in a sideways row: their
+ * avatar, name, and the amount -- green and + when the house owes them, red
+ * and − when they owe it. The sign says it as well as the colour.
+ */
+function PersonCard({ memberId, name, paise }: { memberId: string; name: string; paise: number }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[styles.personCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}
+      accessible
+      accessibilityLabel={
+        paise > 0
+          ? `${name} gets back ${formatPaise(paise)}`
+          : `${name} owes the house ${formatPaise(-paise)}`
+      }>
+      <Avatar name={name} seed={memberId} size={34} />
+      <ThemedText style={[Type.caption, styles.semi, styles.personName]} numberOfLines={1}>
+        {name}
+      </ThemedText>
+      <Money
+        paise={paise}
+        signed
+        size="card"
+        color={paise > 0 ? theme.positive : theme.negative}
+      />
+    </View>
+  );
+}
+
+/** A section's "go further" link: quiet grey and an arrow, after the mockup. */
 function SectionLink({ label, onPress }: { label: string; onPress: () => void }) {
   const theme = useTheme();
   return (
@@ -280,10 +280,8 @@ function SectionLink({ label, onPress }: { label: string; onPress: () => void })
       onPress={onPress}
       hitSlop={8}
       style={({ pressed }) => [styles.sectionLink, { opacity: pressed ? 0.6 : 1 }]}>
-      {/* brandInk, not primary: primary is a fill colour and reads 3.3:1 as
-          small text on the page. */}
-      <ThemedText style={[Type.caption, styles.semi, { color: theme.brandInk }]}>{label}</ThemedText>
-      <Ionicons name="chevron-forward" size={14} color={theme.brandInk} />
+      <ThemedText themeColor="textSecondary" style={Type.caption}>{label}</ThemedText>
+      <Ionicons name="arrow-forward" size={13} color={theme.textSecondary} />
     </Pressable>
   );
 }
@@ -315,6 +313,11 @@ export default function HomeScreen() {
   const { member } = useSession();
   const { pending } = useSync();
   const isOwner = member?.role === 'owner';
+  const focused = useIsFocused();
+  const insets = useSafeAreaInsets();
+  // How far down the green wash reaches: measured from the header, balance
+  // and quick actions, plus enough to run behind the top of the month card.
+  const [washHeight, setWashHeight] = useState(520);
 
   const members = useMembers();
   const balances = useBalances();
@@ -471,8 +474,13 @@ export default function HomeScreen() {
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = (member?.display_name ?? '').trim().split(/\s+/)[0] || 'there';
-  // Short ("Oct"): the small cards are half a screen wide.
-  const monthShort = now.toLocaleDateString('en-IN', { month: 'short' });
+  // "November" on the month card; last month short ("Oct") beside each
+  // figure from it.
+  const monthLong = now.toLocaleDateString('en-IN', { month: 'long' });
+  const prevMonthShort = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString(
+    'en-IN',
+    { month: 'short' }
+  );
 
   // Not hand-memoized: React Compiler is enabled (app.json), and it could not
   // preserve a useMemo whose deps are rebuilt every render -- it reported
@@ -485,27 +493,102 @@ export default function HomeScreen() {
   const settledCount = others.length - openBalances.length;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <HomeHeader
-        greeting={greeting}
-        name={firstName}
-        // The owner's items only. The badge sits on the account button, which
-        // opens Settings and Owner tools; expense approvals are answered here
-        // on Home, so counting them there sent members to a screen with
-        // nothing to approve.
-        badge={isOwner ? (requests.data?.length ?? 0) + (changes.data?.length ?? 0) : 0}
-      />
+    // No top edge: the green wash runs up under the status bar, and the
+    // scroll content pads itself by the inset instead.
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: theme.background }]}>
+      {/* White status bar icons while Home is showing, over the dark wash.
+          Unmounted on blur, so other screens keep their own. */}
+      {focused ? <StatusBar style="light" /> : null}
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={pull.refreshing}
             onRefresh={pull.onRefresh}
-            tintColor={theme.textSecondary}
+            tintColor={theme.onWash}
+            progressViewOffset={insets.top}
           />
         }>
+        {/* The wash: deep green at the top, fading into the page about half
+            way down the month card. It scrolls with the content, so the white
+            text on it never ends up over the pale page. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            theme.washTop,
+            theme.washMid,
+            theme.washLow,
+            theme.washFade,
+            theme.washMint,
+            theme.background,
+          ]}
+          // Each colour where the mockup put it (see washLocations).
+          locations={washLocations(washHeight)}
+          style={[styles.wash, { height: washHeight }]}
+        />
+
+        <View
+          style={styles.top}
+          onLayout={(e) => {
+            const h = Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 150);
+            if (h !== washHeight) setWashHeight(h);
+          }}>
+          <HomeHeader
+            greeting={greeting}
+            name={firstName}
+            // The owner's items only. The badge sits on the account button, which
+            // opens Settings and Owner tools; expense approvals are answered here
+            // on Home, so counting them there sent members to a screen with
+            // nothing to approve.
+            badge={isOwner ? (requests.data?.length ?? 0) + (changes.data?.length ?? 0) : 0}
+          />
+
+          <Appear index={0}>
+            <BalanceHero
+              householdName={household.data?.name}
+              balancePaise={balances.data ? myBalance : undefined}
+            />
+          </Appear>
+
+          {/* Steps 1 to 4, one per action. Frosted, on the wash. */}
+          <QuickActions
+            onWash
+            enterIndex={1}
+            // No Add here: the Add button beside the tab bar already adds an
+            // expense, and two Add buttons on one screen left recurring bills
+            // with no way in from Home.
+            actions={[
+              {
+                key: 'settle',
+                icon: 'swap-horizontal',
+                label: 'Settle',
+                onPress: () => router.push('/settle'),
+              },
+              {
+                key: 'bills',
+                // A calendar, not the repeat arrows: those sat beside Settle's
+                // swap arrows and the two read as the same button.
+                icon: 'calendar-outline',
+                label: 'Bills',
+                onPress: () => router.push('/recurring'),
+              },
+              {
+                key: 'away',
+                icon: 'navigate-outline',
+                label: 'Away',
+                onPress: () => router.push('/away'),
+              },
+              {
+                key: 'people',
+                icon: 'people-outline',
+                label: 'People',
+                onPress: () => router.push('/household'),
+              },
+            ]}
+          />
+        </View>
         {/* Recurring bills post from whoever opens the app first. When that
             call fails there is nothing else in the UI that would ever mention
             it, so rent quietly does not appear. */}
@@ -518,93 +601,21 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* One big card for where you stand, two small ones under it for
-            this month's spending -- the household's and yours. All visible
-            without a swipe: they used to be pages of a horizontal pager,
-            which had to share one height and so left the shorter card half
-            empty. Each small card's second line is the whole of last
-            month, labelled as such. */}
-        {/* Every card rises on its own, top to bottom and left to right:
-            balance, the two small cards, each quick action, the notes,
-            Balances, then each recent expense. Everything draws at once --
-            skeletons included -- and only its arrival is staggered. */}
-        <View style={styles.cards}>
-          <Appear index={0}>
-            <BalanceCard
-              householdName={household.data?.name}
-              people={members.data?.length}
-              balancePaise={balances.data ? myBalance : undefined}
-            />
-          </Appear>
-
-          <View style={styles.smallCards}>
-            {/* Each label says what the number is and when: someone shown
-                the cards cold read "Household ₹40,969" and "Sept ₹68,825"
-                and could not tell what either meant. */}
-            <Appear index={1} style={styles.flex}>
-            <SmallCard
-              tone="house"
-              icon="home-outline"
-              label={`Household · ${monthShort}`}
-              value={spend.data ? formatWholeRupees(spend.data.roomMonthPaise) : undefined}
-              compare={
-                spend.data
-                  ? `Last month ${formatWholeRupees(spend.data.roomPrevMonthFullPaise)}`
-                  : undefined
-              }
-            />
-            </Appear>
-            <Appear index={2} style={styles.flex}>
-            <SmallCard
-              tone="share"
-              icon="account-outline"
-              label={`Your share · ${monthShort}`}
-              value={spend.data ? formatWholeRupees(spend.data.myMonthPaise) : undefined}
-              compare={
-                spend.data
-                  ? `Last month ${formatWholeRupees(spend.data.myPrevMonthFullPaise)}`
-                  : undefined
-              }
-            />
-            </Appear>
-          </View>
-        </View>
-
-        {/* Steps 3 to 6, one per action. */}
-        <QuickActions
-          enterIndex={3}
-          // No Add here: the Add button in the tab bar already adds an
-          // expense, and two Add buttons on one screen left recurring bills
-          // with no way in from Home.
-          actions={[
-            {
-              key: 'settle',
-              icon: 'swap-horizontal',
-              label: 'Settle',
-              onPress: () => router.push('/settle'),
-            },
-            {
-              key: 'bills',
-              // A calendar, not the repeat arrows: those sat beside Settle's
-              // swap arrows and the two read as the same button.
-              icon: 'calendar-outline',
-              label: 'Bills',
-              onPress: () => router.push('/recurring'),
-            },
-            {
-              key: 'away',
-              icon: 'airplane',
-              label: 'Away',
-              onPress: () => router.push('/away'),
-            },
-            {
-              key: 'people',
-              icon: 'people',
-              label: 'People',
-              onPress: () => router.push('/household'),
-            },
-          ]}
-        />
+        {/* This month, in the one white card lifted over the bottom of the
+            wash. Everything rises on its own, top to bottom: balance, each
+            quick action, this card, the notes, Balances, then each recent
+            expense. Everything draws at once -- skeletons included -- and
+            only its arrival is staggered. */}
+        <Appear index={5}>
+          <MonthCard
+            month={monthLong}
+            prevMonth={prevMonthShort}
+            housePaise={spend.data?.roomMonthPaise}
+            housePrevPaise={spend.data?.roomPrevMonthFullPaise}
+            minePaise={spend.data?.myMonthPaise}
+            minePrevPaise={spend.data?.myPrevMonthFullPaise}
+          />
+        </Appear>
 
         {/* Notes, one line each, coloured by what they are: yellow for
             something to keep in mind, never green, which means money in. */}
@@ -747,78 +758,63 @@ export default function HomeScreen() {
 
         <Appear index={9}>
         <Section
-          // No "Manage" link: the People quick action above goes to the same
-          // screen, and two doors to one place on a single screen is just
-          // something else to read.
-          title="Balances">
+          title="Balances"
+          action={<SectionLink label="All" onPress={() => router.push('/household')} />}>
           {/* Other people, and only those with something open, largest
-              first. Your own row repeated the balance tile at the top, and a
-              settled housemate's "—" row answers nothing. */}
-          <Card padded={false}>
+              first, as a sideways row of small cards. Your own balance is
+              the big figure at the top, and a settled housemate answers
+              nothing -- they are counted in the last card instead. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.stripBleed}
+            contentContainerStyle={styles.strip}>
             {!balances.data
-              ? [0, 1, 2].map((i) => <RowSkeleton key={i} round last={i === 2} />)
+              ? [0, 1, 2].map((i) => (
+                  <View
+                    key={i}
+                    style={[styles.personCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
+                    <Skeleton width={34} height={34} radius={17} />
+                    <View style={styles.personSkeleton}>
+                      <Skeleton width="60%" height={11} />
+                      <Skeleton width="80%" height={13} />
+                    </View>
+                  </View>
+                ))
               : null}
-            {/* The real rows fade in where the skeleton was. Mounted once,
-                when the first data lands; a refetch keeps balances.data, so
-                it never replays. */}
+            {/* The real cards fade in where the skeletons were. Mounted once,
+                when the first data lands; a refetch keeps balances.data, so it
+                never replays. */}
             {balances.data ? (
-            <Reveal>
-            {openBalances.length === 0 ? (
-              <View style={styles.row}>
-                <View style={[styles.lineIcon, { backgroundColor: theme.backgroundSelected }]}>
-                  <MaterialCommunityIcons name="check" size={17} color={theme.textSecondary} />
-                </View>
-                <ThemedText themeColor="textSecondary" style={[Type.caption, styles.flex]}>
-                  Everyone else is settled up
-                </ThemedText>
-              </View>
+              <Reveal style={styles.stripInner}>
+                {openBalances.map((b) => (
+                  <PersonCard
+                    key={b.memberId}
+                    memberId={b.memberId}
+                    name={b.displayName}
+                    paise={b.balancePaise}
+                  />
+                ))}
+                {openBalances.length === 0 || settledCount > 0 ? (
+                  <View
+                    style={[
+                      styles.personCard,
+                      openBalances.length === 0 && styles.personCardWide,
+                      { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow },
+                    ]}>
+                    <View style={[styles.lineIcon, { backgroundColor: theme.primarySoft }]}>
+                      <MaterialCommunityIcons name="check" size={17} color={theme.brandInk} />
+                    </View>
+                    <ThemedText themeColor="textSecondary" style={[Type.caption, styles.personName]}>
+                      {openBalances.length === 0
+                        ? 'Everyone else is settled up'
+                        : `${settledCount === 1 ? '1 other is' : `${settledCount} others are`} settled up`}
+                    </ThemedText>
+                  </View>
+                ) : null}
+              </Reveal>
             ) : null}
-            {openBalances.map((b, i) => (
-              <View
-                key={b.memberId}
-                style={[
-                  styles.row,
-                  (i < openBalances.length - 1 || settledCount > 0) && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: theme.border,
-                  },
-                ]}>
-                {/* Neutral, so colour on this card means only the money:
-                    green coming back, red owed. The sign says it too, so no
-                    "gets back" / "owes the house" caption. */}
-                <Avatar name={b.displayName} seed={b.memberId} size={34} />
-                <ThemedText style={[Type.body, styles.medium, styles.flex]} numberOfLines={1}>
-                  {b.displayName}
-                </ThemedText>
-                <ThemedText
-                  accessibilityLabel={
-                    b.balancePaise > 0
-                      ? `${b.displayName} gets back ${formatPaise(b.balancePaise)}`
-                      : `${b.displayName} owes the house ${formatPaise(-b.balancePaise)}`
-                  }
-                  style={[
-                    styles.amount,
-                    {
-                      color:
-                        b.balancePaise > 0
-                          ? theme.positive
-                          : b.balancePaise < 0
-                            ? theme.negative
-                            : theme.textTertiary,
-                    },
-                  ]}>
-                  {`${b.balancePaise > 0 ? '+ ' : '− '}${formatPaise(Math.abs(b.balancePaise))}`}
-                </ThemedText>
-              </View>
-            ))}
-            {openBalances.length > 0 && settledCount > 0 ? (
-              <ThemedText themeColor="textTertiary" style={[Type.micro, styles.settledNote]}>
-                {settledCount === 1 ? '1 other is' : `${settledCount} others are`} settled up
-              </ThemedText>
-            ) : null}
-            </Reveal>
-            ) : null}
-          </Card>
+          </ScrollView>
         </Section>
         </Appear>
 
@@ -839,9 +835,9 @@ export default function HomeScreen() {
           {!expenses.data && pending.length === 0 ? (
             <View style={styles.recentList}>
               {[0, 1, 2].map((i) => (
-                <Card key={i} padded={false}>
+                <View key={i} style={[styles.recentCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
                   <RowSkeleton last />
-                </Card>
+                </View>
               ))}
             </View>
           ) : (expenses.data && expenses.data.length > 0) || pending.length > 0 ? (
@@ -852,9 +848,9 @@ export default function HomeScreen() {
                   and the ones already there stay put. */}
               {pending.map((p, i) => (
                 <Appear key={p.id} index={11 + i}>
-                <Card padded={false}>
+                <View style={[styles.recentCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
                   <View style={styles.row}>
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                    <View style={[styles.rowTile, { backgroundColor: theme.liftTile }]}>
                       <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
                     </View>
                     <View style={styles.flex}>
@@ -874,17 +870,15 @@ export default function HomeScreen() {
                         </ThemedText>
                       </View>
                     </View>
-                    <ThemedText themeColor="textTertiary" style={styles.amount}>
-                      {formatPaise(p.totalPaise)}
-                    </ThemedText>
+                    <Money paise={p.totalPaise} size="row" color={theme.textTertiary} />
                   </View>
-                </Card>
+                </View>
                 </Appear>
               ))}
 
               {expenses.data?.map((e, i) => (
                 <Appear key={e.id} index={11 + pending.length + i}>
-                <Card padded={false}>
+                <View style={[styles.recentCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
                   <Pressable
                     onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
                     // Pressed is a tint, not a fade: lowering opacity under a
@@ -894,11 +888,11 @@ export default function HomeScreen() {
                       styles.row,
                       pressed && [styles.rowPressed, { backgroundColor: theme.backgroundSelected }],
                     ]}>
-                    <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
+                    <View style={[styles.rowTile, { backgroundColor: theme.liftTile }]}>
                       <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
                     </View>
                     <View style={styles.flex}>
-                      <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>
+                      <ThemedText style={[Type.body, styles.semi]} numberOfLines={1}>
                         {e.description || e.categoryName}
                       </ThemedText>
                       <ThemedText themeColor="textTertiary" style={Type.micro}>
@@ -908,15 +902,17 @@ export default function HomeScreen() {
                       <ApprovalTag status={e.approvalStatus} />
                     </View>
                     <View style={styles.amountCol}>
-                      <ThemedText style={[styles.amount, approvalAmountStyle(theme, e.approvalStatus)]}>
-                        {formatPaise(e.totalPaise)}
-                      </ThemedText>
+                      <Money
+                        paise={e.totalPaise}
+                        size="row"
+                        extra={approvalAmountStyle(theme, e.approvalStatus)}
+                      />
                       <ThemedText themeColor="textTertiary" style={Type.micro}>
                         {dayLabel(e.expenseDate)}
                       </ThemedText>
                     </View>
                   </Pressable>
-                </Card>
+                </View>
                 </Appear>
               ))}
             </View>
@@ -1008,7 +1004,8 @@ function Note({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance, gap: Spacing.four },
+  // 18 at the sides, as in the mockup; the cards reach 4 further out.
+  content: { paddingHorizontal: 18, paddingBottom: TabBarClearance, gap: Spacing.four },
   recurringError: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1021,69 +1018,85 @@ const styles = StyleSheet.create({
   centered: { textAlign: 'center' },
   semi: { fontWeight: '600' },
 
-  cards: { gap: Spacing.two + Spacing.one },
-  householdRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  peopleCount: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
-  balanceRule: { height: StyleSheet.hairlineWidth, marginTop: Spacing.three, marginBottom: Spacing.two + Spacing.one },
-  balanceCard: {
-    borderRadius: Radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.four - Spacing.one,
-    paddingTop: Spacing.three + Spacing.one,
-    paddingBottom: Spacing.four - Spacing.one,
-    gap: Spacing.one,
-    // Clips the rings to the rounded corner.
-    overflow: 'hidden',
-  },
-  balanceRings: { position: 'absolute', right: -30, bottom: -50 },
-  balanceValue: { fontSize: 32, lineHeight: 40, fontWeight: '600', letterSpacing: -1 },
-  // The same line height as the figure it stands in for, so nothing moves.
-  balanceSkeleton: { height: 40, justifyContent: 'center' },
-  balanceCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  flexShrink: { flexShrink: 1 },
+
+  // The wash spans the scroll content edge to edge, padding included, and
+  // sits behind everything in it.
+  wash: { position: 'absolute', top: 0, left: 0, right: 0 },
+  top: { gap: Spacing.three },
+
+  hero: { gap: Spacing.two },
+  balanceCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one },
   // Never shrinks: as wide as its words, which stay on one line. The caption
-  // beside it gives way instead. Squeezed, "You get back" broke over two.
+  // beside it gives way instead.
   balanceChip: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.two + Spacing.one,
+    gap: 3,
+    paddingHorizontal: Spacing.two + 2,
     paddingVertical: 2,
     borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   // Ionicons has no plain diagonal arrow. Turned 45° clockwise, the down
   // arrow points down-left (in, to you) and the up arrow up-right (out).
   chipArrow: { transform: [{ rotate: '45deg' }] },
+  // The same height as the figure it stands in for, so nothing moves.
+  balanceSkeleton: { height: 50, justifyContent: 'center' },
 
-  // Two equal halves; the row stretches both to the taller one's height.
-  smallCards: { flexDirection: 'row', gap: Spacing.two + Spacing.one },
-  smallCard: {
-    flex: 1,
-    borderRadius: Radius.lg,
+  // The lifted card: big radius, a wide soft shadow, no visible border in
+  // light mode (its edge is its own white).
+  lift: {
+    marginHorizontal: -4,
+    borderRadius: 26,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three + Spacing.one,
-    gap: Spacing.one,
+    padding: Spacing.three,
+    gap: Spacing.three,
+    elevation: 10,
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
   },
-  // The label and its icon on one line, centred on each other: top-aligned,
-  // the text's line box put its letters visibly below the tile's top edge.
-  smallHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  smallLabel: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '500' },
-  smallIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+  liftHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tiles: { flexDirection: 'row', gap: Spacing.two },
+  tile2: { flex: 1, borderRadius: Radius.lg, padding: Spacing.two + Spacing.one + 1, gap: 2 },
+  tileEmoji: { fontSize: 13, lineHeight: 17 },
+  tileHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  tileValue: { fontSize: 21, lineHeight: 28, fontWeight: '600', letterSpacing: -0.6, marginTop: Spacing.one },
+  tileValueSkeleton: { height: 28, justifyContent: 'center', marginTop: Spacing.one },
+  tileFootSkeleton: { height: 16, justifyContent: 'center' },
+
+
+  // Balances: the row runs edge to edge, its cards starting at the page's
+  // left margin and scrolling off the right.
+  stripBleed: { marginHorizontal: -18 },
+  strip: { paddingHorizontal: 18, paddingVertical: Spacing.two, gap: 10 },
+  stripInner: { flexDirection: 'row', gap: 10 },
+  personCard: {
+    width: 128,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.two + Spacing.one + 1,
+    elevation: 3,
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
-  smallRule: { height: StyleSheet.hairlineWidth, marginTop: Spacing.two + Spacing.one, marginBottom: Spacing.one },
-  // The one big thing in the card, so the room around it does the work.
-  smallValue: { fontSize: 26, lineHeight: 33, fontWeight: '600', letterSpacing: -0.6 },
-  smallValueSkeleton: { height: 33, justifyContent: 'center' },
-  // Regular weight: ThemedText's default 500 made the footnote compete with
-  // the label above it.
-  smallFoot: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
-  smallFootSkeleton: { height: 18, justifyContent: 'center' },
+  personCardWide: { width: 220 },
+  personName: { marginTop: Spacing.two + 2, marginBottom: 2 },
+  personSkeleton: { gap: 8, marginTop: Spacing.two + 2 },
+
+  // Recent: one card per expense, a rounded-square tile for its category.
+  recentCard: {
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  rowTile: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rowSkeletonText: { gap: 6 },
 
   section: { gap: Spacing.two },
@@ -1094,7 +1107,7 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.half,
   },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   countPill: {
     minWidth: 17,
     height: 17,
@@ -1114,7 +1127,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + Spacing.one,
   },
   // A pressed tint follows the card's corners.
-  rowPressed: { borderRadius: Radius.lg },
+  rowPressed: { borderRadius: 20 },
   recentList: { gap: Spacing.two },
   medium: { fontWeight: '500' },
   amount: { fontSize: 15, lineHeight: 21, fontWeight: '500' },

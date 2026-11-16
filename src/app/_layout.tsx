@@ -4,12 +4,14 @@ import { focusManager, QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as Linking from 'expo-linking';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
+import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
+import { AppFonts } from '@/constants/fonts';
 import { MaxContentWidth } from '@/constants/theme';
 // One source of truth for the colour scheme. The navigator theme and the
 // design tokens reading different hooks is how you get light cards on a dark
@@ -98,9 +100,13 @@ function RootNavigator() {
   const handledUrl = useRef<string | null>(null);
   const recoveryPending = useRecoveryPending();
   const theme = useTheme();
+  // The app typeface, from files in the bundle. A failure to load is not a
+  // reason to hold the app: text falls back to the system font.
+  const [fontsLoaded, fontError] = useFonts(AppFonts);
   // The reset flag is read from storage at launch; until it is known the app
   // cannot tell whether to land on the new-password form.
-  const booting = status === 'loading' || recoveryPending === null;
+  const booting =
+    status === 'loading' || recoveryPending === null || (!fontsLoaded && !fontError);
 
   useEffect(() => {
     if (!booting) void SplashScreen.hideAsync();

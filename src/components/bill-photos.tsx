@@ -415,8 +415,8 @@ function ViewerButton({
 const styles = StyleSheet.create({
   field: { gap: Spacing.two },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  // Sentence case at heading size, as on the rest of the form.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
+  // Section titles as on the tabs and the expense form: large, medium weight.
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
   // Room at the top right for the remove badge, which overhangs its tile.
   strip: { gap: Spacing.two, paddingTop: Spacing.two, paddingRight: Spacing.two },
   tile: {

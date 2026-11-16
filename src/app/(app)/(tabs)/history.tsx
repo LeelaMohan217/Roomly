@@ -1,15 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, SectionList, StyleSheet, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApprovalTag, approvalAmountStyle } from '@/components/approval-tag';
 import { ThemedText } from '@/components/themed-text';
-import { AppBar } from '@/components/ui/app-bar';
 import { Card } from '@/components/ui/card';
 import { Appear } from '@/components/ui/motion';
+import { Money } from '@/components/ui/money';
 import { queryState } from '@/components/ui/query-state';
+import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,7 +34,8 @@ const MONTHS = [
 
 
 /**
- * Every expense, newest first, grouped by month under the month's total.
+ * Every expense, newest first, grouped by month under a card with the
+ * month's total, then by day, one card per expense.
  *
  * A search bar filters as you type (description, category, who paid), and
  * the filter button opens a full-screen page for date range, category and
@@ -42,8 +46,17 @@ const MONTHS = [
 export default function HistoryScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const focused = useIsFocused();
+  const insets = useSafeAreaInsets();
+  // How far down the green wash reaches: the header's height plus enough to
+  // run behind the top of the first month card.
+  const [washHeight, setWashHeight] = useState(300);
   const filters = useHistoryFilters();
   const clearFilters = useHistoryFilters((s) => s.clear);
+  const applyFilters = useHistoryFilters((s) => s.apply);
+  // The chips change only the categories; every other filter stays as set.
+  const setCategories = (categoryIds: string[]) =>
+    applyFilters({ categoryIds, paidByIds: filters.paidByIds, from: filters.from, to: filters.to });
   const categories = useCategories();
   const members = useMembers();
   const ranged = !!(filters.from || filters.to);
@@ -135,42 +148,73 @@ export default function HistoryScreen() {
 
   const narrowed = filterCount > 0 || !!needle;
 
-  return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      {/* Search and filter sit in the bar below, and each month band opens
-          that month's statement. The one header control downloads one. */}
-      <AppBar
-        title="History"
-        action={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Download statement"
-            onPress={() => router.push('/statement')}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.headerIcon,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-            ]}>
-            <Ionicons name="download-outline" size={19} color={theme.text} />
-          </Pressable>
-        }
+  // The month and year over the title, on the wash: "November 2026".
+  const now = new Date();
+  const overline = `${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+  // "2026-11", the same shape as a section's key.
+  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  // The header -- title, search and filter, and what is filtered -- stands
+  // on a short green wash and scrolls away with the list, as Home's does.
+  const header = (
+    <View
+      onLayout={(e) => {
+        const h = Math.round(e.nativeEvent.layout.height + insets.top + 96);
+        if (h !== washHeight) setWashHeight(h);
+      }}>
+      {/* Reaches up under the status bar and out to both screen edges; the
+          month card below overlaps where it fades into the page. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          theme.washTop,
+          theme.washMid,
+          theme.washLow,
+          theme.washFade,
+          theme.washMint,
+          theme.background,
+        ]}
+        // The mockup's stops: bright green by the search bar, fading through
+        // mint behind the top of the month card.
+        locations={[0, 0.3, 0.52, 0.72, 0.86, 1]}
+        style={[styles.wash, { top: -insets.top, height: washHeight }]}
       />
+
+      <View style={styles.titleRow}>
+        <View style={styles.flex}>
+          <ThemedText style={[Type.caption, { color: theme.onWashMuted }]}>{overline}</ThemedText>
+          <ThemedText style={[styles.screenTitle, { color: theme.onWash }]}>History</ThemedText>
+        </View>
+        {/* Each month card opens that month's statement. This one downloads
+            a statement for any range. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Download statement"
+          onPress={() => router.push('/statement')}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.headerIcon,
+            { backgroundColor: theme.frost, borderColor: theme.frostEdge, opacity: pressed ? 0.7 : 1 },
+          ]}>
+          <Ionicons name="download-outline" size={19} color={theme.frostIcon} />
+        </Pressable>
+      </View>
 
       <Appear style={styles.top}>
         {/* Search and filter share one bar: the two ways of narrowing the
             same list, side by side. */}
         <View
-          style={[styles.search, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          style={[styles.search, { backgroundColor: theme.washField, borderColor: theme.washFieldEdge }]}>
           <Ionicons name="search" size={18} color={theme.textTertiary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search"
+            placeholder="Search expenses"
             placeholderTextColor={theme.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
-            style={[styles.searchInput, Type.body, { color: theme.text }]}
+            style={[styles.searchInput, Type.body, appFontFor(Type.body), { color: theme.text }]}
           />
           {query.length > 0 ? (
             <Pressable
@@ -208,9 +252,40 @@ export default function HistoryScreen() {
           </Pressable>
         </View>
 
+        {/* Quick category chips, the same filter the Filters page sets: All
+            clears it, a category turns on or off. Frosted on the wash; a
+            chip that is on goes solid white. */}
+        {categories.data && categories.data.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={styles.chipsBleed}
+            contentContainerStyle={styles.chips}>
+            <Chip label="All" on={filters.categoryIds.length === 0} onPress={() => setCategories([])} />
+            {categories.data.map((c) => {
+              const on = filters.categoryIds.includes(c.id);
+              return (
+                <Chip
+                  key={c.id}
+                  label={c.name}
+                  on={on}
+                  onPress={() =>
+                    setCategories(
+                      on
+                        ? filters.categoryIds.filter((id) => id !== c.id)
+                        : [...filters.categoryIds, c.id]
+                    )
+                  }
+                />
+              );
+            })}
+          </ScrollView>
+        ) : null}
+
         {filterCount > 0 ? (
           <View style={styles.filterLine}>
-            <ThemedText themeColor="textSecondary" style={[Type.micro, styles.flex]} numberOfLines={2}>
+            <ThemedText style={[Type.micro, styles.flex, { color: theme.onWashMuted }]} numberOfLines={2}>
               {filterSummary}
             </ThemedText>
             <Pressable
@@ -218,21 +293,38 @@ export default function HistoryScreen() {
               onPress={clearFilters}
               hitSlop={10}
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-              <ThemedText style={[Type.micro, styles.clear, { color: theme.brandInk }]}>Clear</ThemedText>
+              <ThemedText style={[Type.micro, styles.clear, { color: theme.onWash }]}>Clear</ThemedText>
             </Pressable>
           </View>
         ) : null}
       </Appear>
+    </View>
+  );
+
+  const cardColors = {
+    backgroundColor: theme.lift,
+    borderColor: theme.liftEdge,
+    shadowColor: theme.liftShadow,
+  };
+
+  return (
+    // No top edge: the wash runs up under the status bar, and the list pads
+    // itself by the inset instead.
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: theme.background }]}>
+      {/* White status bar icons over the wash while History is showing. */}
+      {focused ? <StatusBar style="light" /> : null}
 
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.day}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top }]}
         stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshing={pull.refreshing}
         onRefresh={pull.onRefresh}
+        progressViewOffset={insets.top}
+        ListHeaderComponent={header}
         ListEmptyComponent={
           // "Nothing logged yet" is a claim about the data, so it may only be
           // made once the data has been read. This used to be shown after a
@@ -257,88 +349,163 @@ export default function HistoryScreen() {
             </Card>
           ))
         }
-        renderSectionHeader={({ section }) => (
-          // Plain text, the month on the left and its total in grey on the
-          // right; tapping it opens that month's statement. Sentence case, as
-          // on Home -- spaced capitals clipped the last letter on Android.
-          <Appear {...entrance(`m${section.key}`)}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${section.title}, ${formatPaise(section.total)}. Open statement`}
-            onPress={() =>
-              router.push({
-                pathname: '/month-statement',
-                params: { year: section.key.slice(0, 4), month: String(Number(section.key.slice(5, 7))) },
-              })
-            }
-            hitSlop={6}
-            style={({ pressed }) => [styles.monthHead, { opacity: pressed ? 0.6 : 1 }]}>
-            <ThemedText style={[styles.monthTitle, styles.flex]}>{section.title}</ThemedText>
-            <ThemedText themeColor="textSecondary" style={Type.caption}>
-              {formatPaise(section.total)}
-            </ThemedText>
-            <Ionicons name="chevron-forward" size={14} color={theme.textTertiary} />
-          </Pressable>
-          </Appear>
-        )}
-        // One grouped list per day, under the day's name: the date lives in
-        // the heading, so the rows carry only what differs between them.
-        renderItem={({ item: day }) => (
-          <Appear {...entrance(`d${day.day}`)} style={styles.day}>
-            <ThemedText themeColor="textTertiary" style={Type.caption}>
-              {dayLabel(day.day)}
-            </ThemedText>
-            <Card padded={false}>
-              {day.items.map((item, i) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => router.push({ pathname: '/expense/[id]', params: { id: item.id } })}
-                  // Pressed is a tint, not a fade: lowering opacity under a
-                  // card with Android elevation leaves a pale band.
-                  style={({ pressed }) => [
-                    styles.row,
-                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-                    pressed && { backgroundColor: theme.backgroundSelected },
-                    pressed && i === 0 && styles.rowFirst,
-                    pressed && i === day.items.length - 1 && styles.rowLast,
-                  ]}>
-                  {/* Grey, so green stays for money and actions. */}
-                  <View style={[styles.tile, { backgroundColor: theme.backgroundSelected }]}>
-                    <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
-                      {iconFor(item.categoryIcon)}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.rowText}>
-                    <ThemedText style={[Type.body, styles.medium]} numberOfLines={1}>
-                      {item.description || item.categoryName}
-                    </ThemedText>
-                    <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
-                      {item.paidByName} · {item.participantCount} way
-                      {item.participantCount === 1 ? '' : 's'}
-                    </ThemedText>
-                    <ApprovalTag status={item.approvalStatus} />
-                  </View>
-
-                  <ThemedText style={[styles.amount, approvalAmountStyle(theme, item.approvalStatus)]}>
-                    {formatPaise(item.totalPaise)}
+        renderSectionHeader={({ section }) => {
+          const entries = section.data.reduce((n, d) => n + d.items.length, 0);
+          return (
+            // One white card per month: what the month cost and how many
+            // entries it has. Tapping it opens that month's statement.
+            <Appear {...entrance(`m${section.key}`)}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${section.title}, ${formatPaise(section.total)}, ${entries} ${entries === 1 ? 'entry' : 'entries'}. Open statement`}
+                onPress={() =>
+                  router.push({
+                    pathname: '/month-statement',
+                    params: { year: section.key.slice(0, 4), month: String(Number(section.key.slice(5, 7))) },
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.monthCard,
+                  cardColors,
+                  pressed && { backgroundColor: theme.backgroundSelected },
+                ]}>
+                <View style={styles.flex}>
+                  <ThemedText themeColor="textSecondary" style={Type.micro}>
+                    {section.key === thisMonthKey ? 'Spent this month' : `Spent in ${section.title}`}
                   </ThemedText>
-                </Pressable>
+                  <Money paise={section.total} size="month" />
+                </View>
+                <View style={styles.entries}>
+                  <ThemedText themeColor="textSecondary" style={Type.micro}>
+                    Entries
+                  </ThemedText>
+                  <ThemedText style={styles.entriesCount}>{entries}</ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+              </Pressable>
+            </Appear>
+          );
+        }}
+        // Each day under its name and the day's total; every expense is a
+        // card of its own. The date lives in the heading, so the rows carry
+        // only what differs between them.
+        renderItem={({ item: day }) => {
+          // Approved only, like the month total, so the two agree.
+          const dayTotal = day.items.reduce(
+            (sum, e) => sum + (e.approvalStatus === 'approved' ? e.totalPaise : 0),
+            0
+          );
+          return (
+            <Appear {...entrance(`d${day.day}`)} style={styles.day}>
+              <View style={styles.dayHead}>
+                <ThemedText style={[Type.caption, styles.semi, styles.flex]}>{dayLabel(day.day)}</ThemedText>
+                <ThemedText themeColor="textSecondary" style={Type.caption}>
+                  {formatPaise(dayTotal)}
+                </ThemedText>
+              </View>
+              {day.items.map((item) => (
+                <View key={item.id} style={[styles.rowCard, cardColors]}>
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/expense/[id]', params: { id: item.id } })}
+                    // Pressed is a tint, not a fade: lowering opacity under a
+                    // card with Android elevation leaves a pale band.
+                    style={({ pressed }) => [
+                      styles.row,
+                      pressed && { backgroundColor: theme.backgroundSelected },
+                    ]}>
+                    {/* Grey, so green stays for money and actions. */}
+                    <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
+                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
+                        {iconFor(item.categoryIcon)}
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.rowText}>
+                      <ThemedText style={[Type.body, styles.semi]} numberOfLines={1}>
+                        {item.description || item.categoryName}
+                      </ThemedText>
+                      <ThemedText themeColor="textTertiary" style={Type.micro} numberOfLines={1}>
+                        {item.paidByName} · {item.participantCount} way
+                        {item.participantCount === 1 ? '' : 's'}
+                      </ThemedText>
+                      <ApprovalTag status={item.approvalStatus} />
+                    </View>
+
+                    <Money
+                      paise={item.totalPaise}
+                      size="row"
+                      extra={approvalAmountStyle(theme, item.approvalStatus)}
+                    />
+                  </Pressable>
+                </View>
               ))}
-            </Card>
-          </Appear>
-        )}
+            </Appear>
+          );
+        }}
       />
     </SafeAreaView>
   );
 }
 
+/** One category chip on the wash: its name only. */
+function Chip({
+  label,
+  on,
+  onPress,
+}: {
+  label: string;
+  on: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        on
+          ? { backgroundColor: theme.washField, borderColor: theme.washField }
+          : { backgroundColor: theme.frost, borderColor: theme.frostEdge },
+        { opacity: pressed ? 0.7 : 1 },
+      ]}>
+      <ThemedText
+        style={[Type.caption, styles.semi, { color: on ? theme.tabActiveInk : theme.onWash }]}
+        numberOfLines={1}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  chipsBleed: { marginHorizontal: -18 },
+  chips: { paddingHorizontal: 18, gap: Spacing.two, paddingTop: Spacing.one },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.three - 2,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
   flex: { flex: 1 },
-  // Bottom padding so rows scrolling up stop short of the search bar instead
-  // of sliding right under its edge.
-  top: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.three, gap: Spacing.two },
+  semi: { fontWeight: '600' },
+  // Out to both screen edges from inside the list's 18 padding.
+  wash: { position: 'absolute', left: -18, right: -18 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+  },
+  screenTitle: { fontSize: 30, lineHeight: 38, fontWeight: '600', letterSpacing: -0.8 },
+  top: { gap: Spacing.two, paddingBottom: Spacing.two },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -348,13 +515,18 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.three,
     paddingRight: Spacing.one + 2,
     minHeight: 50,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
   searchInput: { flex: 1, paddingVertical: Spacing.two },
   headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: StyleSheet.hairlineWidth,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -366,19 +538,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  monthHead: {
+  // The month: a lifted white card, like Home's This month.
+  monthCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.one,
+    gap: Spacing.three,
+    marginHorizontal: -4,
     marginTop: Spacing.three,
-    marginBottom: Spacing.one,
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three + 2,
+    paddingVertical: Spacing.three,
+    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
   },
-  monthTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
-  day: { gap: Spacing.one + 2, marginTop: Spacing.two + Spacing.one },
+  entries: { alignItems: 'flex-end' },
+  entriesCount: { fontSize: 22, lineHeight: 29, fontWeight: '600', letterSpacing: -0.6 },
+  day: { gap: Spacing.two, marginTop: Spacing.three + 2 },
+  dayHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.half },
   filterLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingHorizontal: Spacing.half },
   clear: { fontWeight: '600' },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: TabBarClearance },
+  content: { paddingHorizontal: 18, paddingBottom: TabBarClearance },
   badge: {
     position: 'absolute',
     top: -3,
@@ -393,26 +575,31 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600', lineHeight: 14 },
   centered: { textAlign: 'center' },
+  // One card per expense, as on Home's Recent.
+  rowCard: {
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.three - 4,
     paddingVertical: Spacing.two + Spacing.one,
   },
-  // A pressed tint follows the card's corners on its first and last rows.
-  rowFirst: { borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
-  rowLast: { borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
-  medium: { fontWeight: '500' },
-  amount: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
   tile: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileGlyph: { fontSize: 16 },
+  tileGlyph: { fontSize: 18 },
   rowText: { flex: 1, gap: 1 },
-  empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
+  empty: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five, marginTop: Spacing.three },
 });

@@ -21,7 +21,8 @@ export const Colors = {
     // needs.
     textTertiary: '#697080',
 
-    background: '#F6F7F9',
+    // A faint green-grey, after the redesign mockup: the wash fades into it.
+    background: '#F3F6F4',
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#EFF1F5',
     backgroundSunken: '#EBEDF1',
@@ -116,6 +117,41 @@ export const Colors = {
     // The floating tab bar's drawn shadow, two layers of this.
     barShadow: 'rgba(16,24,40,0.06)',
 
+    // Home's colour wash: deep brand green at the top of the screen, fading
+    // into the page. The balance, greeting and quick actions sit on its dark
+    // top in white, so the stops stay dark (white 7:1+) for the first ~45% of
+    // the wash, where all that text lives.
+    washTop: '#053D2D',
+    washMid: '#08694B',
+    washLow: '#2E9C74',
+    washFade: '#A9DCC6',
+    washMint: '#E4F2EB',
+    onWash: '#FFFFFF',
+    onWashMuted: 'rgba(255,255,255,0.72)',
+    // Frosted controls on the wash: translucent white, no blur library.
+    frost: 'rgba(255,255,255,0.16)',
+    frostEdge: 'rgba(255,255,255,0.26)',
+    frostIcon: '#FFFFFF',
+    // The unread dot on the bell.
+    alertDot: '#FFB547',
+    // A text field on the wash: History's search bar.
+    washField: 'rgba(255,255,255,0.94)',
+    washFieldEdge: 'rgba(255,255,255,0.6)',
+
+    // The one white card lifted over the wash, and its tiles.
+    lift: '#FFFFFF',
+    liftEdge: '#FFFFFF',
+    liftShadow: '#06301F',
+    liftTile: '#F2F6F4',
+
+    // The pill tab bar, its current-tab highlight and the separate Add disc.
+    tabBar: '#FFFFFF',
+    tabBarEdge: '#E6EEEA',
+    tabActive: '#EAF4EF',
+    tabActiveInk: '#06301F',
+    fab: '#06301F',
+    onFab: '#FFFFFF',
+
     chart1: '#0E9A6C',
     chart2: '#3B82F6',
     chart3: '#F59E0B',
@@ -123,6 +159,8 @@ export const Colors = {
     chart5: '#EC4899',
     chart6: '#14B8A6',
     chartTrack: '#E9ECF1',
+    // A bar chart's other columns: a soft green that still reads on white.
+    chartBarSoft: '#CDEBDD',
   },
   dark: {
     text: '#ECEFF4',
@@ -130,7 +168,7 @@ export const Colors = {
     // 5.0:1 on a card; #5E6573 was 3.1:1.
     textTertiary: '#7F8796',
 
-    background: '#0B0C10',
+    background: '#0A0C0B',
     backgroundElement: '#14161B',
     backgroundSelected: '#1C1F26',
     backgroundSunken: '#101216',
@@ -204,6 +242,32 @@ export const Colors = {
 
     barShadow: 'rgba(0,0,0,0.45)',
 
+    washTop: '#0D3426',
+    washMid: '#0F3D2E',
+    washLow: '#0E2B21',
+    washFade: '#0C1612',
+    washMint: '#0B100E',
+    onWash: '#FFFFFF',
+    onWashMuted: 'rgba(255,255,255,0.66)',
+    frost: 'rgba(255,255,255,0.07)',
+    frostEdge: 'rgba(255,255,255,0.12)',
+    frostIcon: '#FFFFFF',
+    alertDot: '#FFB547',
+    washField: 'rgba(20,25,23,0.92)',
+    washFieldEdge: 'rgba(255,255,255,0.12)',
+
+    lift: '#141917',
+    liftEdge: '#1E2723',
+    liftShadow: '#000000',
+    liftTile: '#1A211E',
+
+    tabBar: '#161B19',
+    tabBarEdge: '#222B27',
+    tabActive: '#10281F',
+    tabActiveInk: '#E8FFF4',
+    fab: '#3ECF8E',
+    onFab: '#04231A',
+
     chart1: '#3ECF8E',
     chart2: '#60A5FA',
     chart3: '#FBBF24',
@@ -211,6 +275,7 @@ export const Colors = {
     chart5: '#F472B6',
     chart6: '#2DD4BF',
     chartTrack: '#1C1F26',
+    chartBarSoft: '#1D3B2F',
   },
 } as const;
 
@@ -297,12 +362,15 @@ export const Elevation = {
 
 /** The floating tab bar's measurements, shared by the bar and the screens under it. */
 export const TabBar = {
-  /** The rounded body the tabs sit in. */
-  body: 68,
-  /** How far the hump over the Add button rises above the body. */
-  hump: 8,
+  /** The pill the tabs sit in, and the round Add button beside it. */
+  body: 64,
+  /** No hump any more: Add is its own disc beside the pill. Kept so the
+   *  screens' clearance maths stays one formula. */
+  hump: 0,
   /** Gap between the bar and the screen's sides and bottom inset. */
   margin: 12,
+  /** Space between the pill and the Add disc. */
+  gap: 10,
 } as const;
 
 /**
@@ -321,3 +389,17 @@ export const TabBarClearance = TabBar.margin + TabBar.body + TabBar.hump + 12;
  * tab bar across the full screen. A big phone (~430) is untouched.
  */
 export const MaxContentWidth = 640;
+
+/**
+ * Where the green wash's colours sit, in points from the top of the screen
+ * -- the redesign mockup's stops scaled to a phone's width -- so the
+ * brighter green reaches the same place on every screen whatever the wash's
+ * measured height. The last colour (the page) is always at the very bottom.
+ */
+const WASH_STOPS = [165, 285, 395, 470];
+
+/** LinearGradient locations for a wash this tall, for the six wash colours. */
+export function washLocations(height: number): [number, number, ...number[]] {
+  const stops = WASH_STOPS.map((y) => Math.min(y / Math.max(height, 1), 0.97));
+  return [0, 1, ...stops].sort((a, b) => a - b) as [number, number, ...number[]];
+}

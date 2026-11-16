@@ -8,10 +8,11 @@ import { MonthCalendar } from '@/components/ui/month-calendar';
 import { Sheet } from '@/components/ui/sheet';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Money } from '@/components/ui/money';
 import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { appFontFor } from '@/constants/fonts';
+import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { PickedPhoto } from '@/lib/attachments';
 import { addDays, formatRange, todayIso } from '@/lib/dates';
@@ -21,9 +22,9 @@ import { formatPaise, parseAmount } from '@/lib/money';
 import { useAwayPeriods, useCategories, useMembers, useSuggestions } from '@/lib/queries';
 import { assertBalanced, defaultParticipants, isPresent, splitEqually, type Split } from '@/lib/split';
 
-// The amount input's width per typed character at fontSize 40, plus room for
+// The amount input's width per typed character at fontSize 48, plus room for
 // the caret -- see amountInput below.
-const AMOUNT_DIGIT = 24;
+const AMOUNT_DIGIT = 29;
 const AMOUNT_PAD = 10;
 
 export type ExpenseFormValues = {
@@ -156,12 +157,26 @@ export function ExpenseForm({
   const yesterday = addDays(today, -1);
   const isOtherDay = date !== today && date !== yesterday;
 
+  const card = { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow };
+
+  // One chip per category and amount. The same thing typed two ways
+  // ("Kothimera" and "Kotthimera", both ₹10 Vegetables) made two chips that
+  // fill in the same expense. The first is kept: the list comes best first.
+  // Two different things at one price stay apart if their categories differ.
+  const chips = (suggestions.data ?? []).filter(
+    (s, i, all) =>
+      all.findIndex((o) => o.categoryId === s.categoryId && o.amountPaise === s.amountPaise) === i
+  );
+
   return (
     <>
       {/* Amount is the only field that always needs thought, so it gets the
           screen's one large number and opens focused -- on the page, centred,
-          without a box or a label: the ₹ says what it is. */}
+          without a box: a small "How much?" over it, and the ₹ says the rest. */}
       <View style={styles.amountBlock}>
+        <ThemedText themeColor="textSecondary" style={Type.caption}>
+          How much?
+        </ThemedText>
         <View style={styles.amountRow}>
           <ThemedText themeColor="textTertiary" style={styles.currency}>
             ₹
@@ -183,20 +198,24 @@ export function ExpenseForm({
             // together; a flexed input would leave the ₹ stranded at the left.
             style={[
               styles.amountInput,
+              appFontFor({ fontWeight: '600' }),
               { color: theme.text, width: AMOUNT_DIGIT * Math.max(amount.length, 1) + AMOUNT_PAD },
             ]}
           />
         </View>
 
-        {showSuggestions && suggestions.data && suggestions.data.length > 0 ? (
+        {showSuggestions && chips.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            style={styles.chipBleed}
             contentContainerStyle={styles.chipRow}>
-            {suggestions.data.map((s) => (
+            {chips.map((s) => (
               <Pressable
                 key={`${s.label}-${s.amountPaise}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Use ${s.label}, ${formatPaise(s.amountPaise)}`}
                 onPress={() => {
                   setAmount(String(s.amountPaise / 100));
                   setCategoryId(s.categoryId);
@@ -204,14 +223,14 @@ export function ExpenseForm({
                 }}
                 style={({ pressed }) => [
                   styles.chip,
-                  {
-                    backgroundColor: theme.backgroundSelected,
-                    borderColor: theme.border,
-                    opacity: pressed ? 0.7 : 1,
-                  },
+                  card,
+                  pressed && { backgroundColor: theme.backgroundSelected },
                 ]}>
-                <ThemedText style={Type.micro}>
-                  {s.label} {formatPaise(s.amountPaise)}
+                <ThemedText style={[Type.caption, styles.semi]} numberOfLines={1}>
+                  {s.label}
+                </ThemedText>
+                <ThemedText themeColor="textSecondary" style={Type.caption}>
+                  {formatPaise(s.amountPaise)}
                 </ThemedText>
               </Pressable>
             ))}
@@ -219,9 +238,8 @@ export function ExpenseForm({
         ) : null}
       </View>
 
-      {/* What, what for and when: one grouped list with an icon a row, in
-          place of three labelled fields. */}
-      <Card padded={false}>
+      {/* What, what for and when: one white card, an icon tile a row. */}
+      <View style={[styles.card, card]}>
         <Select
           bare
           icon="apps-outline"
@@ -234,8 +252,8 @@ export function ExpenseForm({
         />
 
         <View style={[styles.detailRow, { borderTopColor: theme.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: theme.backgroundSelected }]}>
-            <Ionicons name="create-outline" size={16} color={theme.textSecondary} />
+          <View style={[styles.detailIcon, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="create-outline" size={18} color={theme.brandInk} />
           </View>
           <TextInput
             value={description}
@@ -245,24 +263,20 @@ export function ExpenseForm({
             accessibilityLabel="What for"
             maxLength={120}
             editable={!busy}
-            style={[Type.body, styles.detailInput, { color: theme.text }]}
+            style={[Type.body, appFontFor(Type.body), styles.detailInput, { color: theme.text }]}
           />
         </View>
 
-        {/* Today, Yesterday, and — the part that was missing — any other day.
-            The third segment used to be a plain View rather than a Pressable,
-            and only appeared at all when editing a record that already had
-            another date. So there was NO date picker: on a shared-expense app,
-            where people routinely log a receipt days later, nothing dated
-            before yesterday could ever be entered. */}
+        {/* Today, Yesterday, or any other day from the calendar: people log
+            a receipt days later all the time. */}
         <View style={[styles.detailRow, { borderTopColor: theme.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: theme.backgroundSelected }]}>
-            <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
+          <View style={[styles.detailIcon, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="calendar-outline" size={18} color={theme.brandInk} />
           </View>
           <View
             accessibilityRole="radiogroup"
             accessibilityLabel="When"
-            style={[styles.segment, styles.flex, { backgroundColor: theme.backgroundSunken }]}>
+            style={[styles.segment, styles.flex, { backgroundColor: theme.liftTile }]}>
             {[
               { key: today, label: 'Today' },
               { key: yesterday, label: 'Yesterday' },
@@ -275,10 +289,7 @@ export function ExpenseForm({
                   accessibilityState={{ checked: selected }}
                   onPress={() => setDate(opt.key)}
                   disabled={busy}
-                  style={[
-                    styles.segmentItem,
-                    selected && { backgroundColor: theme.backgroundElement },
-                  ]}>
+                  style={[styles.segmentItem, selected && [styles.segmentOn, card]]}>
                   <ThemedText
                     themeColor={selected ? 'text' : 'textSecondary'}
                     style={[Type.caption, selected && styles.semi]}>
@@ -297,10 +308,7 @@ export function ExpenseForm({
                 setPickingDate(true);
               }}
               disabled={busy}
-              style={[
-                styles.segmentItem,
-                isOtherDay && { backgroundColor: theme.backgroundElement },
-              ]}>
+              style={[styles.segmentItem, isOtherDay && [styles.segmentOn, card]]}>
               <ThemedText
                 themeColor={isOtherDay ? 'text' : 'textSecondary'}
                 style={[Type.caption, isOtherDay && styles.semi]}
@@ -310,7 +318,7 @@ export function ExpenseForm({
             </Pressable>
           </View>
         </View>
-      </Card>
+      </View>
 
       <View style={styles.field}>
         <ThemedText style={styles.sectionTitle}>Paid by</ThemedText>
@@ -324,20 +332,35 @@ export function ExpenseForm({
             return (
               <Pressable
                 key={m.id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`Paid by ${m.displayName}`}
                 onPress={() => setPaidBy(m.id)}
                 disabled={busy}
                 style={({ pressed }) => [styles.payer, { opacity: pressed ? 0.7 : 1 }]}>
-                <Avatar
-                  name={m.displayName}
-                  seed={m.id}
-                  size={44}
-                  ring={selected}
-                  ringColor={theme.primary}
-                  style={selected ? undefined : styles.dim}
-                />
+                <View>
+                  <Avatar
+                    name={m.displayName}
+                    seed={m.id}
+                    size={50}
+                    ring={selected}
+                    ringColor={theme.primary}
+                    style={selected ? undefined : styles.dim}
+                  />
+                  {/* A tick as well as the ring, so the choice reads without
+                      colour. */}
+                  {selected ? (
+                    <View style={[styles.payerTick, { backgroundColor: theme.primary, borderColor: theme.background }]}>
+                      <Ionicons name="checkmark" size={11} color={theme.onPrimary} />
+                    </View>
+                  ) : null}
+                </View>
                 <ThemedText
-                  themeColor={selected ? 'text' : 'textTertiary'}
-                  style={[Type.micro, selected && styles.semi]}
+                  style={[
+                    Type.micro,
+                    { color: selected ? theme.brandInk : theme.textTertiary },
+                    selected && styles.semi,
+                  ]}
                   numberOfLines={1}>
                   {m.displayName}
                 </ThemedText>
@@ -367,13 +390,15 @@ export function ExpenseForm({
 
       <View style={styles.field}>
         <View style={styles.splitHead}>
-          <ThemedText style={styles.sectionTitle}>Split between</ThemedText>
-          <ThemedText themeColor="textTertiary" style={Type.caption}>
-            {participants.length} of {members.data?.length ?? 0}
-          </ThemedText>
+          <ThemedText style={[styles.sectionTitle, styles.flex]}>Split between</ThemedText>
+          <View style={[styles.countPill, { backgroundColor: theme.primarySoft }]}>
+            <ThemedText style={[Type.micro, styles.semi, { color: theme.brandInk }]}>
+              {participants.length} of {members.data?.length ?? 0}
+            </ThemedText>
+          </View>
         </View>
 
-        <Card padded={false}>
+        <View style={[styles.card, card]}>
           {members.data?.map((m, i) => {
             const included = participants.includes(m.id);
             const isAway = away.data ? !isPresent(m.id, date, away.data) : false;
@@ -389,19 +414,19 @@ export function ExpenseForm({
                 style={({ pressed }) => [
                   styles.splitRow,
                   i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-                  { opacity: pressed ? 0.6 : 1 },
+                  pressed && { backgroundColor: theme.backgroundSelected },
                 ]}>
                 <Avatar
                   name={m.displayName}
                   seed={m.id}
-                  size={36}
+                  size={40}
                   style={included ? undefined : styles.dim}
                 />
 
                 <View style={styles.flex}>
                   <ThemedText
                     themeColor={included ? 'text' : 'textTertiary'}
-                    style={[Type.body, !included && styles.struck]}
+                    style={[Type.body, styles.semi, !included && styles.struck]}
                     numberOfLines={1}>
                     {m.displayName}
                   </ThemedText>
@@ -412,24 +437,22 @@ export function ExpenseForm({
                   ) : null}
                 </View>
 
-                {included && share ? (
-                  <ThemedText style={Type.amount}>{formatPaise(share.amountPaise)}</ThemedText>
-                ) : null}
+                {included && share ? <Money paise={share.amountPaise} size="row" /> : null}
 
                 <Ionicons
                   name={included ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={21}
+                  size={24}
                   color={included ? theme.primary : theme.borderStrong}
                 />
               </Pressable>
             );
           })}
-        </Card>
+        </View>
 
         {category && !category.respectsAwayCalendar ? (
-          <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-            <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
-            <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
+          <View style={[styles.note, { backgroundColor: theme.infoSoft }]}>
+            <Ionicons name="information-circle-outline" size={15} color={theme.info} />
+            <ThemedText style={[Type.micro, styles.flex, { color: theme.info }]}>
               Fixed cost — everyone pays, away or not.
             </ThemedText>
           </View>
@@ -444,6 +467,7 @@ export function ExpenseForm({
 
       <Button
         title={amountPaise ? `${submitLabel} ${formatPaise(amountPaise)}` : submitLabel}
+        style={styles.submit}
         onPress={() => {
           // assertBalanced has existed and been tested since split.ts:85, and
           // was called by nothing. The database catches an unbalanced split at
@@ -480,23 +504,53 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.4 },
   struck: { textDecorationLine: 'line-through' },
 
-  amountBlock: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.two },
+  amountBlock: { alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.two, paddingBottom: Spacing.one },
   amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.one },
-  currency: { fontSize: 28, fontWeight: '600' },
+  currency: { fontSize: 32, lineHeight: 40, fontWeight: '600' },
   // An explicit width (set inline from the digit count), not flex: on web an
   // <input> has an intrinsic width and CSS min-width defaults to auto, so a
   // flexed input pushed the whole screen sideways. minWidth 0 keeps that true.
   amountInput: {
     minWidth: 0,
-    maxWidth: 280,
-    fontSize: 40,
-    fontWeight: '600',
-    letterSpacing: -1,
+    maxWidth: 300,
+    fontSize: 48,
+    letterSpacing: -1.4,
     padding: 0,
   },
-  // Centred while they fit; scrollable once they don't.
-  chipRow: { gap: Spacing.two, flexGrow: 1, justifyContent: 'center' },
+  // Out to the screen edges, so the row scrolls under them; centred while
+  // the chips fit.
+  chipBleed: { alignSelf: 'stretch', marginHorizontal: -Spacing.four, marginTop: Spacing.one },
+  chipRow: {
+    gap: Spacing.two,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
 
+  // The white cards: rounded, a soft shadow, clipping their rows' tints.
+  card: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -505,31 +559,45 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two + 2,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  detailIcon: { width: 34, height: 34, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
+  detailIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   // minWidth 0 for the same web reason as the amount input.
   detailInput: { flex: 1, minWidth: 0, paddingVertical: Spacing.one },
-  // Sentence case at heading size, as on the redesigned screens.
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
-  chip: {
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 6,
+  // Section titles as on the tabs: large, medium weight.
+  sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
+
+  field: { gap: Spacing.two + 2 },
+  payerRow: { gap: Spacing.three, paddingVertical: Spacing.one, paddingRight: Spacing.four },
+  payer: { alignItems: 'center', gap: Spacing.two, width: 64 },
+  payerTick: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  field: { gap: Spacing.two },
-  payerRow: { gap: Spacing.four, paddingVertical: Spacing.one, paddingRight: Spacing.four },
-  payer: { alignItems: 'center', gap: Spacing.two, width: 60 },
-
-  segment: { flexDirection: 'row', borderRadius: Radius.md, padding: 3, gap: 3 },
+  // A pill switch: the chosen day is a small white pill inside it.
+  segment: { flexDirection: 'row', borderRadius: 999, padding: 3, gap: 3 },
   segmentItem: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: Spacing.two,
-    borderRadius: Radius.sm,
+    borderRadius: 999,
+  },
+  segmentOn: {
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
   },
 
-  splitHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  splitHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  countPill: { paddingHorizontal: Spacing.two + 2, paddingVertical: 3, borderRadius: 999 },
   splitRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -542,7 +610,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    borderRadius: Radius.sm,
-    padding: Spacing.two,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
   },
+
+  // The one action: a full-width pill, taller than the default button.
+  submit: { minHeight: 56, borderRadius: 999, marginTop: Spacing.one },
 });

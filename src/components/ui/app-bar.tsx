@@ -104,10 +104,15 @@ export function HomeHeader({
   const unread = (notifications.data ?? []).filter((n) => n.unread).length;
 
   return (
-    <View style={styles.bar}>
-      <View style={styles.homeText}>
-        <ThemedText style={styles.homeGreeting} numberOfLines={1}>
-          {greeting}, <ThemedText style={styles.homeName}>{name}</ThemedText>
+    <View style={[styles.bar, styles.homeBar]}>
+      {/* Two lines, two tones, on the green wash: the greeting light and
+          faded, the name in semibold white -- the way you'd say it. */}
+      <View style={styles.homeText} accessible accessibilityLabel={`${greeting}, ${name}`}>
+        <ThemedText style={[styles.homeGreeting, { color: theme.onWashMuted }]} numberOfLines={1}>
+          {greeting},
+        </ThemedText>
+        <ThemedText style={[styles.homeName, { color: theme.onWash }]} numberOfLines={1}>
+          {name}
         </ThemedText>
       </View>
 
@@ -120,28 +125,20 @@ export function HomeHeader({
           style={({ pressed }) => [
             styles.iconButton,
             {
-              backgroundColor: theme.backgroundElement,
-              borderColor: theme.border,
+              backgroundColor: theme.frost,
+              borderColor: theme.frostEdge,
               opacity: pressed ? 0.7 : 1,
             },
           ]}>
-          {/* Brand green whether or not anything is unread: the red badge is
-              what says "new", so the bell itself never goes grey. */}
-          <Ionicons
-            name={unread > 0 ? 'notifications' : 'notifications-outline'}
-            size={19}
-            color={theme.brandInk}
-          />
+          {/* Frosted on the wash, an outline bell; an amber dot says there is
+              something new. The count is in the button's label. */}
+          <Ionicons name="notifications-outline" size={19} color={theme.frostIcon} />
           {unread > 0 ? (
             <View
-              style={[
-                styles.badge,
-                { backgroundColor: theme.danger, borderColor: theme.background },
-              ]}>
-              <ThemedText style={styles.badgeText} allowFontScaling={false}>
-                {unread > 9 ? '9+' : unread}
-              </ThemedText>
-            </View>
+              style={[styles.unreadDot, { backgroundColor: theme.alertDot }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
           ) : null}
         </Pressable>
 
@@ -162,7 +159,7 @@ export function HomeHeader({
             <View
               style={[
                 styles.badge,
-                { backgroundColor: theme.danger, borderColor: theme.background },
+                { backgroundColor: theme.danger, borderColor: theme.washTop },
               ]}>
               <ThemedText style={styles.badgeText} allowFontScaling={false}>
                 {badge > 9 ? '9+' : badge}
@@ -256,6 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600', lineHeight: 14 },
+  unreadDot: { position: 'absolute', top: 9, right: 10, width: 8, height: 8, borderRadius: 4 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flex: 1 },
   backButton: {
     width: 38,
@@ -269,8 +267,11 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '600', letterSpacing: -0.3 },
   titleBlock: { flex: 1, gap: 1 },
   homeText: { flex: 1, gap: 2 },
-  homeGreeting: { fontSize: 19, fontWeight: '500', letterSpacing: -0.3, lineHeight: 25 },
-  homeName: { fontSize: 19, fontWeight: '600', letterSpacing: -0.3, lineHeight: 25 },
+  // On Home the header scrolls with the wash, so the screen's own padding
+  // sets the sides.
+  homeBar: { paddingHorizontal: 0, alignItems: 'flex-start' },
+  homeGreeting: { fontSize: 24, fontWeight: '300', letterSpacing: -0.6, lineHeight: 30 },
+  homeName: { fontSize: 24, fontWeight: '600', letterSpacing: -0.6, lineHeight: 30 },
   homeRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + Spacing.one },
   // A circle, matching the round avatar beside it in the header.
   iconButton: {

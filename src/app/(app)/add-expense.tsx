@@ -115,12 +115,12 @@ export default function AddExpenseScreen() {
               hitSlop={10}
               style={({ pressed }) => [
                 styles.close,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                { backgroundColor: theme.lift, borderColor: theme.liftEdge, opacity: pressed ? 0.7 : 1 },
               ]}>
               <Ionicons name="close" size={20} color={theme.text} />
             </Pressable>
           </View>
-          <ThemedText style={Type.headline}>New expense</ThemedText>
+          <ThemedText style={styles.title}>New expense</ThemedText>
           <View style={styles.side} />
         </View>
 
@@ -163,13 +163,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   side: { width: 56 },
+  title: { fontSize: 17, lineHeight: 23, fontWeight: '600', letterSpacing: -0.3 },
   close: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   content: { padding: Spacing.four, paddingTop: 0, gap: Spacing.four, paddingBottom: Spacing.six },
   offline: {
