@@ -62,6 +62,7 @@ export default function HouseholdScreen() {
       if (rpcError) throw rpcError;
     },
     onSuccess: () => {
+      dialog.toast({ message: `${name.trim()} added`, icon: 'person-add-outline' });
       setName('');
       setEmail('');
       setJoinedOn(null);

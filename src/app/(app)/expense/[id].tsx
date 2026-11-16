@@ -140,6 +140,11 @@ export default function ExpenseDetailScreen() {
     await queryClient.invalidateQueries();
     setBusy(false);
     setEditing(false);
+    dialog.toast(
+      canEditNow
+        ? { message: 'Changes saved' }
+        : { message: 'Change sent for approval', tone: 'info', icon: 'hourglass-outline' }
+    );
   }
 
   /**
@@ -197,6 +202,11 @@ export default function ExpenseDetailScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries();
       if (canEditNow) router.back();
+      dialog.toast(
+        canEditNow
+          ? { message: 'Expense deleted', icon: 'trash-outline' }
+          : { message: 'Delete request sent for approval', tone: 'info', icon: 'hourglass-outline' }
+      );
     },
     onError: (err) => setError(humanError(err)),
   });
@@ -211,7 +221,10 @@ export default function ExpenseDetailScreen() {
       const { error: rpcError } = await supabase.rpc('unvoid_expense', { p_expense: id });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      dialog.toast({ message: 'Expense restored' });
+      return queryClient.invalidateQueries();
+    },
     onError: (err) => setError(humanError(err)),
   });
 

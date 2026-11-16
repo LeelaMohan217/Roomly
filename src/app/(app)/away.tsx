@@ -157,6 +157,7 @@ export default function AwayScreen() {
       return start < today ? await countBackdated(subject, start, finalEnd ?? today) : null;
     },
     onSuccess: (affected) => {
+      dialog.toast({ message: 'Away dates saved', icon: 'airplane-outline' });
       setBackdated(affected);
       setStart(null);
       setEnd(null);
@@ -172,7 +173,10 @@ export default function AwayScreen() {
       const { error: delError } = await supabase.from('away_periods').delete().eq('id', id);
       if (delError) throw delError;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      dialog.toast({ message: 'Trip removed', icon: 'trash-outline' });
+      return queryClient.invalidateQueries();
+    },
     onError: (e) => setError(humanError(e)),
   });
 

@@ -453,7 +453,12 @@ export default function HomeScreen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: (_, { approve }) => {
+      dialog.toast(
+        approve ? { message: 'Change approved' } : { message: 'Change rejected', tone: 'info' }
+      );
+      return queryClient.invalidateQueries();
+    },
   });
 
   // A housemate's new expense, which counts nowhere until someone other than
@@ -467,7 +472,14 @@ export default function HomeScreen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: (_, { approve }) => {
+      dialog.toast(
+        approve
+          ? { message: 'Approved. It counts now.' }
+          : { message: 'Rejected. It won’t count.', tone: 'info' }
+      );
+      return queryClient.invalidateQueries();
+    },
     onError: (e) =>
       void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
   });
@@ -492,7 +504,14 @@ export default function HomeScreen() {
       });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: (_, { approve }) => {
+      dialog.toast(
+        approve
+          ? { message: 'Request approved. They’re in the household.' }
+          : { message: 'Request declined', tone: 'info' }
+      );
+      return queryClient.invalidateQueries();
+    },
   });
 
   const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise ?? 0;
@@ -801,9 +820,10 @@ export default function HomeScreen() {
         <Appear index={9}>
         <Section
           title="Balances"
-          // Settle up lists every balance, owed to you and owed by you, a row
-          // per person; Household is about members, not money.
-          action={<SectionLink label="All" onPress={() => router.push('/settle')} />}>
+          // Everyone's balance with the house -- the same figures as these
+          // cards, for the whole household. Not Settle up: that is person to
+          // person, so its numbers differ from these.
+          action={<SectionLink label="All" onPress={() => router.push('/balances')} />}>
           {/* Other people, and only those with something open, largest
               first, as a sideways row of small cards. Your own balance is
               the big figure at the top, and a settled housemate answers

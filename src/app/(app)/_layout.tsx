@@ -8,6 +8,7 @@ export default function AppLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="settle" />
+      <Stack.Screen name="balances" />
       <Stack.Screen name="away" />
       <Stack.Screen name="household" />
       <Stack.Screen name="expense/[id]" />

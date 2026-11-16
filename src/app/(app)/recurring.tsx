@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ScreenHeader } from '@/components/ui/app-bar';
+import { useDialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Appear } from '@/components/ui/motion';
@@ -32,6 +33,7 @@ function ordinal(n: number): string {
 
 export default function RecurringScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -62,7 +64,10 @@ export default function RecurringScreen() {
       });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      dialog.toast({ message: 'Bill added as an expense' });
+      return queryClient.invalidateQueries();
+    },
     onError: (e) => setError(humanError(e)),
   });
 

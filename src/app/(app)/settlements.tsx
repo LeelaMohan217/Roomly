@@ -76,7 +76,10 @@ export default function SettlementsScreen() {
         .eq('id', id);
       if (upError) throw upError;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      dialog.toast({ message: 'Payment deleted', icon: 'trash-outline' });
+      return queryClient.invalidateQueries();
+    },
     onError: (e) => setError(humanError(e)),
   });
 

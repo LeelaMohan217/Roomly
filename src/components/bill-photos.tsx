@@ -130,9 +130,11 @@ export function ExpensePhotos({ expenseId, canAdd }: { expenseId: string; canAdd
     mutationFn: async (picked: PickedPhoto[]) =>
       uploadBillPhotos(member!.household_id, member!.id, expenseId, picked),
     onMutate: () => setNote(null),
-    onSuccess: ({ failed, reason }) => {
+    onSuccess: ({ failed, reason }, picked) => {
       if (failed > 0) {
         setNote(`${failed === 1 ? 'A photo' : `${failed} photos`} did not upload. ${reason ?? ''}`.trim());
+      } else {
+        dialog.toast({ message: picked.length === 1 ? 'Photo added' : 'Photos added', icon: 'image-outline' });
       }
     },
     onError: (e) => setNote(humanError(e)),
@@ -141,7 +143,10 @@ export function ExpensePhotos({ expenseId, canAdd }: { expenseId: string; canAdd
 
   const remove = useMutation({
     mutationFn: removeAttachment,
-    onSuccess: () => setOpen(null),
+    onSuccess: () => {
+      setOpen(null);
+      dialog.toast({ message: 'Photo removed', icon: 'trash-outline' });
+    },
     onError: (e) => setNote(humanError(e)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['expense-attachments', expenseId] }),
   });

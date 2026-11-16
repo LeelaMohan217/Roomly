@@ -112,6 +112,7 @@ export default function CategoryEditScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries();
       router.back();
+      dialog.toast({ message: id ? 'Category saved' : `${name.trim()} added` });
     },
     onError: (e) => {
       const msg = humanError(e);
@@ -138,6 +139,7 @@ export default function CategoryEditScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries();
       router.back();
+      dialog.toast({ message: 'Category deleted', icon: 'trash-outline' });
     },
     onError: (e) => setError(humanError(e)),
   });

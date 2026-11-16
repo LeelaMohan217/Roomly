@@ -12,7 +12,7 @@ import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_PHOTOS, uploadBillPhotos } from '@/lib/attachments';
 import { humanError } from '@/lib/errors';
-import { committed, rejected } from '@/lib/haptics';
+import { rejected } from '@/lib/haptics';
 import { useCategories, useMembers } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useSync } from '@/lib/sync';
@@ -67,7 +67,13 @@ export default function AddExpenseScreen() {
     // Sent or queued, the entry is safe either way — so the screen closes
     // and the banner reports what happened. The buzz is the confirmation
     // that survives the screen disappearing.
-    committed();
+    // The toast gives the same buzz committed() did, and says whether it is
+    // already shared or waiting for a connection.
+    dialog.toast(
+      expenseId
+        ? { message: 'Expense added' }
+        : { message: 'Saved. It sends when you’re back online.', icon: 'cloud-upload-outline' }
+    );
 
     // Photos follow the expense, which needs to exist first. A queued expense
     // has no server row yet, so its photos cannot go with it: say so rather

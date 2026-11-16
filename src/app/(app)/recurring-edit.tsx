@@ -128,6 +128,7 @@ export default function RecurringEditScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries();
       router.back();
+      dialog.toast({ message: id ? 'Bill saved' : 'Bill added' });
     },
     onError: (e) => setError(humanError(e)),
   });
@@ -140,6 +141,7 @@ export default function RecurringEditScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries();
       router.back();
+      dialog.toast({ message: 'Bill deleted', icon: 'trash-outline' });
     },
     onError: (e) => setError(humanError(e)),
   });

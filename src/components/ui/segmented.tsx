@@ -58,12 +58,14 @@ export function Segmented<T extends string>({
 
   return (
     <View
-      style={[styles.row, { backgroundColor: theme.liftTile }]}
+      // A soft-white track with the thin edge, so it reads against the page;
+      // the chosen side is a light green pill, like the current tab.
+      style={[styles.row, { backgroundColor: theme.lift, borderColor: theme.liftEdge }]}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {segment > 0 ? (
         <Animated.View
           pointerEvents="none"
-          style={[styles.thumb, { width: segment, backgroundColor: theme.backgroundElement }, thumb]}
+          style={[styles.thumb, { width: segment, backgroundColor: theme.tabActive }, thumb]}
         />
       ) : null}
       {options.map((opt) => {
@@ -78,10 +80,10 @@ export function Segmented<T extends string>({
             disabled={disabled}
             style={[
               styles.item,
-              selected && segment === 0 && { backgroundColor: theme.backgroundElement },
+              selected && segment === 0 && { backgroundColor: theme.tabActive },
             ]}>
             <ThemedText
-              themeColor={selected ? 'text' : 'textSecondary'}
+              themeColor={selected ? 'tabActiveInk' : 'textSecondary'}
               style={[Type.caption, selected && styles.selected]}
               numberOfLines={1}>
               {opt.label}
@@ -98,8 +100,14 @@ const PAD = 3;
 const GAP = 3;
 
 const styles = StyleSheet.create({
-  // A pill switch: the chosen option is a soft-white pill inside it.
-  row: { flexDirection: 'row', borderRadius: Radius.pill, padding: PAD, gap: GAP },
+  // A pill switch: the chosen option is a light green pill inside it.
+  row: {
+    flexDirection: 'row',
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: PAD,
+    gap: GAP,
+  },
   thumb: { position: 'absolute', top: PAD, bottom: PAD, left: PAD, borderRadius: Radius.pill },
   item: {
     flex: 1,

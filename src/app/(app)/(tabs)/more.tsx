@@ -22,7 +22,7 @@ import {
   updateTag,
 } from '@/lib/build-info';
 import { humanError } from '@/lib/errors';
-import { committed, rejected } from '@/lib/haptics';
+import { rejected } from '@/lib/haptics';
 import { PUSH_LABELS, usePushStatus } from '@/lib/push';
 import { useMembers, usePendingChanges } from '@/lib/queries';
 import { useSession } from '@/lib/session';
@@ -94,9 +94,11 @@ export default function MoreScreen() {
       const { error } = await supabase.rpc('transfer_ownership', { p_member_id: id });
       if (error) throw error;
     },
-    onSuccess: () => {
-      committed();
+    onSuccess: (_, id) => {
       setHandOver(false);
+      const who = members.data?.find((m) => m.id === id)?.displayName ?? 'They';
+      // The toast gives the same buzz committed() did.
+      dialog.toast({ message: `${who} is now the owner`, icon: 'key-outline' });
       void queryClient.invalidateQueries();
     },
     onError: (e) => {
@@ -347,19 +349,20 @@ export default function MoreScreen() {
           </Appear>
         ))}
 
-        {/* A full red pill with its words centred: the one thing here that
-            ends something, alone so it is never tapped on the way to another
-            row. It still asks before signing out. */}
+        {/* A pale red pill with red words, centred: clearly the way out, but
+            quiet -- it is not a main action, and the confirmation that
+            follows carries the solid red. Alone so it is never tapped on the
+            way to another row. */}
         <Appear index={groups.length + 1}>
           <Pressable
             accessibilityRole="button"
             onPress={() => void confirmSignOut()}
             style={({ pressed }) => [
               styles.signOut,
-              { backgroundColor: theme.danger, opacity: pressed ? 0.85 : 1 },
+              { backgroundColor: theme.dangerSoft, opacity: pressed ? 0.75 : 1 },
             ]}>
-            <Ionicons name="log-out-outline" size={19} color={theme.onDanger} />
-            <ThemedText style={[Type.body, styles.semi, { color: theme.onDanger }]}>Sign out</ThemedText>
+            <Ionicons name="log-out-outline" size={19} color={theme.danger} />
+            <ThemedText style={[Type.body, styles.semi, { color: theme.danger }]}>Sign out</ThemedText>
           </Pressable>
         </Appear>
       </ScrollView>

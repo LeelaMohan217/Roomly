@@ -52,7 +52,10 @@ export default function MonthStatementScreen() {
       const { error: rpcError } = await supabase.rpc('close_period', { p_period: period!.id });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      dialog.toast({ message: 'Month closed', icon: 'lock-closed-outline' });
+      return queryClient.invalidateQueries();
+    },
     onError: (e) => setError(humanError(e)),
   });
 
@@ -71,7 +74,10 @@ export default function MonthStatementScreen() {
       const { error: rpcError } = await supabase.rpc('reopen_period', { p_period: period!.id });
       if (rpcError) throw rpcError;
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      dialog.toast({ message: 'Month reopened', icon: 'lock-open-outline' });
+      return queryClient.invalidateQueries();
+    },
     onError: (e) => setError(humanError(e)),
   });
 

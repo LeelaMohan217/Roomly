@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,13 +13,14 @@ import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { useDialog } from '@/components/ui/dialog';
 import { Appear, Reveal } from '@/components/ui/motion';
+import { Money } from '@/components/ui/money';
 import { queryState } from '@/components/ui/query-state';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet } from '@/components/ui/sheet';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
-import { committed, rejected } from '@/lib/haptics';
+import { rejected } from '@/lib/haptics';
 import { exportPairStatement } from '@/lib/backup';
 import { dayOf, formatRange, todayIso } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
@@ -250,8 +252,9 @@ export default function SettleScreen() {
     // before the pending list arrived the card offered "I have paid this"
     // again -- a second tap is a real duplicate.
     onSuccess: () => {
-      committed();
       setError(null);
+      // The toast gives the same buzz committed() did.
+      dialog.toast({ message: 'Payment recorded', icon: 'swap-horizontal' });
       return queryClient.invalidateQueries();
     },
     onError: (e) => {
@@ -272,9 +275,13 @@ export default function SettleScreen() {
     onMutate: () => setError(null),
     // Returned for the same reason: "Got it" stayed tappable on a payment
     // already confirmed, and a second tap came back as a red refusal.
-    onSuccess: () => {
-      committed();
+    onSuccess: (_, { approve }) => {
       setError(null);
+      dialog.toast(
+        approve
+          ? { message: 'Payment confirmed' }
+          : { message: 'Marked as not received', tone: 'info' }
+      );
       return queryClient.invalidateQueries();
     },
     onError: (e) => {
@@ -385,16 +392,18 @@ export default function SettleScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         {/* Where you stand overall, before anything else -- the answer the
-            three tabs otherwise left you to add up. The same green card as
-            Home's, so the two screens agree on what the headline is. */}
+            three tabs otherwise left you to add up. In the app's green: the
+            same deep-to-bright gradient as Home's header, the balance set the
+            same way (a − when you owe, paise small), and the two halves of it
+            in frosted tiles. */}
         {myBalance !== undefined ? (
           <Appear index={0}>
-            <View
-              style={[
-                styles.summary,
-                { backgroundColor: theme.balanceCard, borderColor: theme.balanceEdge },
-              ]}>
-              <ThemedText style={[Type.caption, { color: theme.onBalanceMuted }]}>
+            <LinearGradient
+              colors={[theme.washTop, theme.washMid, theme.washLow]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.summary}>
+              <ThemedText style={[Type.caption, { color: theme.onWashMuted }]}>
                 {myBalance > 0
                   ? 'Overall, you get back'
                   : myBalance < 0
@@ -402,24 +411,21 @@ export default function SettleScreen() {
                     : 'You’re all square'}
               </ThemedText>
               <View style={styles.summaryAction}>
-                <ThemedText
-                  style={[
-                    styles.summaryValue,
-                    styles.flex,
-                    {
-                      color:
-                        myBalance > 0
-                          ? theme.balancePositive
-                          : myBalance < 0
-                            ? theme.balanceNegative
-                            : theme.onBalance,
-                    },
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}>
-                  {formatPaise(Math.abs(myBalance))}
-                </ThemedText>
+                <View style={styles.flex}>
+                  <Money
+                    paise={myBalance < 0 ? myBalance : Math.abs(myBalance)}
+                    signed={myBalance < 0}
+                    size="hero"
+                    color={theme.onWash}
+                    accessibilityLabel={
+                      myBalance > 0
+                        ? `Overall, you get back ${formatPaise(myBalance)}`
+                        : myBalance < 0
+                          ? `Overall, you owe ${formatPaise(-myBalance)}`
+                          : 'You’re all square'
+                    }
+                  />
+                </View>
                 {/* The way to act, beside the amount it settles. Only when the
                     plan actually asks you to pay: pairwise nets SUM to your
                     balance, so you can owe one person and still have nothing to
@@ -431,25 +437,12 @@ export default function SettleScreen() {
               {/* Only with lists to sum: when they are withheld for drift, two
                   zeros here would contradict the figure above. */}
               {pairs.rows.length > 0 ? (
-                <View style={[styles.summarySplit, { borderTopColor: theme.balanceRule }]}>
-                  <View style={styles.flex}>
-                    <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>You owe</ThemedText>
-                    <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
-                      {formatPaise(iOweTotal)}
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.summaryDivider, { backgroundColor: theme.balanceRule }]} />
-                  <View style={[styles.flex, styles.summaryRight]}>
-                    <ThemedText style={[Type.micro, { color: theme.onBalanceMuted }]}>
-                      Owed to you
-                    </ThemedText>
-                    <ThemedText style={[styles.summaryPart, { color: theme.onBalance }]}>
-                      {formatPaise(owedTotal)}
-                    </ThemedText>
-                  </View>
+                <View style={styles.summarySplit}>
+                  <SummaryTile icon="arrow-up" label="You owe" paise={iOweTotal} />
+                  <SummaryTile icon="arrow-down" label="Owed to you" paise={owedTotal} />
                 </View>
               ) : null}
-            </View>
+            </LinearGradient>
           </Appear>
         ) : null}
 
@@ -1256,6 +1249,36 @@ function routingNotes(pair: PairNet, them: string): string[] {
 }
 
 /**
+ * One half of the overall balance, frosted on the summary card: an arrow in a
+ * small disc (up, money going out; down, coming in), the label and the sum.
+ */
+function SummaryTile({
+  icon,
+  label,
+  paise,
+}: {
+  icon: 'arrow-up' | 'arrow-down';
+  label: string;
+  paise: number;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[styles.summaryTile, { backgroundColor: theme.frostLight, borderColor: theme.frostStrongEdge }]}
+      accessible
+      accessibilityLabel={`${label} ${formatPaise(paise)}`}>
+      <View style={styles.summaryTileHead}>
+        <View style={[styles.summaryTileIcon, { backgroundColor: theme.frostStrong }]}>
+          <Ionicons name={icon} size={12} color={theme.onWash} style={styles.summaryArrow} />
+        </View>
+        <ThemedText style={[Type.micro, { color: theme.onWashMuted }]}>{label}</ThemedText>
+      </View>
+      <Money paise={paise} size="card" color={theme.onWash} />
+    </View>
+  );
+}
+
+/**
  * The one button on this screen: a compact pill. Solid green with white words
  * for the thing to do; outlined for the alternative beside it; flat grey with
  * muted words once it is already sent and waiting -- same place and shape, so
@@ -1454,22 +1477,26 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
 
   summary: {
-    borderRadius: Radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 26,
+    overflow: 'hidden',
     padding: Spacing.three + Spacing.one,
     gap: Spacing.one,
   },
-  summaryValue: { fontSize: 30, lineHeight: 38, fontWeight: '600', letterSpacing: -1 },
-  summarySplit: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: Spacing.two,
-    paddingTop: Spacing.two + Spacing.one,
+  // Two frosted tiles side by side.
+  summarySplit: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two + 2 },
+  summaryTile: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.three - 2,
+    paddingVertical: Spacing.two + 2,
+    gap: 4,
   },
-  summaryDivider: { width: StyleSheet.hairlineWidth },
-  summaryRight: { paddingLeft: Spacing.three },
-  summaryPart: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  summaryTileHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  summaryTileIcon: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  // Ionicons has no plain diagonal arrow: turned 45°, down points down-left
+  // (in, to you) and up points up-right (out), as on Home's chip.
+  summaryArrow: { transform: [{ rotate: '45deg' }] },
   // The amount on the left, Settle up on the right of it.
   summaryAction: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
 
