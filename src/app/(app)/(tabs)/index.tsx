@@ -11,6 +11,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +28,7 @@ import { Appear, Reveal } from '@/components/ui/motion';
 import { Money } from '@/components/ui/money';
 import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Radius, Spacing, TabBarClearance, Type, washLocations } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing, TabBarClearance, Type, washLocations } from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, todayIso } from '@/lib/dates';
@@ -172,73 +173,107 @@ function MonthCard({
       ]}>
       <View style={styles.liftHead}>
         <ThemedText style={[Type.caption, styles.semi]}>This month</ThemedText>
-        <ThemedText themeColor="textSecondary" style={Type.caption}>
-          {month}
-        </ThemedText>
+        <View style={[styles.monthChip, { backgroundColor: theme.liftTile }]}>
+          <Ionicons name="calendar-clear-outline" size={12} color={theme.textSecondary} />
+          <ThemedText themeColor="textSecondary" style={Type.micro}>
+            {month}
+          </ThemedText>
+        </View>
       </View>
 
-      <View style={styles.tiles}>
-        <MonthTile
-          emoji="🏠"
+      {/* Two columns on the one card, split by a hairline -- no inner boxes. */}
+      <View style={styles.columns}>
+        <MonthColumn
+          icon="home-outline"
           label="Household"
-          value={housePaise !== undefined ? formatWholeRupees(housePaise) : undefined}
-          compare={
-            housePrevPaise !== undefined ? `${prevMonth} ${formatWholeRupees(housePrevPaise)}` : undefined
-          }
+          paise={housePaise}
+          prevPaise={housePrevPaise}
+          prevMonth={prevMonth}
         />
-        <MonthTile
-          emoji="👤"
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <MonthColumn
+          icon="person-outline"
           label="Your share"
-          value={minePaise !== undefined ? formatWholeRupees(minePaise) : undefined}
-          compare={
-            minePrevPaise !== undefined ? `${prevMonth} ${formatWholeRupees(minePrevPaise)}` : undefined
-          }
+          paise={minePaise}
+          prevPaise={minePrevPaise}
+          prevMonth={prevMonth}
         />
       </View>
     </View>
   );
 }
 
-function MonthTile({
-  emoji,
+/**
+ * One figure: a line icon in a soft green circle, the label, this month so
+ * far, and last month's whole figure under it. Users read "Last month
+ * ₹42,175" at a glance; a "₹3.7k under Oct" chip or a percentage made them
+ * work out what was being compared with what.
+ */
+function MonthColumn({
+  icon,
   label,
-  value,
-  compare,
+  paise,
+  prevPaise,
+  prevMonth,
 }: {
-  emoji: string;
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  value?: string;
-  compare?: string;
+  paise?: number;
+  prevPaise?: number;
+  prevMonth: string;
 }) {
   const theme = useTheme();
+
   return (
-    <View style={[styles.tile2, { backgroundColor: theme.liftTile }]}>
-      <View style={styles.tileHead}>
-        <ThemedText allowFontScaling={false} style={styles.tileEmoji}>{emoji}</ThemedText>
+    <View style={styles.column}>
+      <View style={styles.columnHead}>
+        <View style={[styles.columnIcon, { backgroundColor: theme.primarySoft }]}>
+          <Ionicons name={icon} size={14} color={theme.brandInk} />
+        </View>
         <ThemedText themeColor="textSecondary" style={[Type.micro, styles.flexShrink]} numberOfLines={1}>
           {label}
         </ThemedText>
       </View>
-      {value ? (
+
+      {paise !== undefined ? (
         <ThemedText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-          {value}
+          {formatWholeRupees(paise)}
         </ThemedText>
       ) : (
         <View style={styles.tileValueSkeleton}>
           <Skeleton width="70%" height={20} radius={Radius.sm} />
         </View>
       )}
-      {compare ? (
-        <ThemedText themeColor="textSecondary" style={Type.micro} numberOfLines={1}>
-          {compare}
-        </ThemedText>
-      ) : (
+
+      {/* Last month's whole figure, plainly: the two numbers make the
+          comparison without anything to decode. */}
+      {prevPaise === undefined ? (
         <View style={styles.tileFootSkeleton}>
-          <Skeleton width={70} height={10} />
+          <Skeleton width={80} height={10} />
         </View>
+      ) : (
+        <ThemedText themeColor="textSecondary" style={[Type.micro, styles.lastMonth]} numberOfLines={1}>
+          Last month {formatWholeRupees(prevPaise)}
+        </ThemedText>
       )}
     </View>
   );
+}
+
+/** The page's side margin and the gap between Balances cards. */
+const STRIP_SIDE = 18;
+const STRIP_GAP = 10;
+/** How much of the third Balances card shows at the right edge. */
+const STRIP_PEEK = 44;
+
+/**
+ * A Balances card's width: two whole cards across the screen, and the third
+ * peeking in STRIP_PEEK from the right edge, so the row plainly scrolls.
+ * From the app's column width, so it holds on any phone.
+ */
+function usePersonCardWidth() {
+  const screen = Math.min(useWindowDimensions().width, MaxContentWidth);
+  return Math.round((screen - STRIP_SIDE - STRIP_GAP * 2 - STRIP_PEEK) / 2);
 }
 
 /**
@@ -248,9 +283,10 @@ function MonthTile({
  */
 function PersonCard({ memberId, name, paise }: { memberId: string; name: string; paise: number }) {
   const theme = useTheme();
+  const width = usePersonCardWidth();
   return (
     <View
-      style={[styles.personCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}
+      style={[styles.personCard, { width, backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}
       accessible
       accessibilityLabel={
         paise > 0
@@ -314,6 +350,7 @@ export default function HomeScreen() {
   const { pending } = useSync();
   const isOwner = member?.role === 'owner';
   const focused = useIsFocused();
+  const cardWidth = usePersonCardWidth();
   const insets = useSafeAreaInsets();
   // How far down the green wash reaches: measured from the header, balance
   // and quick actions, plus enough to run behind the top of the month card.
@@ -773,7 +810,7 @@ export default function HomeScreen() {
               ? [0, 1, 2].map((i) => (
                   <View
                     key={i}
-                    style={[styles.personCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
+                    style={[styles.personCard, { width: cardWidth, backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
                     <Skeleton width={34} height={34} radius={17} />
                     <View style={styles.personSkeleton}>
                       <Skeleton width="60%" height={11} />
@@ -799,7 +836,7 @@ export default function HomeScreen() {
                   <View
                     style={[
                       styles.personCard,
-                      openBalances.length === 0 && styles.personCardWide,
+                      { width: openBalances.length === 0 ? cardWidth * 2 + STRIP_GAP : cardWidth },
                       { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow },
                     ]}>
                     <View style={[styles.lineIcon, { backgroundColor: theme.primarySoft }]}>
@@ -1059,11 +1096,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
   },
   liftHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tiles: { flexDirection: 'row', gap: Spacing.two },
-  tile2: { flex: 1, borderRadius: Radius.lg, padding: Spacing.two + Spacing.one + 1, gap: 2 },
-  tileEmoji: { fontSize: 13, lineHeight: 17 },
-  tileHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
-  tileValue: { fontSize: 21, lineHeight: 28, fontWeight: '600', letterSpacing: -0.6, marginTop: Spacing.one },
+  monthChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  columns: { flexDirection: 'row', alignItems: 'stretch' },
+  column: { flex: 1, gap: 2 },
+  divider: { width: StyleSheet.hairlineWidth, marginHorizontal: Spacing.three },
+  columnHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  columnIcon: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  lastMonth: { marginTop: 2 },
+  tileValue: { fontSize: 23, lineHeight: 30, fontWeight: '600', letterSpacing: -0.6, marginTop: Spacing.one },
   tileValueSkeleton: { height: 28, justifyContent: 'center', marginTop: Spacing.one },
   tileFootSkeleton: { height: 16, justifyContent: 'center' },
 
@@ -1071,10 +1118,9 @@ const styles = StyleSheet.create({
   // Balances: the row runs edge to edge, its cards starting at the page's
   // left margin and scrolling off the right.
   stripBleed: { marginHorizontal: -18 },
-  strip: { paddingHorizontal: 18, paddingVertical: Spacing.two, gap: 10 },
-  stripInner: { flexDirection: 'row', gap: 10 },
+  strip: { paddingHorizontal: STRIP_SIDE, paddingVertical: Spacing.two, gap: STRIP_GAP },
+  stripInner: { flexDirection: 'row', gap: STRIP_GAP },
   personCard: {
-    width: 128,
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.two + Spacing.one + 1,
@@ -1083,7 +1129,6 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
   },
-  personCardWide: { width: 220 },
   personName: { marginTop: Spacing.two + 2, marginBottom: 2 },
   personSkeleton: { gap: 8, marginTop: Spacing.two + 2 },
 

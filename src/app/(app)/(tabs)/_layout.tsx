@@ -20,6 +20,8 @@ const BAR_MARGIN = TabBar.margin;
 const ADD_SIZE = BODY_HEIGHT;
 /** Room the pill leaves on its right for the Add disc and the gap before it. */
 const ADD_ROOM = ADD_SIZE + TabBar.gap;
+/** The current tab's capsule sits this far inside the bar on every side. */
+const TAB_INSET = 6;
 
 /**
  * The bar’s surface: a floating pill for the four tabs, with the Add disc
@@ -73,14 +75,16 @@ function TabButton({ children, onPress, onLongPress, style, ...rest }: BottomTab
       aria-selected={rest['aria-selected']}
       testID={rest.testID}
       style={({ pressed }) => [style, styles.tab, { opacity: pressed ? 0.6 : 1 }]}>
-      {/* The current tab sits in a soft pill of its own, inside the bar. */}
-      <View
-        style={[
-          styles.tabInner,
-          rest['aria-selected'] ? { backgroundColor: theme.tabActive } : null,
-        ]}>
-        {children}
-      </View>
+      {/* The current tab sits in a capsule inset evenly inside the bar --
+          the same gap above, below and at the sides, with round ends that
+          follow the bar's own. Drawn behind the icon and label rather than
+          wrapped around them, so its size comes from the bar, not from the
+          label (which on a phone came out a square block and squeezed
+          "Reports" to "Repor..."). */}
+      {rest['aria-selected'] ? (
+        <View pointerEvents="none" style={[styles.tabHighlight, { backgroundColor: theme.tabActive }]} />
+      ) : null}
+      {children}
     </Pressable>
   );
 }
@@ -128,9 +132,11 @@ export default function TabsLayout() {
             paddingTop: 0,
             // Keeps the tabs inside the drawn bar, off the footer and sides.
             paddingBottom: footer,
+            // Exactly the pill's edges, so the current tab's capsule sits the
+            // same distance from the bar's sides as from its top and bottom.
             // The right side also clears the Add disc beside the pill.
-            paddingLeft: BAR_MARGIN + Spacing.one,
-            paddingRight: BAR_MARGIN + ADD_ROOM + Spacing.one,
+            paddingLeft: BAR_MARGIN,
+            paddingRight: BAR_MARGIN + ADD_ROOM,
             // The surface is TabBarBackground's drawing; the box itself is
             // invisible. Android's default bar carries elevation 8 and the
             // web one a top border, either of which would outline the box.
@@ -277,14 +283,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // The highlight around the current tab’s icon and label.
-  tabInner: {
-    alignItems: 'center',
     gap: 2,
-    paddingHorizontal: Spacing.three - 2,
-    paddingVertical: 6,
-    borderRadius: 22,
+  },
+  // TAB_INSET from every edge of the tab, which fills the bar's height, so
+  // the capsule is concentric with the bar.
+  tabHighlight: {
+    position: 'absolute',
+    top: TAB_INSET,
+    bottom: TAB_INSET,
+    left: TAB_INSET,
+    right: TAB_INSET,
+    borderRadius: (BODY_HEIGHT - TAB_INSET * 2) / 2,
   },
   label: { fontSize: 11, lineHeight: 14, letterSpacing: 0.1 },
   addButton: {
