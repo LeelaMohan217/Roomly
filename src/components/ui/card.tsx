@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ViewProps } from 'react-native';
 
-import { Elevation, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = ViewProps & {
@@ -22,8 +22,9 @@ export function Card({ variant = 'card', padded = true, style, ...rest }: Props)
           backgroundColor: variant === 'flat' ? theme.backgroundSunken : theme.backgroundElement,
           borderColor: theme.border,
         },
-        variant === 'card' && Elevation.card,
-        variant === 'raised' && Elevation.raised,
+        // No drop shadow: the hairline border marks the card. On Android a
+        // shadowed card fading in drew its shadow as a grey band around a
+        // white box.
         style,
       ]}
       {...rest}

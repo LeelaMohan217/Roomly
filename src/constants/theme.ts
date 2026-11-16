@@ -21,9 +21,12 @@ export const Colors = {
     // needs.
     textTertiary: '#697080',
 
-    // A faint green-grey, after the redesign mockup: the wash fades into it.
-    background: '#F3F6F4',
-    backgroundElement: '#FFFFFF',
+    // A faint green-grey, one shade under the cards, so soft-white cards sit
+    // in it gently instead of looking cut out of it.
+    background: '#EFF3F1',
+    // Soft white, not pure white: pure white cards read stark under the
+    // green wash. Every card and field takes this.
+    backgroundElement: '#FAFCFB',
     backgroundSelected: '#EFF1F5',
     backgroundSunken: '#EBEDF1',
 
@@ -131,6 +134,9 @@ export const Colors = {
     // Frosted controls on the wash: translucent white, no blur library.
     frost: 'rgba(255,255,255,0.16)',
     frostEdge: 'rgba(255,255,255,0.26)',
+    // A stronger frost, for Home's quick-action discs on the brighter green.
+    frostStrong: 'rgba(255,255,255,0.24)',
+    frostStrongEdge: 'rgba(255,255,255,0.42)',
     frostIcon: '#FFFFFF',
     // The unread dot on the bell.
     alertDot: '#FFB547',
@@ -138,15 +144,16 @@ export const Colors = {
     washField: 'rgba(255,255,255,0.94)',
     washFieldEdge: 'rgba(255,255,255,0.6)',
 
-    // The one white card lifted over the wash, and its tiles.
-    lift: '#FFFFFF',
-    liftEdge: '#FFFFFF',
+    // Cards: soft white with a hairline green-grey edge, and the tiles inside
+    // them.
+    lift: '#FAFCFB',
+    liftEdge: '#E2EAE5',
     liftShadow: '#06301F',
-    liftTile: '#F2F6F4',
+    liftTile: '#EEF3F0',
 
     // The pill tab bar, its current-tab highlight and the separate Add disc.
-    tabBar: '#FFFFFF',
-    tabBarEdge: '#E6EEEA',
+    tabBar: '#FAFCFB',
+    tabBarEdge: '#E2EAE5',
     tabActive: '#EAF4EF',
     tabActiveInk: '#06301F',
     fab: '#06301F',
@@ -251,6 +258,8 @@ export const Colors = {
     onWashMuted: 'rgba(255,255,255,0.66)',
     frost: 'rgba(255,255,255,0.07)',
     frostEdge: 'rgba(255,255,255,0.12)',
+    frostStrong: 'rgba(255,255,255,0.12)',
+    frostStrongEdge: 'rgba(255,255,255,0.22)',
     frostIcon: '#FFFFFF',
     alertDot: '#FFB547',
     washField: 'rgba(20,25,23,0.92)',

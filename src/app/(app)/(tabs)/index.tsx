@@ -115,10 +115,12 @@ function BalanceHero({
       </View>
 
       {balancePaise !== undefined ? (
-        // No + or − here, as in the mockup: the caption and the chip right
-        // above already say which way it goes, and the label reads it out.
+        // A − when you owe, so a debt never reads as money coming to you.
+        // Owed to you stays unsigned, as in the mockup: the caption and the
+        // chip above say it, and the label reads it out either way.
         <Money
-          paise={Math.abs(balancePaise)}
+          paise={owing ? balancePaise : Math.abs(balancePaise)}
+          signed={owing}
           size="hero"
           color={theme.onWash}
           accessibilityLabel={`${householdName ? `${householdName}: ` : ''}${
@@ -293,16 +295,19 @@ function PersonCard({ memberId, name, paise }: { memberId: string; name: string;
           ? `${name} gets back ${formatPaise(paise)}`
           : `${name} owes the house ${formatPaise(-paise)}`
       }>
-      <Avatar name={name} seed={memberId} size={34} />
-      <ThemedText style={[Type.caption, styles.semi, styles.personName]} numberOfLines={1}>
-        {name}
-      </ThemedText>
-      <Money
-        paise={paise}
-        signed
-        size="card"
-        color={paise > 0 ? theme.positive : theme.negative}
-      />
+      {/* The person on the left, name over amount beside them. */}
+      <Avatar name={name} seed={memberId} size={38} />
+      <View style={styles.personText}>
+        <ThemedText style={[Type.caption, styles.semi]} numberOfLines={1}>
+          {name}
+        </ThemedText>
+        <Money
+          paise={paise}
+          signed
+          size="card"
+          color={paise > 0 ? theme.positive : theme.negative}
+        />
+      </View>
     </View>
   );
 }
@@ -811,7 +816,7 @@ export default function HomeScreen() {
                   <View
                     key={i}
                     style={[styles.personCard, { width: cardWidth, backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
-                    <Skeleton width={34} height={34} radius={17} />
+                    <Skeleton width={38} height={38} radius={19} />
                     <View style={styles.personSkeleton}>
                       <Skeleton width="60%" height={11} />
                       <Skeleton width="80%" height={13} />
@@ -842,7 +847,7 @@ export default function HomeScreen() {
                     <View style={[styles.lineIcon, { backgroundColor: theme.primarySoft }]}>
                       <MaterialCommunityIcons name="check" size={17} color={theme.brandInk} />
                     </View>
-                    <ThemedText themeColor="textSecondary" style={[Type.caption, styles.personName]}>
+                    <ThemedText themeColor="textSecondary" style={[Type.caption, styles.personText]}>
                       {openBalances.length === 0
                         ? 'Everyone else is settled up'
                         : `${settledCount === 1 ? '1 other is' : `${settledCount} others are`} settled up`}
@@ -1082,18 +1087,14 @@ const styles = StyleSheet.create({
   // The same height as the figure it stands in for, so nothing moves.
   balanceSkeleton: { height: 50, justifyContent: 'center' },
 
-  // The lifted card: big radius, a wide soft shadow, no visible border in
-  // light mode (its edge is its own white).
+  // The lifted card: big radius and a hairline edge, no shadow (a shadowed
+  // card fading in on Android drew a grey band around itself).
   lift: {
     marginHorizontal: -4,
     borderRadius: 26,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
     gap: Spacing.three,
-    elevation: 10,
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
   },
   liftHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthChip: {
@@ -1120,26 +1121,22 @@ const styles = StyleSheet.create({
   stripBleed: { marginHorizontal: -18 },
   strip: { paddingHorizontal: STRIP_SIDE, paddingVertical: Spacing.two, gap: STRIP_GAP },
   stripInner: { flexDirection: 'row', gap: STRIP_GAP },
+  // Avatar left, words right.
   personCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + 2,
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.two + Spacing.one + 1,
-    elevation: 3,
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
   },
-  personName: { marginTop: Spacing.two + 2, marginBottom: 2 },
-  personSkeleton: { gap: 8, marginTop: Spacing.two + 2 },
+  personText: { flex: 1, minWidth: 0, gap: 2 },
+  personSkeleton: { flex: 1, gap: 8 },
 
   // Recent: one card per expense, a rounded-square tile for its category.
   recentCard: {
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    elevation: 2,
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
   },
   rowTile: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rowSkeletonText: { gap: 6 },

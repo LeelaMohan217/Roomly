@@ -469,23 +469,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
     gap: Spacing.three,
-    elevation: 10,
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
   },
   liftHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   avg: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   avgDash: { width: 14, borderTopWidth: 1, borderStyle: 'dashed' },
-  // The other cards: white, rounded, a soft shadow.
+  // The other cards: soft white, rounded, a hairline edge and no shadow.
   cardBox: {
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    elevation: 3,
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
   },
 
   section: { gap: Spacing.two + 2 },

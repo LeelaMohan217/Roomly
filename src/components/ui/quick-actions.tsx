@@ -70,11 +70,11 @@ function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean })
           style={[
             styles.circle,
             styles.frosted,
-            { backgroundColor: theme.frost, borderColor: theme.frostEdge },
+            { backgroundColor: theme.frostStrong, borderColor: theme.frostStrongEdge },
           ]}>
           <Ionicons name={a.icon} size={22} color={theme.frostIcon} />
         </View>
-        <ThemedText style={[Type.micro, styles.label, { color: theme.onWashMuted }]} numberOfLines={1}>
+        <ThemedText style={[Type.micro, styles.washLabel, { color: theme.onWash }]} numberOfLines={1}>
           {a.label}
         </ThemedText>
       </AnimatedPressable>
@@ -112,4 +112,6 @@ const styles = StyleSheet.create({
   },
   frosted: { width: 54, height: 54, borderRadius: 27, borderWidth: 1 },
   label: { fontWeight: '500' },
+  // Full white and a step heavier, so the names hold on the brighter green.
+  washLabel: { fontWeight: '600' },
 });

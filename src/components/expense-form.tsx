@@ -535,21 +535,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    elevation: 2,
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
   },
 
-  // The white cards: rounded, a soft shadow, clipping their rows' tints.
+  // The cards: soft white, rounded, a hairline edge, clipping their rows' tints.
   card: {
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    elevation: 3,
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
   },
   detailRow: {
     flexDirection: 'row',
@@ -590,10 +582,6 @@ const styles = StyleSheet.create({
   },
   segmentOn: {
     borderWidth: StyleSheet.hairlineWidth,
-    elevation: 1,
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
   },
 
   splitHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
