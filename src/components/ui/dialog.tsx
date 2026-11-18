@@ -31,7 +31,7 @@ import { Icon, type IconName } from '@/components/ui/icon';
 
 export type Tone = 'danger' | 'warning' | 'success' | 'info';
 
-type Palette = (typeof Colors)['light'] | (typeof Colors)['dark'];
+type Palette = (typeof Colors)['light'];
 
 /** The three colours a tone paints with: its ink, its wash, and text on a fill. */
 export function toneColors(theme: Palette, tone: Tone) {

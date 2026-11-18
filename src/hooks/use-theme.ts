@@ -1,13 +1,6 @@
-/**
- * Learn more about light and dark modes:
- * https://docs.expo.dev/guides/color-schemes/
- */
-
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
+// Light-only: the phone's dark mode setting is deliberately ignored.
 export function useTheme() {
-  // Anything but an explicit "dark" -- unspecified, or null on some
-  // platforms -- is light.
-  return Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  return Colors.light;
 }

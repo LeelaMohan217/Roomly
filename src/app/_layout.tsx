@@ -3,7 +3,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { focusManager, QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as Linking from 'expo-linking';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
@@ -13,10 +13,6 @@ import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
 import { AppFonts } from '@/constants/fonts';
 import { MaxContentWidth } from '@/constants/theme';
-// One source of truth for the colour scheme. The navigator theme and the
-// design tokens reading different hooks is how you get light cards on a dark
-// page.
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { recoveryStarted, setRecoveryPending, useRecoveryPending } from '@/lib/recovery';
 import { SessionProvider, useSession } from '@/lib/session';
@@ -45,8 +41,6 @@ if (Platform.OS !== 'web') {
 const DAY = 1000 * 60 * 60 * 24;
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -68,8 +62,9 @@ export default function RootLayout() {
 
   const [persister] = useState(() => createAsyncStoragePersister({ storage: AsyncStorage }));
 
+  // Light-only: the phone's dark mode setting is ignored.
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{ persister, maxAge: 7 * DAY }}>
