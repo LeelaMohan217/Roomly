@@ -6,12 +6,15 @@ import { ThemedText } from '@/components/themed-text';
 import { Appear, usePressFeedback } from '@/components/ui/motion';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useTourTarget, type TourTarget } from '@/lib/tour';
 
 export type QuickAction = {
   key: string;
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
+  /** Names this action's disc as a stop on the first-run tour. */
+  tourTarget?: TourTarget;
 };
 
 const SIZE = 48;
@@ -56,6 +59,7 @@ export function QuickActions({
 function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean }) {
   const theme = useTheme();
   const press = usePressFeedback({ dim: 0.35, squash: 0.04 });
+  const ref = useTourTarget(a.tourTarget);
 
   if (onWash) {
     return (
@@ -67,6 +71,8 @@ function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean })
         onPressOut={press.onPressOut}
         style={[styles.item, press.style]}>
         <View
+          ref={ref}
+          collapsable={false}
           style={[
             styles.circle,
             styles.frosted,
@@ -89,7 +95,7 @@ function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean })
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={[styles.item, press.style]}>
-      <View style={[styles.circle, { backgroundColor: theme.primarySoft }]}>
+      <View ref={ref} collapsable={false} style={[styles.circle, { backgroundColor: theme.primarySoft }]}>
         <Ionicons name={a.icon} size={21} color={theme.brandInk} />
       </View>
       <ThemedText style={[Type.micro, styles.label]} numberOfLines={1}>

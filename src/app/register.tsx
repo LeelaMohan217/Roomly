@@ -20,6 +20,7 @@ import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
 import { normalizePhone, PHONE_PREFIX, phoneProblem, toTenDigits } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
+import { TOUR_METADATA_KEY } from '@/lib/tour';
 
 const MIN_PASSWORD = 8;
 
@@ -96,7 +97,10 @@ export default function RegisterScreen() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { display_name: name.trim(), phone: phoneE164 } },
+      // The first-run tour is for accounts made here and nowhere else; the
+      // flag rides on the account itself, so it follows them to whichever
+      // phone they first sign in on (see lib/tour).
+      options: { data: { display_name: name.trim(), phone: phoneE164, [TOUR_METADATA_KEY]: true } },
     });
 
     setBusy(false);

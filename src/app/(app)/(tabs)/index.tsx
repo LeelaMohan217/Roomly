@@ -49,6 +49,7 @@ import { useSession } from '@/lib/session';
 import { isPresent } from '@/lib/split';
 import { supabase } from '@/lib/supabase';
 import { useSync } from '@/lib/sync';
+import { useTourStore, useTourTarget } from '@/lib/tour';
 
 type JoinRequest = {
   id: string;
@@ -77,11 +78,12 @@ function BalanceHero({
   balancePaise?: number;
 }) {
   const theme = useTheme();
+  const tourTarget = useTourTarget('balance');
   const owed = balancePaise !== undefined && balancePaise > 0;
   const owing = balancePaise !== undefined && balancePaise < 0;
 
   return (
-    <View style={styles.hero}>
+    <View ref={tourTarget} collapsable={false} style={styles.hero}>
       <View style={styles.balanceCaptionRow}>
         <ThemedText style={[Type.caption, styles.flexShrink, { color: theme.onWashMuted }]} numberOfLines={1}>
           {balancePaise === undefined
@@ -167,8 +169,11 @@ function MonthCard({
   minePrevPaise?: number;
 }) {
   const theme = useTheme();
+  const tourTarget = useTourTarget('month');
   return (
     <View
+      ref={tourTarget}
+      collapsable={false}
       style={[
         styles.lift,
         { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow },
@@ -553,6 +558,24 @@ export default function HomeScreen() {
     .sort((a, b) => Math.abs(b.balancePaise) - Math.abs(a.balancePaise));
   const settledCount = others.length - openBalances.length;
 
+  // The first-run tour measures this screen's cards, so it waits until Home
+  // is showing and its figures have landed (or a few seconds have passed, so
+  // a slow network never holds it off for good). See lib/tour.
+  const setTourHomeReady = useTourStore((s) => s.setHomeReady);
+  const figuresLoaded = !!balances.data && !!spend.data;
+  useEffect(() => {
+    if (!focused) {
+      setTourHomeReady(false);
+      return;
+    }
+    if (figuresLoaded) {
+      setTourHomeReady(true);
+      return;
+    }
+    const timer = setTimeout(() => setTourHomeReady(true), 4000);
+    return () => clearTimeout(timer);
+  }, [focused, figuresLoaded, setTourHomeReady]);
+
   return (
     // No top edge: the green wash runs up under the status bar, and the
     // scroll content pads itself by the inset instead.
@@ -623,6 +646,7 @@ export default function HomeScreen() {
             actions={[
               {
                 key: 'settle',
+                tourTarget: 'settle',
                 icon: 'swap-horizontal',
                 label: 'Settle',
                 onPress: () => router.push('/settle'),

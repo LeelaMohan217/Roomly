@@ -1,9 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs, useRouter } from 'expo-router';
 import type { BottomTabBarButtonProps } from 'expo-router/tabs';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GuidedTour } from '@/components/guided-tour';
 import { PhoneNudge } from '@/components/phone-nudge';
 import { UpdatePrompt } from '@/components/update-prompt';
 import { SyncBanner } from '@/components/ui/sync-banner';
@@ -13,6 +23,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { tapped } from '@/lib/haptics';
 import { usePushRegistration } from '@/lib/push';
 import { useHouseholdRealtime } from '@/lib/realtime';
+import { useSession } from '@/lib/session';
+import { resolveTour, useTourStore, useTourTarget, type TourTarget } from '@/lib/tour';
 
 const BODY_HEIGHT = TabBar.body;
 const BAR_MARGIN = TabBar.margin;
@@ -22,6 +34,21 @@ const ADD_SIZE = BODY_HEIGHT;
 const ADD_ROOM = ADD_SIZE + TabBar.gap;
 /** The current tab's capsule sits this far inside the bar on every side. */
 const TAB_INSET = 6;
+/** One easing for the capsule sliding over and the colours changing under it. */
+const TAB_EASE = { duration: 220, easing: Easing.out(Easing.cubic) };
+
+type IconName = keyof typeof Ionicons.glyphMap;
+
+/** What each tab draws, and its stop on the first-run tour, by route name. */
+const TABS: Record<string, { title: string; icon: IconName; iconFocused: IconName; tour: TourTarget }> = {
+  index: { title: 'Home', icon: 'home-outline', iconFocused: 'home', tour: 'tab-home' },
+  history: { title: 'History', icon: 'receipt-outline', iconFocused: 'receipt', tour: 'tab-history' },
+  reports: { title: 'Reports', icon: 'bar-chart-outline', iconFocused: 'bar-chart', tour: 'tab-reports' },
+  more: { title: 'More', icon: 'menu-outline', iconFocused: 'menu', tour: 'tab-more' },
+};
+
+/** A tab's place inside the pill: its left edge and width. */
+type Slot = { x: number; width: number };
 
 /**
  * The bar’s surface: a floating pill for the four tabs, with the Add disc
@@ -31,9 +58,33 @@ const TAB_INSET = 6;
  * Below the bar’s middle, the full width down to the bottom of the screen is
  * painted in the page colour. Screens scroll behind the bar, and without this
  * their rows showed through the gap under it and beside its lower half.
+ *
+ * The current tab's capsule lives here, inside the pill and behind the tabs,
+ * drawn once and slid from tab to tab -- it used to be drawn inside each
+ * tab, so it vanished from one and reappeared on the next. Inside the pill
+ * rather than beside it because the pill carries Android elevation, which
+ * would draw it over any sibling drawn after it.
  */
-function TabBarBackground({ footer }: { footer: number }) {
+function TabBarBackground({
+  footer,
+  pillRef,
+  indicatorX,
+  indicatorWidth,
+}: {
+  footer: number;
+  pillRef: RefObject<View | null>;
+  indicatorX: SharedValue<number>;
+  indicatorWidth: SharedValue<number>;
+}) {
   const theme = useTheme();
+  // The same TAB_INSET from the pill's top and bottom as from the tab's
+  // sides, with round ends that follow the pill's own.
+  const capsule = useAnimatedStyle(() => ({
+    left: indicatorX.get() + TAB_INSET,
+    width: Math.max(indicatorWidth.get() - TAB_INSET * 2, 0),
+    opacity: indicatorWidth.get() > 0 ? 1 : 0,
+  }));
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <View
@@ -43,6 +94,8 @@ function TabBarBackground({ footer }: { footer: number }) {
         ]}
       />
       <View
+        ref={pillRef}
+        collapsable={false}
         style={[
           styles.pill,
           {
@@ -51,8 +104,9 @@ function TabBarBackground({ footer }: { footer: number }) {
             borderColor: theme.tabBarEdge,
             shadowColor: theme.liftShadow,
           },
-        ]}
-      />
+        ]}>
+        <Animated.View style={[styles.tabHighlight, { backgroundColor: theme.tabActive }, capsule]} />
+      </View>
     </View>
   );
 }
@@ -63,11 +117,74 @@ function TabBarBackground({ footer }: { footer: number }) {
  * Our own button rather than the navigator's: its default is a pressable with
  * a borderless Android ripple, which drew a large grey circle spilling past
  * the bar whenever a tab was tapped.
+ *
+ * It draws its own icon and label, ignoring the navigator's, so the change
+ * between current and not can ease: the outline and filled icons, and the two
+ * label weights and colours, cross-fade over the capsule's slide. It also
+ * reports where it sits inside the pill, so the capsule knows where to go.
  */
-function TabButton({ children, onPress, onLongPress, style, ...rest }: BottomTabBarButtonProps) {
+function TabButton({
+  children: _navigatorContent,
+  onPress,
+  onLongPress,
+  style,
+  routeName,
+  pillRef,
+  onSlot,
+  onSelected,
+  ...rest
+}: BottomTabBarButtonProps & {
+  routeName: string;
+  pillRef: RefObject<View | null>;
+  onSlot: (name: string, slot: Slot) => void;
+  onSelected: (name: string) => void;
+}) {
   const theme = useTheme();
+  const reduced = useReducedMotion();
+  const meta = TABS[routeName];
+  const selected = !!rest['aria-selected'];
+
+  const tourRef = useTourTarget(meta?.tour);
+  const nodeRef = useRef<View | null>(null);
+  const setRef = useCallback(
+    (node: View | null) => {
+      nodeRef.current = node;
+      tourRef(node);
+    },
+    [tourRef]
+  );
+
+  useEffect(() => {
+    if (selected) onSelected(routeName);
+  }, [selected, routeName, onSelected]);
+
+  // 1 when this is the current tab. Jumps under reduced motion.
+  const progress = useSharedValue(selected ? 1 : 0);
+  useEffect(() => {
+    const to = selected ? 1 : 0;
+    progress.set(reduced ? to : withTiming(to, TAB_EASE));
+  }, [selected, reduced, progress]);
+  const activeStyle = useAnimatedStyle(() => ({ opacity: progress.get() }));
+  const inactiveStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.get() }));
+
+  // Both measured in the window, so the offset holds whatever wraps the tab.
+  const measureSlot = () => {
+    const node = nodeRef.current;
+    const pill = pillRef.current;
+    if (!node || !pill) return;
+    pill.measureInWindow((pillX) => {
+      node.measureInWindow((x, _y, width) => {
+        if (width > 0) onSlot(routeName, { x: x - pillX, width });
+      });
+    });
+  };
+
+  if (!meta) return null;
+
   return (
     <Pressable
+      ref={setRef}
+      onLayout={measureSlot}
       onPress={onPress}
       onLongPress={onLongPress}
       role={rest.role}
@@ -75,16 +192,32 @@ function TabButton({ children, onPress, onLongPress, style, ...rest }: BottomTab
       aria-selected={rest['aria-selected']}
       testID={rest.testID}
       style={({ pressed }) => [style, styles.tab, { opacity: pressed ? 0.6 : 1 }]}>
-      {/* The current tab sits in a capsule inset evenly inside the bar --
-          the same gap above, below and at the sides, with round ends that
-          follow the bar's own. Drawn behind the icon and label rather than
-          wrapped around them, so its size comes from the bar, not from the
-          label (which on a phone came out a square block and squeezed
-          "Reports" to "Repor..."). */}
-      {rest['aria-selected'] ? (
-        <View pointerEvents="none" style={[styles.tabHighlight, { backgroundColor: theme.tabActive }]} />
-      ) : null}
-      {children}
+      <View style={styles.iconBox}>
+        <Animated.View style={inactiveStyle}>
+          <Ionicons name={meta.icon} size={21} color={theme.textTertiary} />
+        </Animated.View>
+        <Animated.View style={[styles.overlay, activeStyle]}>
+          <Ionicons name={meta.iconFocused} size={21} color={theme.tabActiveInk} />
+        </Animated.View>
+      </View>
+      <View>
+        <Animated.Text
+          numberOfLines={1}
+          style={[styles.label, { color: theme.textTertiary }, appFontFor({ fontWeight: '500' }), inactiveStyle]}>
+          {meta.title}
+        </Animated.Text>
+        <Animated.Text
+          numberOfLines={1}
+          style={[
+            styles.label,
+            styles.overlay,
+            { color: theme.tabActiveInk },
+            appFontFor({ fontWeight: '600' }),
+            activeStyle,
+          ]}>
+          {meta.title}
+        </Animated.Text>
+      </View>
     </Pressable>
   );
 }
@@ -108,6 +241,18 @@ export default function TabsLayout() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
+  const addTarget = useTourTarget('add');
+  const tourStatus = useTourStore((s) => s.status);
+  const tourUser = useTourStore((s) => s.userId);
+
+  // Whether this account still has the first-run tour to see (lib/tour).
+  useEffect(() => {
+    if (session) void resolveTour(session);
+    // Per account: a token refresh hands over a new session object for the
+    // same person, and must not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
 
   // Mounted once for the whole tab shell rather than per screen.
   useHouseholdRealtime();
@@ -116,10 +261,34 @@ export default function TabsLayout() {
   // Everything under the bar's body: the gap and the system inset.
   const footer = BAR_MARGIN + insets.bottom;
 
+  // The sliding capsule: where each tab sits in the pill (each tab reports
+  // its own), which one is current, and the capsule's eased position.
+  const reduced = useReducedMotion();
+  const pillRef = useRef<View | null>(null);
+  const [slots, setSlots] = useState<Record<string, Slot>>({});
+  const [current, setCurrent] = useState<string | null>(null);
+  const indicatorX = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
+
+  const reportSlot = useCallback((name: string, slot: Slot) => {
+    setSlots((prev) =>
+      prev[name]?.x === slot.x && prev[name]?.width === slot.width ? prev : { ...prev, [name]: slot }
+    );
+  }, []);
+
+  useEffect(() => {
+    const slot = current ? slots[current] : undefined;
+    if (!slot) return;
+    // The first placement, and anyone who asked for less motion, jumps.
+    const animate = !reduced && indicatorWidth.get() > 0;
+    indicatorX.set(animate ? withTiming(slot.x, TAB_EASE) : slot.x);
+    indicatorWidth.set(animate ? withTiming(slot.width, TAB_EASE) : slot.width);
+  }, [current, slots, reduced, indicatorX, indicatorWidth]);
+
   return (
     <View style={styles.wrap}>
       <Tabs
-        screenOptions={{
+        screenOptions={({ route }) => ({
           headerShown: false,
           tabBarActiveTintColor: theme.tabActiveInk,
           tabBarInactiveTintColor: theme.textTertiary,
@@ -145,34 +314,27 @@ export default function TabsLayout() {
             elevation: 0,
             shadowOpacity: 0,
           },
-          tabBarBackground: () => <TabBarBackground footer={footer} />,
-          tabBarButton: (props) => <TabButton {...props} />,
-          tabBarLabel: ({ focused, color, children }) => (
-            <Text
-              style={[styles.label, { color }, appFontFor({ fontWeight: focused ? '600' : '500' })]}
-              numberOfLines={1}>
-              {children}
-            </Text>
+          tabBarBackground: () => (
+            <TabBarBackground
+              footer={footer}
+              pillRef={pillRef}
+              indicatorX={indicatorX}
+              indicatorWidth={indicatorWidth}
+            />
           ),
-        }}>
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={21} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="history"
-          options={{
-            title: 'History',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={21} color={color} />
-            ),
-          }}
-        />
+          // Icon and label are drawn by TabButton from TABS, so they can ease.
+          tabBarButton: (props) => (
+            <TabButton
+              {...props}
+              routeName={route.name}
+              pillRef={pillRef}
+              onSlot={reportSlot}
+              onSelected={setCurrent}
+            />
+          ),
+        })}>
+        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="history" options={{ title: 'History' }} />
         <Tabs.Screen
           name="add"
           options={{
@@ -184,38 +346,15 @@ export default function TabsLayout() {
             tabBarItemStyle: { display: 'none' },
           }}
         />
-        <Tabs.Screen
-          name="reports"
-          options={{
-            title: 'Reports',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'bar-chart' : 'bar-chart-outline'}
-                size={21}
-                color={color}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="more"
-          options={{
-            title: 'More',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'menu' : 'menu-outline'}
-                size={21}
-                color={color}
-              />
-            ),
-          }}
-        />
+        <Tabs.Screen name="reports" options={{ title: 'Reports' }} />
+        <Tabs.Screen name="more" options={{ title: 'More' }} />
       </Tabs>
 
       {/* Add expense: its own round disc beside the pill, as tall as it.
           It opens the modal instead of switching tabs, so the tab you were on
           stays the current one. */}
       <Pressable
+        ref={addTarget}
         accessibilityRole="button"
         accessibilityLabel="Add expense"
         onPress={() => {
@@ -249,11 +388,16 @@ export default function TabsLayout() {
 
       {/* Mounted once for the tab shell, like the banner: it asks accounts
           made before phone sign-in to add a number, wherever they land. */}
-      <PhoneNudge />
+      {/* One thing at a time over Home: the tour first, and the phone sheet
+          only once it is settled that there is no tour, or it is done. */}
+      {tourStatus === 'idle' && tourUser === session?.user.id ? <PhoneNudge /> : null}
 
       {/* "Update ready -- Restart now" once a new version has downloaded,
           shown only on the tabs so it never lands on a half-typed form. */}
       <UpdatePrompt />
+
+      {/* Last, so it draws over the bar, the Add disc and everything else. */}
+      <GuidedTour />
     </View>
   );
 }
@@ -285,16 +429,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  // TAB_INSET from every edge of the tab, which fills the bar's height, so
-  // the capsule is concentric with the bar.
+  // TAB_INSET from the pill's top and bottom; left and width come from the
+  // current tab's slot. Concentric with the bar.
   tabHighlight: {
     position: 'absolute',
     top: TAB_INSET,
     bottom: TAB_INSET,
-    left: TAB_INSET,
-    right: TAB_INSET,
     borderRadius: (BODY_HEIGHT - TAB_INSET * 2) / 2,
   },
+  iconBox: { alignItems: 'center', justifyContent: 'center' },
+  // The current-tab version, laid exactly over the other one.
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', textAlign: 'center' },
   label: { fontSize: 11, lineHeight: 14, letterSpacing: 0.1 },
   addButton: {
     position: 'absolute',
