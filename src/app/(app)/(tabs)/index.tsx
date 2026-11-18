@@ -59,6 +59,9 @@ import { useTourStore, useTourTarget } from '@/lib/tour';
 import { FeatureCards } from '@/components/ui/feature-cards';
 import { Icon, type IconName } from '@/components/ui/icon';
 
+/** The most insights Home's swipeable row shows. */
+const MAX_INSIGHTS = 5;
+
 /** How many approvals Home shows before "Show all". */
 const HOME_APPROVALS = 2;
 
@@ -384,21 +387,28 @@ export default function HomeScreen() {
   // The one-line insight under the month card (lib/insight).
   const monthly = useMonthlyTotals();
   const nowDate = new Date();
-  // Every true insight; Home shows one, the next each time it opens, and
-  // skips any you've hidden this month.
+  // Every true insight, in a row you swipe through; each open starts one
+  // further along, and any you've hidden this month are left out.
   const rotation = useInsightRotation(member?.id ? `${member.id}` : undefined);
-  const insight = monthly.data
-    ? pickInsight(
-        homeInsights(
-          monthly.data,
-          nowDate.getFullYear(),
-          nowDate.getMonth() + 1,
-          nowDate.getDate()
-        ),
-        rotation.hidden,
-        rotation.turn
+  const visibleInsights = monthly.data
+    ? homeInsights(
+        monthly.data,
+        nowDate.getFullYear(),
+        nowDate.getMonth() + 1,
+        nowDate.getDate()
       )
-    : null;
+        .filter((i) => !rotation.hidden.has(i.key))
+        // The five most useful at most: enough to swipe through, few dots.
+        .slice(0, MAX_INSIGHTS)
+    : [];
+  const first = pickInsight(visibleInsights, new Set(), rotation.turn);
+  const startAt = first ? visibleInsights.indexOf(first) : 0;
+  const insights = [...visibleInsights.slice(startAt), ...visibleInsights.slice(0, startAt)];
+  // One card fills the page's width; dots under the row say there are more
+  // and which one is showing.
+  const screenWidth = useWindowDimensions().width;
+  const insightWidth = Math.min(screenWidth, MaxContentWidth) - STRIP_SIDE * 2;
+  const [insightIndex, setInsightIndex] = useState(0);
   // The six newest, each its own card under Recent; "See all" opens History.
   const expenses = useExpenses(6);
   const away = useAwayPeriods();
@@ -619,12 +629,31 @@ export default function HomeScreen() {
         {/* What the month says, in one line: a category that has passed last
             month, a real fall late in the month, or where the money goes.
             Rises a beat after the card, once the balance has counted up. */}
-        {insight ? (
-          // Keyed, so the next insight rises in when one is hidden.
-          <Appear key={insight.key} index={6}>
+        {insights.length > 0 ? (
+          <Appear index={6}>
+            {/* Every insight at once, side by side: swipe left and right
+                rather than tapping ✕ to reach the next. Snaps one card at a
+                time, the next peeking in at the edge. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={insightWidth + Spacing.two}
+              decelerationRate="fast"
+              scrollEventThrottle={32}
+              onScroll={(e) => {
+                const i = Math.round(
+                  e.nativeEvent.contentOffset.x / (insightWidth + Spacing.two)
+                );
+                if (i !== insightIndex) setInsightIndex(i);
+              }}
+              style={styles.stripBleed}
+              contentContainerStyle={styles.insightRow}>
+            {insights.map((insight) => (
             <View
+              key={insight.key}
               style={[
                 styles.insight,
+                { width: insightWidth },
                 insight.tone === 'up'
                   ? { backgroundColor: theme.warningSoft, borderColor: `${theme.warning}33` }
                   : { backgroundColor: theme.primarySoft, borderColor: theme.washFade },
@@ -675,6 +704,24 @@ export default function HomeScreen() {
                 />
               </Pressable>
             </View>
+            ))}
+            </ScrollView>
+            {/* One dot per insight, the current one long and green. */}
+            {insights.length > 1 ? (
+              <View style={styles.dots} accessibilityElementsHidden>
+                {insights.map((i, n) => (
+                  <View
+                    key={i.key}
+                    style={[
+                      styles.dot,
+                      n === Math.min(insightIndex, insights.length - 1)
+                        ? [styles.dotOn, { backgroundColor: theme.primary }]
+                        : { backgroundColor: theme.borderStrong },
+                    ]}
+                  />
+                ))}
+              </View>
+            ) : null}
           </Appear>
         ) : null}
 
@@ -1139,6 +1186,10 @@ const styles = StyleSheet.create({
   // Balances: the row runs edge to edge, its cards starting at the page's
   // left margin and scrolling off the right.
   stripBleed: { marginHorizontal: -18 },
+  insightRow: { paddingHorizontal: STRIP_SIDE, gap: Spacing.two },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: Spacing.two },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotOn: { width: 16 },
   strip: { paddingHorizontal: STRIP_SIDE, paddingVertical: Spacing.two, gap: STRIP_GAP },
   stripInner: { flexDirection: 'row', gap: STRIP_GAP },
   // Avatar left, words right.

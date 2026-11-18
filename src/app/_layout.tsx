@@ -7,7 +7,8 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter }
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Platform, StyleSheet, View } from 'react-native';
+import { Appearance, AppState, Platform, StyleSheet, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 import { BrandSplash } from '@/components/brand/splash';
 import { DialogProvider } from '@/components/ui/dialog';
@@ -23,6 +24,17 @@ import { SessionProvider, useSession } from '@/lib/session';
 import { SyncProvider } from '@/lib/sync';
 
 SplashScreen.preventAutoHideAsync();
+
+// Light only, whatever the phone is set to: this also turns native pieces --
+// date pickers, alerts, the keyboard -- light on builds whose app.json still
+// says "automatic". (The JS colours come from hooks/use-color-scheme.)
+if (Platform.OS !== 'web') {
+  try {
+    Appearance.setColorScheme('light');
+  } catch {
+    // Older native builds without setColorScheme: the JS palette is still light.
+  }
+}
 
 /**
  * Tell React Query when the app comes back to the foreground, so anything
@@ -70,6 +82,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      {/* Dark status-bar icons by default, for the light pages; the green
+          screens (Home, History, Reports) switch them to white while showing. */}
+      <StatusBar style="dark" />
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{ persister, maxAge: 7 * DAY }}>

@@ -1,27 +1,14 @@
-import { useSyncExternalStore } from 'react';
-import { Appearance, type ColorSchemeName } from 'react-native';
+import type { ColorSchemeName } from 'react-native';
 
 /**
- * The system colour scheme, read through one stable subscription.
+ * Roomly is light only. The phone's dark mode setting is ignored: every
+ * screen is designed for the light palette, and the dark one is no longer
+ * maintained (see constants/theme). The root layout also pins the native
+ * scheme to light (Appearance.setColorScheme), and app.json's
+ * userInterfaceStyle is "light" for the next APK.
  *
- * Not react-native's own useColorScheme: react-native-web's version re-adds
- * its media-query listener in an effect on every render. When the theme
- * flips, the first components to re-render swap their listeners out mid-
- * dispatch and the browser skips the new ones, so half the screen stayed in
- * the old theme -- a dark page with light cards and dark text on it.
- * useSyncExternalStore with a module-level subscribe never churns, so every
- * component sees the same scheme at the same time, on web and native alike.
+ * Kept as a hook so every caller still reads the scheme the same way.
  */
-function subscribe(onChange: () => void) {
-  const sub = Appearance.addChangeListener(onChange);
-  return () => sub.remove();
-}
-
-function getScheme(): ColorSchemeName {
-  // Typed as possibly null or undefined; both mean "no preference".
-  return Appearance.getColorScheme() ?? 'unspecified';
-}
-
 export function useColorScheme(): ColorSchemeName {
-  return useSyncExternalStore(subscribe, getScheme, getScheme);
+  return 'light';
 }

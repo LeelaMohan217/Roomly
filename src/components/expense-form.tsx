@@ -386,7 +386,7 @@ export function ExpenseForm({
                 <View style={styles.flex}>
                   <ThemedText
                     themeColor={included ? 'text' : 'textTertiary'}
-                    style={[Type.body, styles.semi, !included && styles.struck]}
+                    style={[Type.body, styles.semi]}
                     numberOfLines={1}>
                     {m.displayName}
                   </ThemedText>
@@ -399,11 +399,17 @@ export function ExpenseForm({
 
                 {included && share ? <Money paise={share.amountPaise} size="row" /> : null}
 
-                <Icon
-                  name={included ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={24}
-                  color={included ? theme.primary : theme.borderStrong}
-                />
+                {/* In the split: a filled dark-green circle with a white tick.
+                    Out: an empty circle, no colour. */}
+                <View
+                  style={[
+                    styles.check,
+                    included
+                      ? { backgroundColor: theme.brandInk, borderColor: theme.brandInk }
+                      : { backgroundColor: 'transparent', borderColor: theme.borderStrong },
+                  ]}>
+                  {included ? <Icon name="checkmark" size={15} color="#FFFFFF" /> : null}
+                </View>
               </Pressable>
             );
           })}
@@ -534,6 +540,14 @@ const styles = StyleSheet.create({
   },
 
   splitHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  check: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   countPill: { paddingHorizontal: Spacing.two + 2, paddingVertical: 3, borderRadius: 999 },
   splitRow: {
     flexDirection: 'row',
