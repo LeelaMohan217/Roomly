@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,12 +15,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApprovalTag, approvalAmountStyle } from '@/components/approval-tag';
+import { ApprovalRows, useApprovals } from '@/components/approvals';
 import { ThemedText } from '@/components/themed-text';
 import { HomeHeader } from '@/components/ui/app-bar';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useDialog } from '@/components/ui/dialog';
 
 import { Appear, Reveal } from '@/components/ui/motion';
 import { Money } from '@/components/ui/money';
@@ -44,13 +43,11 @@ import { humanError } from '@/lib/errors';
 import { categoryColor, categoryIcon, categoryTint } from '@/lib/icons';
 import { formatPaise, formatWholeRupees } from '@/lib/money';
 import {
-  useAwaitingApproval,
   useAwayPeriods,
   useBalances,
   useMonthlyTotals,
   useExpenses,
   useMembers,
-  usePendingChanges,
   useRecurring,
   useSpendSummary,
 } from '@/lib/queries';
@@ -62,12 +59,8 @@ import { useTourStore, useTourTarget } from '@/lib/tour';
 import { FeatureCards } from '@/components/ui/feature-cards';
 import { Icon, type IconName } from '@/components/ui/icon';
 
-type JoinRequest = {
-  id: string;
-  display_name: string;
-  email: string | null;
-  claim_member_id: string | null;
-};
+/** How many approvals Home shows before "Show all". */
+const HOME_APPROVALS = 2;
 
 
 /**
@@ -191,7 +184,13 @@ function MonthCard({
       collapsable={false}
       style={[
         styles.lift,
-        { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow },
+        // Frosted rather than solid white: a hint of the green wash shows
+        // through, so the card sits in it instead of on top of it.
+        {
+          backgroundColor: 'rgba(255,255,255,0.72)',
+          borderColor: 'rgba(255,255,255,0.9)',
+          shadowColor: theme.liftShadow,
+        },
       ]}>
       <View style={styles.liftHead}>
         <ThemedText style={[Type.caption, styles.semi]}>This month</ThemedText>
@@ -368,7 +367,6 @@ function RowSkeleton({ round = false, last = false }: { round?: boolean; last?: 
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const dialog = useDialog();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
@@ -404,8 +402,6 @@ export default function HomeScreen() {
   // The six newest, each its own card under Recent; "See all" opens History.
   const expenses = useExpenses(6);
   const away = useAwayPeriods();
-  const changes = usePendingChanges();
-  const awaiting = useAwaitingApproval();
   const recurring = useRecurring();
   const spend = useSpendSummary(member?.id);
   // Resolves once every active query has refetched, so the disc stays up for
@@ -468,119 +464,8 @@ export default function HomeScreen() {
     },
   });
 
-  const requests = useQuery({
-    queryKey: ['join-requests'],
-    enabled: !!member && isOwner,
-    queryFn: async (): Promise<JoinRequest[]> => {
-      const { data, error } = await supabase
-        .from('join_requests')
-        .select('id, display_name, email, claim_member_id')
-        .eq('status', 'pending')
-        .order('requested_at');
-      if (error) throw error;
-      return data as JoinRequest[];
-    },
-  });
-
-  const reviewChange = useMutation({
-    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
-      const { error } = await supabase.rpc('review_pending_change', {
-        p_change: id,
-        p_approve: approve,
-        p_note: null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: (_, { approve }) => {
-      dialog.toast(
-        approve ? { message: 'Change approved' } : { message: 'Change rejected', tone: 'info' }
-      );
-      return queryClient.invalidateQueries();
-    },
-    // A failed answer used to vanish without a word: the card just stayed.
-    onError: (e) =>
-      void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
-  });
-
-  async function rejectChange(id: string, kind: string) {
-    const ok = await dialog.confirm({
-      tone: 'danger',
-      icon: 'close-circle-outline',
-      title: kind === 'void' ? 'Keep the expense?' : 'Reject this change?',
-      message:
-        kind === 'void'
-          ? 'The expense stays as it is, and whoever asked is told you said no.'
-          : 'The expense stays as it was, and whoever asked is told you said no.',
-      confirmLabel: 'Reject',
-    });
-    if (ok) reviewChange.mutate({ id, approve: false });
-  }
-
-  async function declineJoin(id: string, name: string) {
-    const ok = await dialog.confirm({
-      tone: 'danger',
-      icon: 'person-remove-outline',
-      title: `Decline ${name}?`,
-      message: 'They won’t join the household. They can ask again with a new invite.',
-      confirmLabel: 'Decline',
-    });
-    if (ok) reviewJoin.mutate({ id, approve: false });
-  }
-
-  // A housemate's new expense, which counts nowhere until someone other than
-  // whoever added it says yes (migration 0039).
-  const reviewExpense = useMutation({
-    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
-      const { error } = await supabase.rpc('review_expense', {
-        p_expense: id,
-        p_approve: approve,
-        p_note: null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: (_, { approve }) => {
-      dialog.toast(
-        approve
-          ? { message: 'Approved. It counts now.' }
-          : { message: 'Rejected. It won’t count.', tone: 'info' }
-      );
-      return queryClient.invalidateQueries();
-    },
-    onError: (e) =>
-      void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
-  });
-
-  async function rejectExpense(id: string) {
-    const ok = await dialog.confirm({
-      tone: 'danger',
-      icon: 'close-circle-outline',
-      title: 'Reject this expense?',
-      message: 'It won’t count towards anyone’s balance, and stays in History marked rejected.',
-      confirmLabel: 'Reject',
-    });
-    if (ok) reviewExpense.mutate({ id, approve: false });
-  }
-
-  const reviewJoin = useMutation({
-    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
-      const { error } = await supabase.rpc('review_join_request', {
-        p_request: id,
-        p_approve: approve,
-        p_note: null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: (_, { approve }) => {
-      dialog.toast(
-        approve
-          ? { message: 'Request approved. They’re in the household.' }
-          : { message: 'Request declined', tone: 'info' }
-      );
-      return queryClient.invalidateQueries();
-    },
-    onError: (e) =>
-      void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
-  });
+  // Everything waiting for your yes or no (components/approvals).
+  const approvals = useApprovals();
 
   const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise ?? 0;
   const today = todayIso();
@@ -589,9 +474,9 @@ export default function HomeScreen() {
   );
   // Join requests and change requests are the owner's to answer; a new
   // expense is answered by whoever can_review_expense() says may, owner or not.
-  const toApprove = (awaiting.data ?? []).filter((e) => e.canReview);
-  const approvalCount =
-    (isOwner ? (requests.data?.length ?? 0) + (changes.data?.length ?? 0) : 0) + toApprove.length;
+  const approvalCount = approvals.count;
+  // The owner's own items, for the badge on the account button.
+  const ownerItems = approvals.items.filter((i) => i.kind !== 'expense').length;
   const dueForAmount = (recurring.data ?? []).filter(
     (r) => r.isDue && r.mode === 'confirm'
   ).length;
@@ -676,13 +561,7 @@ export default function HomeScreen() {
           style={[styles.wash, { height: washHeight }]}
         />
 
-        <View
-          style={styles.top}
-          onLayout={(e) => {
-            // Well past the month card: the last stretch is the slow fade.
-            const h = Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 330);
-            if (h !== washHeight) setWashHeight(h);
-          }}>
+        <View style={styles.top}>
           <HomeHeader
             greeting={greeting}
             name={firstName}
@@ -690,7 +569,7 @@ export default function HomeScreen() {
             // opens Settings and Owner tools; expense approvals are answered here
             // on Home, so counting them there sent members to a screen with
             // nothing to approve.
-            badge={isOwner ? (requests.data?.length ?? 0) + (changes.data?.length ?? 0) : 0}
+            badge={isOwner ? ownerItems : 0}
           />
 
           <Appear index={0}>
@@ -717,7 +596,16 @@ export default function HomeScreen() {
             quick action, this card, the notes, Balances, then each recent
             expense. Everything draws at once -- skeletons included -- and
             only its arrival is staggered. */}
-        <Appear index={5}>
+        {/* The wash is measured to this card: its green dissolves behind the
+            card and is gone just below it, so whatever comes next -- the
+            insight, or the action cards once it is hidden -- sits on the
+            plain page. */}
+        <Appear
+          index={5}
+          onLayout={(e) => {
+            const h = Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 36);
+            if (h !== washHeight) setWashHeight(h);
+          }}>
           <MonthCard
             month={monthLong}
             prevMonth={prevMonthShort}
@@ -818,108 +706,17 @@ export default function HomeScreen() {
 
         {approvalCount > 0 ? (
           <Appear index={8}>
-          <Section title="Needs you" count={approvalCount}>
-            {toApprove.map((e) => {
-              const busy = reviewExpense.isPending && reviewExpense.variables?.id === e.id;
-              return (
-                <Card key={e.id} style={styles.approval}>
-                  <Pressable
-                    onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
-                    style={styles.approvalHead}>
-                    <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-                      <Icon name={categoryIcon(e.categoryIcon)} size={18} color={theme.textSecondary} />
-                    </View>
-                    <View style={styles.flex}>
-                      <ThemedText style={Type.headline}>
-                        {e.createdByName} added {formatPaise(e.totalPaise)}
-                      </ThemedText>
-                      <ThemedText themeColor="textSecondary" style={Type.caption} numberOfLines={1}>
-                        {e.description || e.categoryName} · paid by {e.paidByName} · tap to review
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                  <View style={styles.approvalActions}>
-                    <Button
-                      title="Approve"
-                      onPress={() => reviewExpense.mutate({ id: e.id, approve: true })}
-                      loading={busy}
-                      disabled={reviewExpense.isPending}
-                      style={styles.flex}
-                    />
-                    <Button
-                      title="Reject"
-                      variant="ghost"
-                      onPress={() => void rejectExpense(e.id)}
-                      disabled={reviewExpense.isPending}
-                      style={styles.flex}
-                    />
-                  </View>
-                </Card>
-              );
-            })}
-
-            {(isOwner ? changes.data : [])?.map((c) => (
-              <Card key={c.id} style={styles.approval}>
-                <Pressable
-                  onPress={() =>
-                    router.push({ pathname: '/expense/[id]', params: { id: c.entityId } })
-                  }>
-                  <ThemedText style={Type.headline}>
-                    {c.requestedByName} wants to{' '}
-                    {c.kind === 'void' ? 'delete an expense' : 'change an expense'}
-                  </ThemedText>
-                  <ThemedText themeColor="textSecondary" style={Type.caption}>
-                    {c.kind === 'update' && typeof c.payload.total_paise === 'number'
-                      ? `New amount ${formatPaise(c.payload.total_paise)} · tap to review`
-                      : 'Tap to review'}
-                  </ThemedText>
-                </Pressable>
-                <View style={styles.approvalActions}>
-                  <Button
-                    title="Approve"
-                    onPress={() => reviewChange.mutate({ id: c.id, approve: true })}
-                    loading={reviewChange.isPending}
-                    style={styles.flex}
-                  />
-                  <Button
-                    title="Reject"
-                    variant="ghost"
-                    onPress={() => void rejectChange(c.id, c.kind)}
-                    disabled={reviewChange.isPending}
-                    style={styles.flex}
-                  />
-                </View>
-              </Card>
-            ))}
-
-            {(isOwner ? requests.data : [])?.map((r) => (
-              <Card key={r.id} style={styles.approval}>
-                <View style={styles.approvalHead}>
-                  <Avatar name={r.display_name} seed={r.id} size={36} />
-                  <View style={styles.flex}>
-                    <ThemedText style={Type.headline}>{r.display_name} wants to join</ThemedText>
-                    <ThemedText themeColor="textSecondary" style={Type.caption}>
-                      {r.email ?? 'no email'}
-                    </ThemedText>
-                  </View>
-                </View>
-                <View style={styles.approvalActions}>
-                  <Button
-                    title="Approve"
-                    onPress={() => reviewJoin.mutate({ id: r.id, approve: true })}
-                    loading={reviewJoin.isPending}
-                    style={styles.flex}
-                  />
-                  <Button
-                    title="Reject"
-                    variant="ghost"
-                    onPress={() => void declineJoin(r.id, r.display_name)}
-                    disabled={reviewJoin.isPending}
-                    style={styles.flex}
-                  />
-                </View>
-              </Card>
-            ))}
+          <Section
+            title="Needs you"
+            count={approvalCount}
+            // Two at most here, so a busy week does not push the rest of Home
+            // off the screen; the Approvals page has them all.
+            action={
+              approvalCount > HOME_APPROVALS ? (
+                <SectionLink label={`Show all ${approvalCount}`} onPress={() => router.push("/approvals")} />
+              ) : undefined
+            }>
+            <ApprovalRows approvals={approvals} limit={HOME_APPROVALS} />
           </Section>
           </Appear>
         ) : null}

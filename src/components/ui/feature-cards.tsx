@@ -56,6 +56,19 @@ export function FeatureCards({
   );
 }
 
+/** `hex` laid over the card colour `base` at this strength, as an opaque colour. */
+function mix(hex: string, amount: number, base: string): string {
+  const n = parseInt(hex.slice(1, 7), 16);
+  const b = parseInt(base.slice(1, 7), 16);
+  const channel = (shift: number) => {
+    const under = (b >> shift) & 255;
+    return Math.round(under + (((n >> shift) & 255) - under) * amount)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
+}
+
 /** Its own component so each card can be a tour stop. */
 function Card({ card: c }: { card: FeatureCard }) {
   const theme = useTheme();
@@ -77,8 +90,10 @@ function Card({ card: c }: { card: FeatureCard }) {
         c.featured
           ? { borderColor: 'transparent' }
           : {
-              backgroundColor: c.color ? `${hue}14` : theme.backgroundElement,
-              borderColor: c.color ? `${hue}2E` : theme.liftEdge,
+              // Solid, not see-through: the same faint tint mixed onto white,
+              // so the card looks the same over the page or the green.
+              backgroundColor: c.color ? mix(hue, 0.08, theme.backgroundElement) : theme.backgroundElement,
+              borderColor: c.color ? mix(hue, 0.2, theme.backgroundElement) : theme.liftEdge,
             },
         { opacity: pressed ? 0.7 : 1 },
       ]}>

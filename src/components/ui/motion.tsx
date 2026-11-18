@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import type { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
+import type {
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -84,11 +89,14 @@ export function Appear({
   index = 0,
   still = false,
   style,
+  onLayout,
 }: {
   children: React.ReactNode;
   index?: number;
   still?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Where it lands, for anything sized to it (Home's wash). */
+  onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const progress = useEntrance(
     Math.min(index * Motion.stagger, Motion.maxDelay),
@@ -100,7 +108,11 @@ export function Appear({
     transform: [{ translateY: (1 - progress.value) * RISE }],
   }));
 
-  return <Animated.View style={[style, enter]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[style, enter]} onLayout={onLayout}>
+      {children}
+    </Animated.View>
+  );
 }
 
 /**

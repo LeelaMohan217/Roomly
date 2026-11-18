@@ -24,6 +24,7 @@ export default function AppLayout() {
       <Stack.Screen name="settlements" />
       <Stack.Screen name="month-statement" />
       <Stack.Screen name="statement" />
+      <Stack.Screen name="approvals" />
       <Stack.Screen name="ledger" />
       <Stack.Screen name="ledger-compare" />
       <Stack.Screen name="ledger-statement" />
