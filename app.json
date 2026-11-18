@@ -40,11 +40,7 @@
           "backgroundColor": "#0E9A6C",
           "image": "./assets/images/splash-wordmark.png",
           "imageWidth": 220,
-          "resizeMode": "contain",
-          "dark": {
-            "backgroundColor": "#0E9A6C",
-            "image": "./assets/images/splash-wordmark.png"
-          }
+          "resizeMode": "contain"
         }
       ],
       "expo-sqlite",
