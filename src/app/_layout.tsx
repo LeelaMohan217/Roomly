@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { focusManager, QueryClient } from '@tanstack/react-query';
+import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
+import * as Network from 'expo-network';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as Linking from 'expo-linking';
 import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
@@ -34,6 +35,17 @@ SplashScreen.preventAutoHideAsync();
 if (Platform.OS !== 'web') {
   focusManager.setEventListener((handleFocus) => {
     const sub = AppState.addEventListener('change', (state) => handleFocus(state === 'active'));
+    return () => sub.remove();
+  });
+
+  // Same story for connectivity: React Query only knows the browser's
+  // online/offline events, so on a phone a query that failed offline never
+  // refetched when the connection came back. Screens now show the loading
+  // shape while offline (see queryState), so this is what ends it.
+  onlineManager.setEventListener((setOnline) => {
+    const sub = Network.addNetworkStateListener((state) => {
+      setOnline(state.isConnected !== false && state.isInternetReachable !== false);
+    });
     return () => sub.remove();
   });
 }

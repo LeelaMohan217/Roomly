@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { humanError } from '@/lib/errors';
 import { formatPaise } from '@/lib/money';
 import { useSync } from '@/lib/sync';
 import { Icon } from '@/components/ui/icon';
@@ -30,7 +31,7 @@ export function SyncBanner() {
               {formatPaise(p.totalPaise)} couldn&apos;t be saved
             </ThemedText>
             <ThemedText themeColor="textSecondary" style={Type.micro}>
-              {p.lastError ?? 'The server rejected it.'}
+              {p.lastError ? humanError(p.lastError) : 'The server rejected it.'}
             </ThemedText>
           </View>
           <Pressable onPress={() => void retryOne(p.id)} hitSlop={8}>

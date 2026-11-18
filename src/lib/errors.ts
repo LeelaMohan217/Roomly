@@ -106,9 +106,32 @@ function fallbackFor(code: string | undefined): string {
   return code ? `${FALLBACK} (${code})` : FALLBACK;
 }
 
+/**
+ * Connection failures, in every wording the platforms use. Android's is the
+ * worst: "fetch failed: java.net.UnknownHostException: Unable to resolve host
+ * ...supabase.co": No address associated with hostname" -- a Java class name
+ * and the project's hostname, which reached the Home screen verbatim.
+ */
+const NETWORK_PATTERN =
+  /network request failed|failed to fetch|fetch failed|load failed|networkerror|unknownhost|unable to resolve host|no address associated|sockettimeout|timed? ?out|econn|enotfound|connection (refused|reset|abort|closed)|internet connection|offline/i;
+
+const OFFLINE_MESSAGE = "You're offline. This will update when you're back online.";
+
+/** True when `e` is the connection failing, not the server saying no. */
+export function isNetworkError(e: unknown): boolean {
+  const err = (typeof e === 'object' && e !== null ? e : {}) as Maybe;
+  const text = [err.message, err.details, typeof e === 'string' ? e : '']
+    .filter(Boolean)
+    .join(' ');
+  return NETWORK_PATTERN.test(text);
+}
+
 export function humanError(e: unknown): string {
   const err = (typeof e === 'object' && e !== null ? e : {}) as Maybe;
   const raw = (err.message ?? (typeof e === 'string' ? e : '')).trim();
+
+  // Before anything else: a connection failure is never worth its raw text.
+  if (isNetworkError(e)) return OFFLINE_MESSAGE;
 
   if (err.code && BY_CODE[err.code]) return BY_CODE[err.code];
   if (raw && BY_MESSAGE[raw]) return BY_MESSAGE[raw];

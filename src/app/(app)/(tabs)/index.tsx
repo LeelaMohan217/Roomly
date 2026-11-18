@@ -39,7 +39,6 @@ import { useInsightRotation } from '@/lib/insight-hidden';
 import { tapped } from '@/lib/haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, todayIso } from '@/lib/dates';
-import { humanError } from '@/lib/errors';
 import { categoryColor, categoryIcon, categoryTint } from '@/lib/icons';
 import { formatPaise, formatWholeRupees } from '@/lib/money';
 import {
@@ -54,6 +53,7 @@ import {
 import { useSession } from '@/lib/session';
 import { isPresent } from '@/lib/split';
 import { supabase } from '@/lib/supabase';
+import { isNetworkError } from '@/lib/errors';
 import { useSync } from '@/lib/sync';
 import { useTourStore, useTourTarget } from '@/lib/tour';
 import { FeatureCards } from '@/components/ui/feature-cards';
@@ -370,7 +370,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { member } = useSession();
-  const { pending } = useSync();
+  const { pending, online } = useSync();
   const isOwner = member?.role === 'owner';
   const focused = useIsFocused();
   const cardWidth = usePersonCardWidth();
@@ -423,20 +423,26 @@ export default function HomeScreen() {
    * first mount, so an Android process that survived several days across a due
    * date never posted at all until it was killed.
    */
-  const [recurringError, setRecurringError] = useState<string | null>(null);
+  const [recurringFailed, setRecurringFailed] = useState(false);
 
   useEffect(() => {
     if (!member) return;
+    // Offline there is nothing to try: the call would only fail. The effect
+    // re-runs when `online` flips back, which is the retry.
+    if (!online) return;
 
     async function postDue() {
       const { data, error } = await supabase.rpc('post_due_recurrences');
       // Previously `const { data } = await ...` — so offline, or refused, rent
       // silently failed to post and nobody ever learned why.
       if (error) {
-        setRecurringError(humanError(error));
+        // A dropped connection is not news -- the offline banner already says
+        // so, and this retries on reconnect and on every return to the app.
+        // Only a real refusal is worth a line, and never its raw text.
+        if (!isNetworkError(error)) setRecurringFailed(true);
         return;
       }
-      setRecurringError(null);
+      setRecurringFailed(false);
       if (typeof data === 'number' && data > 0) {
         void queryClient.invalidateQueries();
       }
@@ -448,7 +454,7 @@ export default function HomeScreen() {
       if (state === 'active') void postDue();
     });
     return () => sub.remove();
-  }, [member, queryClient]);
+  }, [member, online, queryClient]);
 
   const household = useQuery({
     queryKey: ['household', member?.household_id],
@@ -582,11 +588,11 @@ export default function HomeScreen() {
         {/* Recurring bills post from whoever opens the app first. When that
             call fails there is nothing else in the UI that would ever mention
             it, so rent quietly does not appear. */}
-        {recurringError ? (
+        {recurringFailed ? (
           <View style={[styles.recurringError, { backgroundColor: theme.backgroundSunken }]}>
             <Icon name="alert-circle-outline" size={15} color={theme.textTertiary} />
             <ThemedText themeColor="textTertiary" style={[Type.micro, styles.recurringErrorText]}>
-              Could not post recurring bills. {recurringError}
+              Some recurring bills haven&apos;t been added yet. We&apos;ll try again shortly.
             </ThemedText>
           </View>
         ) : null}

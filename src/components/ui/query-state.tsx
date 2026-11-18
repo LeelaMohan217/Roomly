@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { humanError } from '@/lib/errors';
+import { humanError, isNetworkError } from '@/lib/errors';
 import { Icon } from '@/components/ui/icon';
 
 /**
@@ -94,6 +94,13 @@ export function queryState(
   // Only when there is nothing to show. A background refresh that fails --
   // returning to the app on a weak signal -- also sets isError, and swapped a
   // list that was right a moment ago for "Couldn't load" until a retry.
+  //
+  // A dropped connection is not a failure worth a card: keep showing the
+  // loading shape, and the query refetches by itself on reconnect (see
+  // onlineManager in app/_layout.tsx). Only a real server refusal says so.
+  if (query.isError && query.data === undefined && isNetworkError(query.error)) {
+    return <Loading label={loadingLabel ?? `Loading ${what}…`} />;
+  }
   if (query.isError && query.data === undefined) {
     return <LoadFailed what={what} error={query.error} onRetry={() => void query.refetch()} />;
   }
