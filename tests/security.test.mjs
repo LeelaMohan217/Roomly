@@ -64,6 +64,8 @@ const TABLES = [
   'phone_login_attempts',
   // 0040: which bill photo belongs to which expense.
   'expense_attachments',
+  // 0043: the private ledger. Only its owner may read a row.
+  'personal_expenses',
 ];
 
 for (const t of TABLES) {

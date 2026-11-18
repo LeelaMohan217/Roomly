@@ -1,26 +1,26 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { BillPhotoPicker } from '@/components/bill-photos';
 import { ThemedText } from '@/components/themed-text';
 import { MonthCalendar } from '@/components/ui/month-calendar';
-import { Sheet } from '@/components/ui/sheet';
+import { TextField } from '@/components/ui/text-field';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Money } from '@/components/ui/money';
 import { Notice } from '@/components/ui/notice';
 import { Select, type SelectOption } from '@/components/ui/select';
 import { appFontFor } from '@/constants/fonts';
-import { Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { PickedPhoto } from '@/lib/attachments';
 import { addDays, formatRange, todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
-import { iconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { formatPaise, parseAmount } from '@/lib/money';
 import { useAwayPeriods, useCategories, useMembers, useSuggestions } from '@/lib/queries';
 import { assertBalanced, defaultParticipants, isPresent, splitEqually, type Split } from '@/lib/split';
+import { Icon } from '@/components/ui/icon';
 
 // The amount input's width per typed character at fontSize 48, plus room for
 // the caret -- see amountInput below.
@@ -103,13 +103,24 @@ export function ExpenseForm({
   const categoryOptions: SelectOption[] = (categories.data ?? []).map((c) => ({
     value: c.id,
     label: c.name,
-    glyph: iconFor(c.icon),
+    icon: categoryIcon(c.icon),
     hint: c.respectsAwayCalendar
       ? 'Splits only between people who were here'
       : c.kind === 'bulk'
         ? 'Everyone pays — it outlasts any one trip'
         : 'Everyone pays, away or not',
   }));
+
+  const payerOptions: SelectOption[] = (members.data ?? []).map((m) => ({
+    value: m.id,
+    label: m.displayName,
+    icon: 'person-outline',
+  }));
+
+  function chooseDay(iso: string) {
+    setDate(iso);
+    setPickingDate(false);
+  }
 
   const auto = useMemo(() => {
     if (!members.data) return [];
@@ -238,155 +249,104 @@ export function ExpenseForm({
         ) : null}
       </View>
 
-      {/* What, what for and when: one white card, an icon tile a row. */}
-      <View style={[styles.card, card]}>
-        <Select
-          bare
-          icon="apps-outline"
-          label="Category"
-          placeholder="Category"
-          value={categoryId}
-          options={categoryOptions}
-          onChange={setCategoryId}
-          disabled={busy}
-        />
+      {/* The same fields, in the same order and style, as My ledger's form:
+          a dropdown that opens under its box, then what for, who paid, when. */}
+      <Select
+        label="Category"
+        placeholder="Choose a category"
+        value={categoryId}
+        options={categoryOptions}
+        onChange={setCategoryId}
+        disabled={busy}
+        anchored
+      />
 
-        <View style={[styles.detailRow, { borderTopColor: theme.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="create-outline" size={18} color={theme.brandInk} />
-          </View>
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="What for (optional)"
-            placeholderTextColor={theme.textTertiary}
-            accessibilityLabel="What for"
-            maxLength={120}
-            editable={!busy}
-            style={[Type.body, appFontFor(Type.body), styles.detailInput, { color: theme.text }]}
-          />
-        </View>
+      <TextField
+        label="What for (optional)"
+        value={description}
+        onChangeText={(v) => setDescription(v.slice(0, 120))}
+        placeholder="Milk, rent, Wi-Fi bill"
+        editable={!busy}
+        returnKeyType="done"
+      />
 
-        {/* Today, Yesterday, or any other day from the calendar: people log
-            a receipt days later all the time. */}
-        <View style={[styles.detailRow, { borderTopColor: theme.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="calendar-outline" size={18} color={theme.brandInk} />
-          </View>
-          <View
-            accessibilityRole="radiogroup"
-            accessibilityLabel="When"
-            style={[styles.segment, styles.flex, { backgroundColor: theme.liftTile }]}>
-            {[
-              { key: today, label: 'Today' },
-              { key: yesterday, label: 'Yesterday' },
-            ].map((opt) => {
-              const selected = date === opt.key;
-              return (
-                <Pressable
-                  key={opt.key}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  onPress={() => setDate(opt.key)}
-                  disabled={busy}
-                  style={[styles.segmentItem, selected && [styles.segmentOn, card]]}>
-                  <ThemedText
-                    themeColor={selected ? 'text' : 'textSecondary'}
-                    style={[Type.caption, selected && styles.semi]}>
-                    {opt.label}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+      <Select
+        label="Paid by"
+        placeholder="Who paid?"
+        value={paidBy}
+        options={payerOptions}
+        onChange={setPaidBy}
+        disabled={busy}
+        anchored
+      />
 
+      {/* Today, Yesterday, or any other day from the calendar: people log a
+          receipt days later all the time. */}
+      <View style={styles.block}>
+        <ThemedText themeColor="textSecondary" style={styles.fieldLabel}>
+          When
+        </ThemedText>
+        <View style={styles.days}>
+          {(
+            [
+              { key: 'today', label: 'Today', on: date === today, onPress: () => chooseDay(today) },
+              {
+                key: 'yesterday',
+                label: 'Yesterday',
+                on: date === yesterday,
+                onPress: () => chooseDay(yesterday),
+              },
+              {
+                key: 'other',
+                label: isOtherDay ? formatRange(date, date) : 'Pick a day',
+                on: isOtherDay,
+                onPress: () => {
+                  const [y, m] = date.split('-').map(Number);
+                  setPickerMonth({ year: y, month: m });
+                  setPickingDate((p) => !p);
+                },
+              },
+            ] as const
+          ).map((d) => (
             <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: isOtherDay }}
-              onPress={() => {
-                const [y, m] = date.split('-').map(Number);
-                setPickerMonth({ year: y, month: m });
-                setPickingDate(true);
-              }}
+              key={d.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: d.on }}
+              onPress={d.onPress}
               disabled={busy}
-              style={[styles.segmentItem, isOtherDay && [styles.segmentOn, card]]}>
-              <ThemedText
-                themeColor={isOtherDay ? 'text' : 'textSecondary'}
-                style={[Type.caption, isOtherDay && styles.semi]}
-                numberOfLines={1}>
-                {isOtherDay ? formatRange(date, date) : 'Pick a day'}
+              style={[
+                styles.day,
+                {
+                  backgroundColor: d.on ? theme.tabActive : theme.backgroundElement,
+                  borderColor: d.on ? theme.primary : theme.liftEdge,
+                },
+              ]}>
+              {d.key === 'other' ? (
+                <Icon
+                  name="calendar-clear-outline"
+                  size={14}
+                  color={d.on ? theme.tabActiveInk : theme.textSecondary}
+                />
+              ) : null}
+              <ThemedText style={[Type.caption, { color: d.on ? theme.tabActiveInk : theme.text }]}>
+                {d.label}
               </ThemedText>
             </Pressable>
-          </View>
+          ))}
         </View>
+        {pickingDate ? (
+          <MonthCalendar
+            year={pickerMonth.year}
+            month={pickerMonth.month}
+            onMonthChange={(year, month) => setPickerMonth({ year, month })}
+            start={date}
+            end={date}
+            onDayPress={(iso) => {
+              if (iso <= today) chooseDay(iso);
+            }}
+          />
+        ) : null}
       </View>
-
-      <View style={styles.field}>
-        <ThemedText style={styles.sectionTitle}>Paid by</ThemedText>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.payerRow}>
-          {members.data?.map((m) => {
-            const selected = m.id === paidBy;
-            return (
-              <Pressable
-                key={m.id}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={`Paid by ${m.displayName}`}
-                onPress={() => setPaidBy(m.id)}
-                disabled={busy}
-                style={({ pressed }) => [styles.payer, { opacity: pressed ? 0.7 : 1 }]}>
-                <View>
-                  <Avatar
-                    name={m.displayName}
-                    seed={m.id}
-                    size={50}
-                    ring={selected}
-                    ringColor={theme.primary}
-                    style={selected ? undefined : styles.dim}
-                  />
-                  {/* A tick as well as the ring, so the choice reads without
-                      colour. */}
-                  {selected ? (
-                    <View style={[styles.payerTick, { backgroundColor: theme.primary, borderColor: theme.background }]}>
-                      <Ionicons name="checkmark" size={11} color={theme.onPrimary} />
-                    </View>
-                  ) : null}
-                </View>
-                <ThemedText
-                  style={[
-                    Type.micro,
-                    { color: selected ? theme.brandInk : theme.textTertiary },
-                    selected && styles.semi,
-                  ]}
-                  numberOfLines={1}>
-                  {m.displayName}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      <Sheet
-        visible={pickingDate}
-        title="When was this?"
-        subtitle="Backdating is fine — the split is worked out for the day you choose."
-        onClose={() => setPickingDate(false)}>
-        <MonthCalendar
-          year={pickerMonth.year}
-          month={pickerMonth.month}
-          onMonthChange={(year, month) => setPickerMonth({ year, month })}
-          start={date}
-          end={date}
-          onDayPress={(iso) => {
-            setDate(iso);
-            setPickingDate(false);
-          }}
-        />
-      </Sheet>
 
       <View style={styles.field}>
         <View style={styles.splitHead}>
@@ -439,7 +399,7 @@ export function ExpenseForm({
 
                 {included && share ? <Money paise={share.amountPaise} size="row" /> : null}
 
-                <Ionicons
+                <Icon
                   name={included ? 'checkmark-circle' : 'ellipse-outline'}
                   size={24}
                   color={included ? theme.primary : theme.borderStrong}
@@ -451,7 +411,7 @@ export function ExpenseForm({
 
         {category && !category.respectsAwayCalendar ? (
           <View style={[styles.note, { backgroundColor: theme.infoSoft }]}>
-            <Ionicons name="information-circle-outline" size={15} color={theme.info} />
+            <Icon name="information-circle-outline" size={15} color={theme.info} />
             <ThemedText style={[Type.micro, styles.flex, { color: theme.info }]}>
               Fixed cost — everyone pays, away or not.
             </ThemedText>
@@ -558,29 +518,18 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 19, lineHeight: 25, fontWeight: '500', letterSpacing: -0.4 },
 
   field: { gap: Spacing.two + 2 },
-  payerRow: { gap: Spacing.three, paddingVertical: Spacing.one, paddingRight: Spacing.four },
-  payer: { alignItems: 'center', gap: Spacing.two, width: 64 },
-  payerTick: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
-  // A pill switch: the chosen day is a small white pill inside it.
-  segment: { flexDirection: 'row', borderRadius: 999, padding: 3, gap: 3 },
-  segmentItem: {
-    flex: 1,
+  // When: as on My ledger's form -- the label, then a pill per day.
+  block: { gap: Spacing.two },
+  fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  days: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  day: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.two,
-    borderRadius: 999,
-  },
-  segmentOn: {
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
 

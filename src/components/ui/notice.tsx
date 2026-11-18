@@ -1,12 +1,12 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { toneColors, type Tone } from '@/components/ui/dialog';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Icon, type IconName } from '@/components/ui/icon';
 
-const ICON: Record<Tone, keyof typeof Ionicons.glyphMap> = {
+const ICON: Record<Tone, IconName> = {
   danger: 'alert-circle-outline',
   warning: 'warning-outline',
   success: 'checkmark-circle-outline',
@@ -30,7 +30,7 @@ export function Notice({
   tone?: Tone;
   title?: string;
   message: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   style?: ViewStyle;
 }) {
   const theme = useTheme();
@@ -40,7 +40,7 @@ export function Notice({
     <View
       accessibilityRole={tone === 'danger' ? 'alert' : undefined}
       style={[styles.box, { backgroundColor: colors.soft }, style]}>
-      <Ionicons name={icon ?? ICON[tone]} size={16} color={colors.fg} style={styles.icon} />
+      <Icon name={icon ?? ICON[tone]} size={16} color={colors.fg} style={styles.icon} />
       <View style={styles.text}>
         {title ? (
           <ThemedText style={[Type.caption, styles.title, { color: colors.fg }]}>{title}</ThemedText>

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -22,11 +21,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { MAX_PHOTOS, uploadBillPhotos } from '@/lib/attachments';
 import { humanError } from '@/lib/errors';
 import { formatRange } from '@/lib/dates';
-import { iconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import { useExpense, useMembers, usePendingChanges } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 export default function ExpenseDetailScreen() {
   const theme = useTheme();
@@ -269,7 +269,7 @@ export default function ExpenseDetailScreen() {
 
   // Each notice is one line; the full story is a tap away, in a popup, so the
   // expense itself stays at the top of the screen.
-  const explain = (tone: Tone, icon: keyof typeof Ionicons.glyphMap, title: string, message: string) =>
+  const explain = (tone: Tone, icon: IconName, title: string, message: string) =>
     void dialog.alert({ tone, icon, title, message });
 
   return (
@@ -329,7 +329,7 @@ export default function ExpenseDetailScreen() {
                   added an edge. */}
               <Appear index={0} style={styles.hero}>
                 <View style={[styles.heroTile, { backgroundColor: theme.liftTile }]}>
-                  <ThemedText allowFontScaling={false} style={styles.heroGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
+                  <Icon name={categoryIcon(e.categoryIcon)} size={26} color={theme.textSecondary} />
                 </View>
                 <ThemedText
                   style={[styles.heroAmount, e.voidedAt ? { color: theme.textTertiary } : null]}
@@ -511,7 +511,7 @@ export default function ExpenseDetailScreen() {
                   accessible
                   accessibilityLabel={`Added by ${e.createdByName}, ${addedOn(e.createdAt)}`}
                   style={styles.row}>
-                  <Ionicons name="person-add-outline" size={17} color={theme.textSecondary} />
+                  <Icon name="person-add-outline" size={17} color={theme.textSecondary} />
                   <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
                     Added by {e.createdByName}
                   </ThemedText>
@@ -526,7 +526,7 @@ export default function ExpenseDetailScreen() {
                     accessible
                     accessibilityLabel={`Approved by ${e.reviewedByName}, ${addedOn(e.reviewedAt)}`}
                     style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
-                    <Ionicons name="checkmark-circle-outline" size={17} color={theme.textSecondary} />
+                    <Icon name="checkmark-circle-outline" size={17} color={theme.textSecondary} />
                     <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
                       Approved by {e.reviewedByName}
                     </ThemedText>
@@ -618,7 +618,7 @@ function Note({
   onPress,
 }: {
   tone: 'danger' | 'warning' | 'neutral';
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   text: string;
   onPress?: () => void;
 }) {
@@ -634,9 +634,9 @@ function Note({
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [styles.note, { backgroundColor: soft, opacity: pressed ? 0.7 : 1 }]}>
-      <Ionicons name={icon} size={16} color={ink} />
+      <Icon name={icon} size={16} color={ink} />
       <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: ink }]}>{text}</ThemedText>
-      {onPress ? <Ionicons name="chevron-forward" size={14} color={ink} /> : null}
+      {onPress ? <Icon name="chevron-forward" size={14} color={ink} /> : null}
     </Pressable>
   );
 }
@@ -649,7 +649,7 @@ function HeaderIcon({
   danger = false,
   busy = false,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   danger?: boolean;
@@ -674,7 +674,7 @@ function HeaderIcon({
           opacity: pressed ? 0.7 : 1,
         },
       ]}>
-      {busy ? <ActivityIndicator size="small" color={ink} /> : <Ionicons name={icon} size={18} color={ink} />}
+      {busy ? <ActivityIndicator size="small" color={ink} /> : <Icon name={icon} size={18} color={ink} />}
     </Pressable>
   );
 }

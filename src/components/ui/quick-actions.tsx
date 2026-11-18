@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -7,10 +6,11 @@ import { Appear, usePressFeedback } from '@/components/ui/motion';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTourTarget, type TourTarget } from '@/lib/tour';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 export type QuickAction = {
   key: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   /** Names this action's disc as a stop on the first-run tour. */
@@ -78,7 +78,7 @@ function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean })
             styles.frosted,
             { backgroundColor: theme.frostLight, borderColor: theme.frostStrongEdge },
           ]}>
-          <Ionicons name={a.icon} size={22} color={theme.frostIcon} />
+          <Icon name={a.icon} size={22} color={theme.frostIcon} />
         </View>
         <ThemedText style={[Type.micro, styles.washLabel, { color: theme.onWash }]} numberOfLines={1}>
           {a.label}
@@ -96,7 +96,7 @@ function Action({ action: a, onWash }: { action: QuickAction; onWash: boolean })
       onPressOut={press.onPressOut}
       style={[styles.item, press.style]}>
       <View ref={ref} collapsable={false} style={[styles.circle, { backgroundColor: theme.primarySoft }]}>
-        <Ionicons name={a.icon} size={21} color={theme.brandInk} />
+        <Icon name={a.icon} size={21} color={theme.brandInk} />
       </View>
       <ThemedText style={[Type.micro, styles.label]} numberOfLines={1}>
         {a.label}

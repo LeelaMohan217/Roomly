@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -6,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { useTheme } from '@/hooks/use-theme';
+import { Icon } from '@/components/ui/icon';
 
 type Props = {
   visible: boolean;
@@ -94,7 +94,7 @@ export function Sheet({ visible, title, subtitle, onClose, children }: Props) {
               styles.close,
               { backgroundColor: theme.liftTile, opacity: pressed ? 0.7 : 1 },
             ]}>
-            <Ionicons name="close" size={17} color={theme.textSecondary} />
+            <Icon name="close" size={17} color={theme.textSecondary} />
           </Pressable>
         </View>
 

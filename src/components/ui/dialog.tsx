@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   createContext,
   useCallback,
@@ -17,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing, Type, type Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { committed, rejected, tapped } from '@/lib/haptics';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * Every popup in the app: confirmations, error and info messages, and the
@@ -47,7 +47,7 @@ export function toneColors(theme: Palette, tone: Tone) {
   }
 }
 
-const DEFAULT_ICON: Record<Tone, keyof typeof Ionicons.glyphMap> = {
+const DEFAULT_ICON: Record<Tone, IconName> = {
   danger: 'alert-circle-outline',
   warning: 'warning-outline',
   success: 'checkmark-circle-outline',
@@ -61,7 +61,7 @@ type ConfirmOptions = {
   confirmLabel: string;
   cancelLabel?: string;
   tone?: Tone;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
 };
 
 type AlertOptions = {
@@ -69,13 +69,13 @@ type AlertOptions = {
   message?: string;
   buttonLabel?: string;
   tone?: Tone;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
 };
 
 type ToastOptions = {
   message: string;
   tone?: Tone;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
 };
 
 type Request =
@@ -239,7 +239,7 @@ function DialogCard({ request, onClose }: { request: Request; onClose: (ok: bool
           },
         ]}>
         <View style={[styles.iconRing, { backgroundColor: colors.soft }]}>
-          <Ionicons name={icon} size={28} color={colors.fg} />
+          <Icon name={icon} size={28} color={colors.fg} />
         </View>
 
         <View style={styles.text}>
@@ -296,7 +296,7 @@ function Toast({
           { backgroundColor: theme.backgroundElement, borderColor: colors.fg },
         ]}>
         <View style={[styles.toastIcon, { backgroundColor: colors.soft }]}>
-          <Ionicons name={icon ?? DEFAULT_ICON[tone]} size={18} color={colors.fg} />
+          <Icon name={icon ?? DEFAULT_ICON[tone]} size={18} color={colors.fg} />
         </View>
         <ThemedText style={[Type.caption, styles.toastText]} numberOfLines={3}>
           {message}

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { useDialog } from '@/components/ui/dialog';
 import { Appear } from '@/components/ui/motion';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -23,6 +24,7 @@ import { supabase } from '@/lib/supabase';
  */
 export default function WaitingScreen() {
   const theme = useTheme();
+  const dialog = useDialog();
   const { pending, signOut, refresh } = useSession();
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -30,6 +32,15 @@ export default function WaitingScreen() {
 
   async function cancel() {
     if (!pending) return;
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'close-circle-outline',
+      title: 'Cancel your request?',
+      message: 'The owner won’t see it any more. To join later you’ll need the invite code again.',
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep waiting',
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
 
@@ -50,6 +61,18 @@ export default function WaitingScreen() {
 
     await refresh();
     setBusy(false);
+    dialog.toast({ message: 'Request cancelled', tone: 'info' });
+  }
+
+  async function confirmSignOut() {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'log-out-outline',
+      title: 'Sign out?',
+      message: 'Your request stays with the owner. Sign back in to see when you’re let in.',
+      confirmLabel: 'Sign out',
+    });
+    if (ok) void signOut();
   }
 
   async function checkNow() {
@@ -102,7 +125,7 @@ export default function WaitingScreen() {
           <Button
             title="Sign out"
             variant="ghost"
-            onPress={() => void signOut()}
+            onPress={() => void confirmSignOut()}
             disabled={busy || checking}
           />
         </Appear>

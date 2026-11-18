@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,14 +14,19 @@ import { queryState } from '@/components/ui/query-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Spacing, TabBarClearance, Type, washLocations } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { categoryColor, categoryIcon, tintOf } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import { useMonthlyTotals, type CategoryTotal } from '@/lib/queries';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Rows "Where it went" shows before Show all. */
+const TOP_ROWS = 4;
 
 const KIND_LABEL: Record<CategoryTotal['kind'], string> = {
   fixed: 'Fixed costs',
@@ -63,12 +67,17 @@ export default function ReportsScreen() {
   const previousTotal = sum(forMonth(prev.getFullYear(), prev.getMonth() + 1));
   const delta = currentTotal - previousTotal;
 
+  // Where it went lists the four biggest until Show all.
+  const [showAll, setShowAll] = useState(false);
+
   const palette = [theme.chart1, theme.chart2, theme.chart3, theme.chart4, theme.chart5];
 
-  // The five biggest categories get a colour each; everything after them
-  // shares one grey slice, so the ring always adds up to the total and every
-  // row in the list below has a dot that matches something in it.
-  const colorAt = (i: number) => (i < palette.length ? palette[i] : theme.textTertiary);
+  // The five biggest categories get their own colour -- the same one as their
+  // icon on Home's Recent and History -- and everything after them shares one
+  // grey slice, so the ring always adds up to the total and every row below
+  // has an icon that matches something in it.
+  const colorAt = (i: number) =>
+    i < palette.length ? categoryColor(current[i]?.icon) : theme.textTertiary;
   const rest = current.slice(palette.length);
   const slices: Slice[] = [
     ...current
@@ -163,12 +172,9 @@ export default function ReportsScreen() {
         <View
           style={styles.top}
           onLayout={(e) => {
-            // Never shorter than the wash's own colour stops, or the fade
-            // into the page is squeezed into a hard edge.
-            const h = Math.max(
-              Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 150),
-              560
-            );
+            // Well past the top of the chart card: the last stretch is the
+            // slow fade into the page, as on Home.
+            const h = Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 330);
             if (h !== washHeight) setWashHeight(h);
           }}>
           <ThemedText style={[styles.screenTitle, { color: theme.onWash }]}>Reports</ThemedText>
@@ -217,7 +223,7 @@ export default function ReportsScreen() {
                 accessible
                 accessibilityLabel={`${formatPaise(Math.abs(delta))} ${delta > 0 ? 'more' : 'less'} than ${MONTHS[prev.getMonth()]}`}
                 style={[styles.deltaPill, { backgroundColor: theme.frost, borderColor: theme.frostEdge }]}>
-                <Ionicons
+                <Icon
                   name={delta > 0 ? 'trending-up' : 'trending-down'}
                   size={14}
                   color={theme.onWash}
@@ -271,7 +277,7 @@ export default function ReportsScreen() {
         {!totals.isLoading && !totals.isError && current.length === 0 ? (
           <Appear index={3}>
           <View style={[styles.cardBox, styles.empty, card]}>
-            <Ionicons name="bar-chart-outline" size={22} color={theme.textTertiary} />
+            <Icon name="bar-chart-outline" size={22} color={theme.textTertiary} />
             <ThemedText style={Type.headline}>Nothing this month</ThemedText>
             <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
               Expenses you add will break down here by category.
@@ -295,16 +301,16 @@ export default function ReportsScreen() {
                     value={formatPaise(currentTotal)}
                   />
                 </View>
-                {current.map((c, i) => (
+                {(showAll ? current : current.slice(0, TOP_ROWS)).map((c, i) => (
                   <View
                     key={c.categoryId}
                     accessible
                     accessibilityLabel={`${c.categoryName}, ${share(c.totalPaise)} percent, ${formatPaise(c.totalPaise)}`}
                     style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
-                    {/* The category's own colour, as a rounded tile like the
-                        expense rows elsewhere, with its share under the name. */}
-                    <View style={[styles.swatch, { backgroundColor: theme.liftTile }]}>
-                      <View style={[styles.dot, { backgroundColor: colorAt(i) }]} />
+                    {/* The category's icon in its slice's colour, on a soft
+                        tint of it, as on Recent and History. */}
+                    <View style={[styles.swatch, { backgroundColor: tintOf(colorAt(i)) }]}>
+                      <Icon name={categoryIcon(c.icon)} size={18} color={colorAt(i)} />
                     </View>
                     <View style={styles.flex}>
                       <ThemedText style={[Type.body, styles.semi]} numberOfLines={1}>
@@ -327,6 +333,30 @@ export default function ReportsScreen() {
                     </View>
                   </View>
                 ))}
+                {/* The four biggest first; the rest one tap away. */}
+                {current.length > TOP_ROWS ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showAll }}
+                    onPress={() => setShowAll((v) => !v)}
+                    style={({ pressed }) => [
+                      styles.showAll,
+                      {
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderTopColor: theme.border,
+                        opacity: pressed ? 0.6 : 1,
+                      },
+                    ]}>
+                    <ThemedText style={[Type.caption, styles.semi, { color: theme.brandInk }]}>
+                      {showAll ? 'Show less' : `Show all ${current.length}`}
+                    </ThemedText>
+                    <Icon
+                      name={showAll ? 'chevron-up' : 'chevron-down'}
+                      size={15}
+                      color={theme.brandInk}
+                    />
+                  </Pressable>
+                ) : null}
               </View>
             </Section>
             </Appear>
@@ -379,7 +409,7 @@ function NavButton({
   label,
   disabled = false,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   onPress: () => void;
   label: string;
   disabled?: boolean;
@@ -401,7 +431,7 @@ function NavButton({
           opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
         },
       ]}>
-      <Ionicons name={icon} size={17} color={theme.frostIcon} />
+      <Icon name={icon} size={17} color={theme.frostIcon} />
     </Pressable>
   );
 }
@@ -492,6 +522,13 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 4,
+  },
+  showAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: Spacing.three,
   },
   swatch: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   shareTrack: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 6 },

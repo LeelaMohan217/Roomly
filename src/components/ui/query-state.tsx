@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,6 +7,7 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * The three states every data screen actually has, and only two of which this
@@ -66,7 +66,7 @@ export function LoadFailed({
   return (
     <Card style={styles.block}>
       <View style={[styles.icon, { backgroundColor: theme.dangerSoft }]}>
-        <Ionicons name="cloud-offline-outline" size={20} color={theme.danger} />
+        <Icon name="cloud-offline-outline" size={20} color={theme.danger} />
       </View>
       <ThemedText style={Type.headline}>Couldn&apos;t load {what}</ThemedText>
       <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>

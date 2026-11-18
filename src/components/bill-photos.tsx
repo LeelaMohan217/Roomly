@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useState } from 'react';
@@ -33,6 +32,7 @@ import {
 import { humanError } from '@/lib/errors';
 import { canPickPhoto } from '@/lib/photo';
 import { useSession } from '@/lib/session';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 const TILE = 72;
 
@@ -264,7 +264,7 @@ function Thumb({
           onPress={onRemove}
           hitSlop={8}
           style={[styles.removeBadge, { backgroundColor: theme.text, borderColor: theme.background }]}>
-          <Ionicons name="close" size={12} color={theme.background} />
+          <Icon name="close" size={12} color={theme.background} />
         </Pressable>
       ) : null}
     </View>
@@ -296,7 +296,7 @@ function AddTile({
   onPress,
   disabled,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   disabled: boolean;
@@ -313,7 +313,7 @@ function AddTile({
         styles.addTile,
         { borderColor: theme.borderStrong, opacity: pressed || disabled ? 0.6 : 1 },
       ]}>
-      <Ionicons name={icon} size={20} color={theme.textSecondary} />
+      <Icon name={icon} size={20} color={theme.textSecondary} />
       <ThemedText themeColor="textSecondary" style={Type.micro}>
         {label}
       </ThemedText>
@@ -398,7 +398,7 @@ function ViewerButton({
   onPress,
   busy = false,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   busy?: boolean;
@@ -412,7 +412,7 @@ function ViewerButton({
       onPress={onPress}
       hitSlop={8}
       style={({ pressed }) => [styles.viewerButton, { opacity: pressed ? 0.6 : 1 }]}>
-      {busy ? <ActivityIndicator color="#fff" /> : <Ionicons name={icon} size={22} color="#fff" />}
+      {busy ? <ActivityIndicator color="#fff" /> : <Icon name={icon} size={22} color="#fff" />}
     </Pressable>
   );
 }

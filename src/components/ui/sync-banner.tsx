@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -6,6 +5,7 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatPaise } from '@/lib/money';
 import { useSync } from '@/lib/sync';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * The only honest way to run offline is to say so. A silent queue is how
@@ -24,7 +24,7 @@ export function SyncBanner() {
     <View style={styles.wrap}>
       {blocked.map((p) => (
         <View key={p.id} style={[styles.bar, { backgroundColor: theme.dangerSoft }]}>
-          <Ionicons name="alert-circle" size={16} color={theme.danger} />
+          <Icon name="alert-circle" size={16} color={theme.danger} />
           <View style={styles.flex}>
             <ThemedText style={[Type.caption, styles.semi, { color: theme.danger }]}>
               {formatPaise(p.totalPaise)} couldn&apos;t be saved
@@ -39,7 +39,7 @@ export function SyncBanner() {
             </ThemedText>
           </Pressable>
           <Pressable onPress={() => void discard(p.id)} hitSlop={8}>
-            <Ionicons name="close" size={16} color={theme.textTertiary} />
+            <Icon name="close" size={16} color={theme.textTertiary} />
           </Pressable>
         </View>
       ))}
@@ -54,7 +54,7 @@ export function SyncBanner() {
           {syncing ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <Ionicons
+            <Icon
               name={online ? 'cloud-upload-outline' : 'cloud-offline-outline'}
               size={16}
               color={online ? theme.primary : theme.textTertiary}

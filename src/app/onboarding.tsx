@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -6,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthButton, AuthHeader, AuthResult, authStyles } from '@/components/auth-form';
 import { ThemedText } from '@/components/themed-text';
+import { useDialog } from '@/components/ui/dialog';
 import { Appear } from '@/components/ui/motion';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * The first screen after signing in, for an account that is not in a
@@ -26,6 +27,18 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { session, signOut, unreachable, refresh } = useSession();
   const [checking, setChecking] = useState(false);
+  const dialog = useDialog();
+
+  async function confirmSignOut() {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'log-out-outline',
+      title: 'Sign out?',
+      message: 'You can sign back in any time with the same email.',
+      confirmLabel: 'Sign out',
+    });
+    if (ok) void signOut();
+  }
 
   const name = (session?.user.user_metadata?.display_name as string | undefined)?.trim().split(/\s+/)[0];
   const email = session?.user.email;
@@ -59,7 +72,7 @@ export default function OnboardingScreen() {
           actions={
             <>
               <AuthButton variant="secondary" title="Try again" onPress={checkAgain} busy={checking} />
-              <SignOutLink email={email} onPress={() => void signOut()} />
+              <SignOutLink email={email} onPress={() => void confirmSignOut()} />
             </>
           }>
           Check your internet connection. Your household and expenses are safe — nothing has
@@ -102,7 +115,7 @@ export default function OnboardingScreen() {
         </View>
 
         <Appear index={3}>
-          <SignOutLink email={email} onPress={() => void signOut()} />
+          <SignOutLink email={email} onPress={() => void confirmSignOut()} />
         </Appear>
       </View>
     </SafeAreaView>
@@ -135,7 +148,7 @@ function Choice({
   hint,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   title: string;
   hint: string;
   onPress: () => void;
@@ -160,7 +173,7 @@ function Choice({
       {/* An icon in a soft green tile, not an emoji: the same family as the
           rest of the screen, and the same on every phone. */}
       <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
-        <Ionicons name={icon} size={22} color={theme.primary} />
+        <Icon name={icon} size={22} color={theme.primary} />
       </View>
 
       <View style={styles.cardText}>
@@ -170,7 +183,7 @@ function Choice({
         </ThemedText>
       </View>
 
-      <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+      <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
     </Pressable>
   );
 }

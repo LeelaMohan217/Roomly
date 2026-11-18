@@ -1,10 +1,10 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { ApprovalStatus } from '@/lib/queries';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * "Waiting" or "Rejected" on an expense row, so a figure that does not count
@@ -23,7 +23,7 @@ export function ApprovalTag({ status }: { status: ApprovalStatus }) {
       accessible
       accessibilityLabel={waiting ? 'Waiting for approval' : 'Rejected'}
       style={[styles.tag, { backgroundColor: waiting ? theme.warningSoft : theme.dangerSoft }]}>
-      <Ionicons name={waiting ? 'time-outline' : 'close-circle-outline'} size={11} color={ink} />
+      <Icon name={waiting ? 'time-outline' : 'close-circle-outline'} size={11} color={ink} />
       <ThemedText style={[styles.text, { color: ink }]}>{waiting ? 'Waiting' : 'Rejected'}</ThemedText>
     </View>
   );

@@ -1,5 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useRouter } from 'expo-router';
@@ -26,19 +24,30 @@ import { useDialog } from '@/components/ui/dialog';
 
 import { Appear, Reveal } from '@/components/ui/motion';
 import { Money } from '@/components/ui/money';
-import { QuickActions } from '@/components/ui/quick-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MaxContentWidth, Radius, Spacing, TabBarClearance, Type, washLocations } from '@/constants/theme';
+import {
+  MaxContentWidth,
+  Radius,
+  Spacing,
+  TabBarClearance,
+  Type,
+  washLocations,
+} from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
+import { useCountUp } from '@/hooks/use-count-up';
+import { homeInsights, pickInsight } from '@/lib/insight';
+import { useInsightRotation } from '@/lib/insight-hidden';
+import { tapped } from '@/lib/haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, todayIso } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
-import { iconFor } from '@/lib/icons';
+import { categoryColor, categoryIcon, categoryTint } from '@/lib/icons';
 import { formatPaise, formatWholeRupees } from '@/lib/money';
 import {
   useAwaitingApproval,
   useAwayPeriods,
   useBalances,
+  useMonthlyTotals,
   useExpenses,
   useMembers,
   usePendingChanges,
@@ -50,6 +59,8 @@ import { isPresent } from '@/lib/split';
 import { supabase } from '@/lib/supabase';
 import { useSync } from '@/lib/sync';
 import { useTourStore, useTourTarget } from '@/lib/tour';
+import { FeatureCards } from '@/components/ui/feature-cards';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 type JoinRequest = {
   id: string;
@@ -64,8 +75,8 @@ type JoinRequest = {
  * rather than boxed in a card: what the balance means, and the amount.
  *
  * The amount is white whichever way it goes (on green, "owed to you" can't
- * itself be green); the caption, the frosted chip and the + or − all say the
- * direction, so colour is never the only signal. Anything still loading shows
+ * itself be green); the caption and the − say the direction, so colour is
+ * never the only signal. Anything still loading shows
  * a skeleton -- a ₹0.00 before the data arrives would be a claim.
  */
 function BalanceHero({
@@ -81,11 +92,14 @@ function BalanceHero({
   const tourTarget = useTourTarget('balance');
   const owed = balancePaise !== undefined && balancePaise > 0;
   const owing = balancePaise !== undefined && balancePaise < 0;
+  // The figure runs up from ₹0 as Home opens. Only what is drawn counts; the
+  // label below always reads out the real amount.
+  const counted = useCountUp(balancePaise);
 
   return (
     <View ref={tourTarget} collapsable={false} style={styles.hero}>
       <View style={styles.balanceCaptionRow}>
-        <ThemedText style={[Type.caption, styles.flexShrink, { color: theme.onWashMuted }]} numberOfLines={1}>
+        <ThemedText style={[styles.balanceCaption, styles.flexShrink, { color: theme.onWashMuted }]} numberOfLines={1}>
           {balancePaise === undefined
             ? 'Your balance'
             : owed
@@ -94,26 +108,6 @@ function BalanceHero({
                 ? 'You owe the house'
                 : 'You’re all square'}
         </ThemedText>
-
-        {/* The direction as a shape too: an arrow in when it comes back to
-            you, out when you pay. The amount's label already says it to a
-            screen reader. */}
-        {owed || owing ? (
-          <View
-            style={[styles.balanceChip, { backgroundColor: theme.frost, borderColor: theme.frostEdge }]}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants">
-            <Ionicons
-              name={owed ? 'arrow-down' : 'arrow-up'}
-              size={12}
-              color={theme.onWash}
-              style={styles.chipArrow}
-            />
-            <ThemedText style={[Type.micro, styles.semi, { color: theme.onWash }]} numberOfLines={1}>
-              {owed ? 'You get back' : 'You pay'}
-            </ThemedText>
-          </View>
-        ) : null}
       </View>
 
       {balancePaise !== undefined ? (
@@ -121,9 +115,10 @@ function BalanceHero({
         // Owed to you stays unsigned, as in the mockup: the caption and the
         // chip above say it, and the label reads it out either way.
         <Money
-          paise={owing ? balancePaise : Math.abs(balancePaise)}
+          paise={owing ? (counted ?? balancePaise) : Math.abs(counted ?? balancePaise)}
           signed={owing}
-          size="hero"
+          size="display"
+          // White on the green; the pill below says which way it goes.
           color={theme.onWash}
           accessibilityLabel={`${householdName ? `${householdName}: ` : ''}${
             owed
@@ -135,9 +130,29 @@ function BalanceHero({
         />
       ) : (
         <View style={styles.balanceSkeleton}>
-          <Skeleton width="55%" height={30} radius={Radius.sm} tint={theme.frost} />
+          <Skeleton width="55%" height={40} radius={Radius.sm} tint={theme.frost} />
         </View>
       )}
+
+      {/* Which way it goes, in colour and in words: red to pay, green to
+          receive. Nothing when you're square. The amount's label already
+          says it to a screen reader. */}
+      {owed || owing ? (
+        <View
+          // Frosted, like the bell beside the greeting: see-through white on
+          // the green, the arrow and words saying which way.
+          style={[
+            styles.directionPill,
+            { backgroundColor: theme.frost, borderColor: theme.frostEdge },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants">
+          <Icon name={owing ? 'arrow-up' : 'arrow-down'} size={15} color="#FFFFFF" />
+          <ThemedText style={[styles.directionText, styles.semi]}>
+            {owing ? 'To pay' : 'To receive'}
+          </ThemedText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -181,7 +196,7 @@ function MonthCard({
       <View style={styles.liftHead}>
         <ThemedText style={[Type.caption, styles.semi]}>This month</ThemedText>
         <View style={[styles.monthChip, { backgroundColor: theme.liftTile }]}>
-          <Ionicons name="calendar-clear-outline" size={12} color={theme.textSecondary} />
+          <Icon name="calendar-clear-outline" size={12} color={theme.textSecondary} />
           <ThemedText themeColor="textSecondary" style={Type.micro}>
             {month}
           </ThemedText>
@@ -223,7 +238,7 @@ function MonthColumn({
   prevPaise,
   prevMonth,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   paise?: number;
   prevPaise?: number;
@@ -235,7 +250,7 @@ function MonthColumn({
     <View style={styles.column}>
       <View style={styles.columnHead}>
         <View style={[styles.columnIcon, { backgroundColor: theme.primarySoft }]}>
-          <Ionicons name={icon} size={14} color={theme.brandInk} />
+          <Icon name={icon} size={14} color={theme.brandInk} />
         </View>
         <ThemedText themeColor="textSecondary" style={[Type.micro, styles.flexShrink]} numberOfLines={1}>
           {label}
@@ -327,7 +342,7 @@ function SectionLink({ label, onPress }: { label: string; onPress: () => void })
       hitSlop={8}
       style={({ pressed }) => [styles.sectionLink, { opacity: pressed ? 0.6 : 1 }]}>
       <ThemedText themeColor="textSecondary" style={Type.caption}>{label}</ThemedText>
-      <Ionicons name="arrow-forward" size={13} color={theme.textSecondary} />
+      <Icon name="arrow-forward" size={13} color={theme.textSecondary} />
     </Pressable>
   );
 }
@@ -368,6 +383,24 @@ export default function HomeScreen() {
 
   const members = useMembers();
   const balances = useBalances();
+  // The one-line insight under the month card (lib/insight).
+  const monthly = useMonthlyTotals();
+  const nowDate = new Date();
+  // Every true insight; Home shows one, the next each time it opens, and
+  // skips any you've hidden this month.
+  const rotation = useInsightRotation(member?.id ? `${member.id}` : undefined);
+  const insight = monthly.data
+    ? pickInsight(
+        homeInsights(
+          monthly.data,
+          nowDate.getFullYear(),
+          nowDate.getMonth() + 1,
+          nowDate.getDate()
+        ),
+        rotation.hidden,
+        rotation.turn
+      )
+    : null;
   // The six newest, each its own card under Recent; "See all" opens History.
   const expenses = useExpenses(6);
   const away = useAwayPeriods();
@@ -464,7 +497,35 @@ export default function HomeScreen() {
       );
       return queryClient.invalidateQueries();
     },
+    // A failed answer used to vanish without a word: the card just stayed.
+    onError: (e) =>
+      void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
   });
+
+  async function rejectChange(id: string, kind: string) {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'close-circle-outline',
+      title: kind === 'void' ? 'Keep the expense?' : 'Reject this change?',
+      message:
+        kind === 'void'
+          ? 'The expense stays as it is, and whoever asked is told you said no.'
+          : 'The expense stays as it was, and whoever asked is told you said no.',
+      confirmLabel: 'Reject',
+    });
+    if (ok) reviewChange.mutate({ id, approve: false });
+  }
+
+  async function declineJoin(id: string, name: string) {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'person-remove-outline',
+      title: `Decline ${name}?`,
+      message: 'They won’t join the household. They can ask again with a new invite.',
+      confirmLabel: 'Decline',
+    });
+    if (ok) reviewJoin.mutate({ id, approve: false });
+  }
 
   // A housemate's new expense, which counts nowhere until someone other than
   // whoever added it says yes (migration 0039).
@@ -517,6 +578,8 @@ export default function HomeScreen() {
       );
       return queryClient.invalidateQueries();
     },
+    onError: (e) =>
+      void dialog.alert({ tone: 'danger', title: 'That didn’t go through', message: humanError(e) }),
   });
 
   const myBalance = balances.data?.find((b) => b.memberId === member?.id)?.balancePaise ?? 0;
@@ -580,7 +643,7 @@ export default function HomeScreen() {
     // No top edge: the green wash runs up under the status bar, and the
     // scroll content pads itself by the inset instead.
     <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: theme.background }]}>
-      {/* White status bar icons while Home is showing, over the dark wash.
+      {/* White status bar icons while Home is showing, over the green wash.
           Unmounted on blur, so other screens keep their own. */}
       {focused ? <StatusBar style="light" /> : null}
 
@@ -595,9 +658,8 @@ export default function HomeScreen() {
             progressViewOffset={insets.top}
           />
         }>
-        {/* The wash: deep green at the top, fading into the page about half
-            way down the month card. It scrolls with the content, so the white
-            text on it never ends up over the pale page. */}
+        {/* The wash: the app's green, lighter than before, fading into the
+            page about half way down the month card, with white text on it. */}
         <LinearGradient
           pointerEvents="none"
           colors={[
@@ -608,15 +670,17 @@ export default function HomeScreen() {
             theme.washMint,
             theme.background,
           ]}
-          // Each colour where the mockup put it (see washLocations).
-          locations={washLocations(washHeight)}
+          // Spread evenly down a taller wash, so the green dissolves into the
+          // page instead of stopping at a line.
+          locations={washLocations()}
           style={[styles.wash, { height: washHeight }]}
         />
 
         <View
           style={styles.top}
           onLayout={(e) => {
-            const h = Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 150);
+            // Well past the month card: the last stretch is the slow fade.
+            const h = Math.round(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 330);
             if (h !== washHeight) setWashHeight(h);
           }}>
           <HomeHeader
@@ -635,51 +699,13 @@ export default function HomeScreen() {
               balancePaise={balances.data ? myBalance : undefined}
             />
           </Appear>
-
-          {/* Steps 1 to 4, one per action. Frosted, on the wash. */}
-          <QuickActions
-            onWash
-            enterIndex={1}
-            // No Add here: the Add button beside the tab bar already adds an
-            // expense, and two Add buttons on one screen left recurring bills
-            // with no way in from Home.
-            actions={[
-              {
-                key: 'settle',
-                tourTarget: 'settle',
-                icon: 'swap-horizontal',
-                label: 'Settle',
-                onPress: () => router.push('/settle'),
-              },
-              {
-                key: 'bills',
-                // A calendar, not the repeat arrows: those sat beside Settle's
-                // swap arrows and the two read as the same button.
-                icon: 'calendar-outline',
-                label: 'Bills',
-                onPress: () => router.push('/recurring'),
-              },
-              {
-                key: 'away',
-                icon: 'navigate-outline',
-                label: 'Away',
-                onPress: () => router.push('/away'),
-              },
-              {
-                key: 'people',
-                icon: 'people-outline',
-                label: 'People',
-                onPress: () => router.push('/household'),
-              },
-            ]}
-          />
         </View>
         {/* Recurring bills post from whoever opens the app first. When that
             call fails there is nothing else in the UI that would ever mention
             it, so rent quietly does not appear. */}
         {recurringError ? (
           <View style={[styles.recurringError, { backgroundColor: theme.backgroundSunken }]}>
-            <Ionicons name="alert-circle-outline" size={15} color={theme.textTertiary} />
+            <Icon name="alert-circle-outline" size={15} color={theme.textTertiary} />
             <ThemedText themeColor="textTertiary" style={[Type.micro, styles.recurringErrorText]}>
               Could not post recurring bills. {recurringError}
             </ThemedText>
@@ -701,6 +727,68 @@ export default function HomeScreen() {
             minePrevPaise={spend.data?.myPrevMonthFullPaise}
           />
         </Appear>
+
+        {/* What the month says, in one line: a category that has passed last
+            month, a real fall late in the month, or where the money goes.
+            Rises a beat after the card, once the balance has counted up. */}
+        {insight ? (
+          // Keyed, so the next insight rises in when one is hidden.
+          <Appear key={insight.key} index={6}>
+            <View
+              style={[
+                styles.insight,
+                insight.tone === 'up'
+                  ? { backgroundColor: theme.warningSoft, borderColor: `${theme.warning}33` }
+                  : { backgroundColor: theme.primarySoft, borderColor: theme.washFade },
+              ]}>
+              <View style={[styles.insightIcon, { backgroundColor: theme.backgroundElement }]}>
+                <Icon
+                  name={
+                    insight.tone === 'up'
+                      ? 'trending-up'
+                      : insight.tone === 'down'
+                        ? 'trending-down'
+                        : 'sparkles'
+                  }
+                  size={16}
+                  color={insight.tone === 'up' ? theme.warning : theme.brandInk}
+                />
+              </View>
+              <ThemedText
+                style={[
+                  Type.caption,
+                  styles.flex,
+                  { color: insight.tone === 'up' ? theme.warning : theme.brandInk },
+                ]}>
+                <ThemedText
+                  style={[
+                    Type.caption,
+                    styles.semi,
+                    { color: insight.tone === 'up' ? theme.warning : theme.brandInk },
+                  ]}>
+                  {insight.lead}
+                </ThemedText>
+                {insight.rest}
+              </ThemedText>
+              {/* Seen it: hide this one for the rest of the month. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Hide this tip"
+                onPress={() => {
+                  tapped();
+                  rotation.hide(insight.key);
+                }}
+                hitSlop={10}
+                style={({ pressed }) => [styles.insightClose, { opacity: pressed ? 0.5 : 1 }]}>
+                <Icon
+                  name="close"
+                  size={15}
+                  color={insight.tone === 'up' ? theme.warning : theme.brandInk}
+                />
+              </Pressable>
+            </View>
+          </Appear>
+        ) : null}
 
         {/* Notes, one line each, coloured by what they are: yellow for
             something to keep in mind, never green, which means money in. */}
@@ -739,9 +827,7 @@ export default function HomeScreen() {
                     onPress={() => router.push({ pathname: '/expense/[id]', params: { id: e.id } })}
                     style={styles.approvalHead}>
                     <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
-                        {iconFor(e.categoryIcon)}
-                      </ThemedText>
+                      <Icon name={categoryIcon(e.categoryIcon)} size={18} color={theme.textSecondary} />
                     </View>
                     <View style={styles.flex}>
                       <ThemedText style={Type.headline}>
@@ -798,7 +884,7 @@ export default function HomeScreen() {
                   <Button
                     title="Reject"
                     variant="ghost"
-                    onPress={() => reviewChange.mutate({ id: c.id, approve: false })}
+                    onPress={() => void rejectChange(c.id, c.kind)}
                     disabled={reviewChange.isPending}
                     style={styles.flex}
                   />
@@ -827,7 +913,7 @@ export default function HomeScreen() {
                   <Button
                     title="Reject"
                     variant="ghost"
-                    onPress={() => reviewJoin.mutate({ id: r.id, approve: false })}
+                    onPress={() => void declineJoin(r.id, r.display_name)}
                     disabled={reviewJoin.isPending}
                     style={styles.flex}
                   />
@@ -840,6 +926,61 @@ export default function HomeScreen() {
 
         {/* No category breakdown on Home: the Reports tab has it, and Home
             stays on where you stand and what just happened. */}
+
+        {/* The everyday actions, then the private ledger, in one row that
+            scrolls sideways. No Add here: the Add button beside the tab bar
+            already adds an expense. */}
+        <Appear index={9}>
+          <FeatureCards
+            bleed={STRIP_SIDE}
+            cards={[
+              {
+                key: 'settle',
+                tourTarget: 'settle',
+                icon: 'swap-horizontal',
+                label: 'Settle',
+                caption: 'Pay or get paid',
+                color: '#16A34A',
+                onPress: () => router.push('/settle'),
+              },
+              {
+                key: 'bills',
+                // A calendar, not the repeat arrows: those sat beside Settle's
+                // swap arrows and the two read as the same button.
+                icon: 'calendar-outline',
+                label: 'Bills',
+                caption: 'Rent, Wi-Fi, more',
+                color: '#D97706',
+                onPress: () => router.push('/recurring'),
+              },
+              {
+                key: 'away',
+                icon: 'navigate-outline',
+                label: 'Away',
+                caption: 'Days out of town',
+                color: '#0284C7',
+                onPress: () => router.push('/away'),
+              },
+              {
+                key: 'people',
+                icon: 'people-outline',
+                label: 'People',
+                caption: 'Your housemates',
+                color: '#7C3AED',
+                onPress: () => router.push('/household'),
+              },
+              {
+                key: 'ledger',
+                icon: 'lock-closed-outline',
+                label: 'My ledger',
+                caption: 'Just for you',
+                color: '#DB2777',
+                tag: 'New',
+                onPress: () => router.push('/ledger'),
+              },
+            ]}
+          />
+        </Appear>
 
         <Appear index={9}>
         <Section
@@ -891,7 +1032,7 @@ export default function HomeScreen() {
                       { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow },
                     ]}>
                     <View style={[styles.lineIcon, { backgroundColor: theme.primarySoft }]}>
-                      <MaterialCommunityIcons name="check" size={17} color={theme.brandInk} />
+                      <Icon name="check" size={17} color={theme.brandInk} />
                     </View>
                     <ThemedText themeColor="textSecondary" style={[Type.caption, styles.personText]}>
                       {openBalances.length === 0
@@ -938,15 +1079,15 @@ export default function HomeScreen() {
                 <Appear key={p.id} index={11 + i}>
                 <View style={[styles.recentCard, { backgroundColor: theme.lift, borderColor: theme.liftEdge, shadowColor: theme.liftShadow }]}>
                   <View style={styles.row}>
-                    <View style={[styles.rowTile, { backgroundColor: theme.liftTile }]}>
-                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(p.categoryIcon)}</ThemedText>
+                    <View style={[styles.rowTile, { backgroundColor: categoryTint(p.categoryIcon) }]}>
+                      <Icon name={categoryIcon(p.categoryIcon)} size={18} color={categoryColor(p.categoryIcon)} />
                     </View>
                     <View style={styles.flex}>
                       <ThemedText style={Type.body} numberOfLines={1}>
                         {p.description || p.categoryName}
                       </ThemedText>
                       <View style={styles.pendingRow}>
-                        <Ionicons
+                        <Icon
                           name={p.blocked ? 'alert-circle' : 'cloud-upload-outline'}
                           size={11}
                           color={p.blocked ? theme.danger : theme.textTertiary}
@@ -976,8 +1117,8 @@ export default function HomeScreen() {
                       styles.row,
                       pressed && [styles.rowPressed, { backgroundColor: theme.backgroundSelected }],
                     ]}>
-                    <View style={[styles.rowTile, { backgroundColor: theme.liftTile }]}>
-                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>{iconFor(e.categoryIcon)}</ThemedText>
+                    <View style={[styles.rowTile, { backgroundColor: categoryTint(e.categoryIcon) }]}>
+                      <Icon name={categoryIcon(e.categoryIcon)} size={18} color={categoryColor(e.categoryIcon)} />
                     </View>
                     <View style={styles.flex}>
                       <ThemedText style={[Type.body, styles.semi]} numberOfLines={1}>
@@ -1007,7 +1148,7 @@ export default function HomeScreen() {
           ) : (
             <Card style={styles.empty}>
               <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
-                <Ionicons name="receipt-outline" size={18} color={theme.brandInk} />
+                <Icon name="receipt-outline" size={18} color={theme.brandInk} />
               </View>
               <ThemedText style={Type.headline}>Nothing logged yet</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -1068,7 +1209,7 @@ function Note({
   onPress,
 }: {
   tone: 'warning' | 'info';
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   text: string;
   onPress: () => void;
 }) {
@@ -1081,11 +1222,11 @@ function Note({
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.note, { backgroundColor: soft, opacity: pressed ? 0.7 : 1 }]}>
-      <Ionicons name={icon} size={16} color={ink} />
+      <Icon name={icon} size={16} color={ink} />
       <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: ink }]} numberOfLines={1}>
         {text}
       </ThemedText>
-      <Ionicons name="chevron-forward" size={14} color={ink} />
+      <Icon name="chevron-forward" size={14} color={ink} />
     </Pressable>
   );
 }
@@ -1113,8 +1254,15 @@ const styles = StyleSheet.create({
   wash: { position: 'absolute', top: 0, left: 0, right: 0 },
   top: { gap: Spacing.three },
 
-  hero: { gap: Spacing.two },
-  balanceCaptionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginTop: Spacing.one },
+  // Centred on the wash: the caption and chip over the amount, both mid-screen.
+  hero: { gap: Spacing.two, alignItems: 'center' },
+  balanceCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
   // Never shrinks: as wide as its words, which stay on one line. The caption
   // beside it gives way instead.
   balanceChip: {
@@ -1131,7 +1279,36 @@ const styles = StyleSheet.create({
   // arrow points down-left (in, to you) and the up arrow up-right (out).
   chipArrow: { transform: [{ rotate: '45deg' }] },
   // The same height as the figure it stands in for, so nothing moves.
-  balanceSkeleton: { height: 50, justifyContent: 'center' },
+  directionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: -2,
+  },
+  directionText: { color: '#FFFFFF', fontSize: 14, lineHeight: 19 },
+  balanceCaption: { fontSize: 16, lineHeight: 22, fontWeight: '500' },
+  insight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + 2,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+  },
+  insightClose: { alignSelf: 'flex-start', padding: 2 },
+  insightIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceSkeleton: { height: 50, justifyContent: 'center', alignItems: 'center', alignSelf: 'stretch' },
 
   // The lifted card: big radius and a hairline edge, no shadow (a shadowed
   // card fading in on Android drew a grey band around itself).

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -9,6 +8,7 @@ import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * Top bar for the tab screens: brand on the left, you on the right.
@@ -92,28 +92,36 @@ export function HomeHeader({
   greeting,
   name,
   badge = 0,
+  light = false,
 }: {
   /** "Good evening" -- the comma and name are added here. */
   greeting: string;
   name: string;
   /** Things waiting for an owner's approval, shown on the avatar. */
   badge?: number;
+  /** On a pale wash: dark text and white buttons instead of white on green. */
+  light?: boolean;
 }) {
   const theme = useTheme();
   const router = useRouter();
   const { member } = useSession();
   const notifications = useNotifications();
   const unread = (notifications.data ?? []).filter((n) => n.unread).length;
+  const ink = light ? theme.text : theme.onWash;
+  const inkMuted = light ? theme.textSecondary : theme.onWashMuted;
+  const buttonBg = light ? 'rgba(255,255,255,0.78)' : theme.frost;
+  const buttonEdge = light ? 'rgba(255,255,255,0.95)' : theme.frostEdge;
+  const buttonIcon = light ? theme.text : theme.frostIcon;
 
   return (
     <View style={[styles.bar, styles.homeBar]}>
       {/* Two lines, two tones, on the green wash: the greeting light and
           faded, the name in semibold white -- the way you'd say it. */}
       <View style={styles.homeText} accessible accessibilityLabel={`${greeting}, ${name}`}>
-        <ThemedText style={[styles.homeGreeting, { color: theme.onWashMuted }]} numberOfLines={1}>
+        <ThemedText style={[styles.homeGreeting, { color: inkMuted }]} numberOfLines={1}>
           {greeting},
         </ThemedText>
-        <ThemedText style={[styles.homeName, { color: theme.onWash }]} numberOfLines={1}>
+        <ThemedText style={[styles.homeName, { color: ink }]} numberOfLines={1}>
           {name}
         </ThemedText>
       </View>
@@ -127,14 +135,14 @@ export function HomeHeader({
           style={({ pressed }) => [
             styles.iconButton,
             {
-              backgroundColor: theme.frost,
-              borderColor: theme.frostEdge,
+              backgroundColor: buttonBg,
+              borderColor: buttonEdge,
               opacity: pressed ? 0.7 : 1,
             },
           ]}>
           {/* Frosted on the wash, an outline bell; an amber dot says there is
               something new. The count is in the button's label. */}
-          <Ionicons name="notifications-outline" size={19} color={theme.frostIcon} />
+          <Icon name="notifications-outline" size={19} color={buttonIcon} />
           {unread > 0 ? (
             <View
               style={[styles.unreadDot, { backgroundColor: theme.alertDot }]}
@@ -163,7 +171,7 @@ export function HomeHeader({
             <View
               style={[
                 styles.badge,
-                { backgroundColor: theme.danger, borderColor: theme.washTop },
+                { backgroundColor: theme.danger, borderColor: light ? '#FFFFFF' : theme.washTop },
               ]}>
               <ThemedText style={styles.badgeText} allowFontScaling={false}>
                 {badge > 9 ? '9+' : badge}
@@ -212,7 +220,7 @@ export function ScreenHeader({
               opacity: pressed ? 0.7 : 1,
             },
           ]}>
-          <Ionicons name="chevron-back" size={20} color={theme.text} />
+          <Icon name="chevron-back" size={20} color={theme.text} />
         </Pressable>
         ) : null}
 

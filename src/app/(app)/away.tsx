@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
@@ -22,6 +21,7 @@ import { useAwayPeriods, useMembers } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { isPresent } from '@/lib/split';
 import { supabase } from '@/lib/supabase';
+import { Icon } from '@/components/ui/icon';
 
 export default function AwayScreen() {
   const theme = useTheme();
@@ -209,7 +209,7 @@ export default function AwayScreen() {
               styles.headerIcon,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
             ]}>
-            <Ionicons name="information-circle-outline" size={19} color={theme.text} />
+            <Icon name="information-circle-outline" size={19} color={theme.text} />
           </Pressable>
         }
       />
@@ -220,7 +220,7 @@ export default function AwayScreen() {
         showsVerticalScrollIndicator={false}>
         {awayToday.length > 0 ? (
           <Appear index={0} style={[styles.note, { backgroundColor: theme.warningSoft }]}>
-            <Ionicons name="airplane-outline" size={15} color={theme.warning} />
+            <Icon name="airplane-outline" size={15} color={theme.warning} />
             <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
               Away today: {awayToday.map((m) => m.displayName).join(', ')}
             </ThemedText>
@@ -302,7 +302,7 @@ export default function AwayScreen() {
                     setEnd(null);
                   }}
                   hitSlop={8}>
-                  <Ionicons name="close" size={19} color={theme.textTertiary} />
+                  <Icon name="close" size={19} color={theme.textTertiary} />
                 </Pressable>
               </View>
 
@@ -358,7 +358,7 @@ export default function AwayScreen() {
                 styles.note,
                 { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
               ]}>
-              <Ionicons name="alert-circle-outline" size={15} color={theme.warning} />
+              <Icon name="alert-circle-outline" size={15} color={theme.warning} />
               <ThemedText style={[Type.caption, styles.medium, styles.flex, { color: theme.warning }]}>
                 Saved · past expenses were not changed
               </ThemedText>
@@ -367,7 +367,7 @@ export default function AwayScreen() {
                 accessibilityLabel="Dismiss"
                 onPress={() => setBackdated(null)}
                 hitSlop={10}>
-                <Ionicons name="close" size={16} color={theme.warning} />
+                <Icon name="close" size={16} color={theme.warning} />
               </Pressable>
             </Pressable>
           </Appear>
@@ -433,7 +433,7 @@ export default function AwayScreen() {
                     </View>
 
                     {canRemove ? (
-                      <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+                      <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
                     ) : null}
                   </Pressable>
                 );
@@ -441,7 +441,7 @@ export default function AwayScreen() {
             </Card>
           ) : (
             <Card style={styles.empty}>
-              <Ionicons name="airplane-outline" size={20} color={theme.textTertiary} />
+              <Icon name="airplane-outline" size={20} color={theme.textTertiary} />
               <ThemedText themeColor="textSecondary" style={Type.caption}>
                 No trips marked yet.
               </ThemedText>

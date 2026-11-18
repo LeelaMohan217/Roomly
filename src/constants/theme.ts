@@ -120,15 +120,15 @@ export const Colors = {
     // The floating tab bar's drawn shadow, two layers of this.
     barShadow: 'rgba(16,24,40,0.06)',
 
-    // Home's colour wash: deep brand green at the top of the screen, fading
-    // into the page. The balance, greeting and quick actions sit on its dark
-    // top in white, so the stops stay dark (white 7:1+) for the first ~45% of
-    // the wash, where all that text lives.
-    washTop: '#053D2D',
-    washMid: '#08694B',
-    washLow: '#2E9C74',
-    washFade: '#A9DCC6',
-    washMint: '#E4F2EB',
+    // The colour wash on Home, History and Reports: the brand green, a few
+    // shades lighter than the old deep forest so it sits easily over the
+    // light cards, dissolving into the page. White text still reads on its
+    // top half, where the titles and the balance live.
+    washTop: '#12976B',
+    washMid: '#1DAC7C',
+    washLow: '#5EC59E',
+    washFade: '#B9E4D1',
+    washMint: '#E2F0EA',
     onWash: '#FFFFFF',
     onWashMuted: 'rgba(255,255,255,0.72)',
     // Frosted controls on the wash: translucent white, no blur library.
@@ -404,15 +404,13 @@ export const TabBarClearance = TabBar.margin + TabBar.body + TabBar.hump + 12;
 export const MaxContentWidth = 640;
 
 /**
- * Where the green wash's colours sit, in points from the top of the screen
- * -- the redesign mockup's stops scaled to a phone's width -- so the
- * brighter green reaches the same place on every screen whatever the wash's
- * measured height. The last colour (the page) is always at the very bottom.
+ * Where the wash's six colours sit, as shares of its height: spread evenly, so
+ * the green dissolves into the page over the last third instead of stopping at
+ * a line. Screens make the wash tall enough to run well past their first card.
  */
-const WASH_STOPS = [165, 285, 395, 470];
+export const WASH_LOCATIONS: [number, number, ...number[]] = [0, 0.26, 0.48, 0.7, 0.86, 1];
 
-/** LinearGradient locations for a wash this tall, for the six wash colours. */
-export function washLocations(height: number): [number, number, ...number[]] {
-  const stops = WASH_STOPS.map((y) => Math.min(y / Math.max(height, 1), 0.97));
-  return [0, 1, ...stops].sort((a, b) => a - b) as [number, number, ...number[]];
+/** The wash's locations. Kept as a function for the screens that call it. */
+export function washLocations(_height?: number): [number, number, ...number[]] {
+  return WASH_LOCATIONS;
 }

@@ -1,9 +1,9 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
 import { useMemberPhotos } from '@/lib/queries';
+import { Icon } from '@/components/ui/icon';
 
 /** "Mohan Nethala" -> "MN", "Ravi" -> "RA". Never more than two glyphs. */
 function initials(name: string): string {
@@ -84,7 +84,7 @@ export function Avatar({
             accessibilityLabel={`${name}'s photo`}
           />
         ) : icon ? (
-          <Ionicons name="person" size={Math.round(size * 0.52)} color={ink} />
+          <Icon name="person" size={Math.round(size * 0.52)} color={ink} />
         ) : (
           <Text style={[styles.text, { fontSize, color: ink }]} allowFontScaling={false}>
             {initials(name)}

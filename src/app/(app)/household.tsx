@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
@@ -24,6 +23,7 @@ import { humanError } from '@/lib/errors';
 import { useMembers } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 export default function HouseholdScreen() {
   const theme = useTheme();
@@ -187,7 +187,7 @@ export default function HouseholdScreen() {
                   </View>
 
                   {removable ? (
-                    <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+                    <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
                   ) : null}
                 </Pressable>
               );
@@ -219,7 +219,7 @@ export default function HouseholdScreen() {
         ) : (
           <Appear index={1}>
             <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
+              <Icon name="lock-closed-outline" size={14} color={theme.textTertiary} />
               <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
                 Only the owner can add or remove people.
               </ThemedText>
@@ -260,11 +260,11 @@ export default function HouseholdScreen() {
               Living here since
             </ThemedText>
             <View style={[styles.dateBox, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="calendar-outline" size={15} color={theme.textTertiary} />
+              <Icon name="calendar-outline" size={15} color={theme.textTertiary} />
               <ThemedText style={[Type.body, styles.flex]}>
                 {joinedOn ? formatRange(joinedOn, joinedOn) : 'Since the household started'}
               </ThemedText>
-              <Ionicons name="chevron-forward" size={14} color={theme.textTertiary} />
+              <Icon name="chevron-forward" size={14} color={theme.textTertiary} />
             </View>
             <ThemedText themeColor="textTertiary" style={Type.micro}>
               They cannot be given a share of anything dated before this.
@@ -359,7 +359,7 @@ function LinkRow({
   onPress,
   first = false,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   onPress: () => void;
   first?: boolean;
@@ -375,10 +375,10 @@ function LinkRow({
         { opacity: pressed ? 0.7 : 1 },
       ]}>
       <View style={[styles.linkIcon, { backgroundColor: theme.primarySoft }]}>
-        <Ionicons name={icon} size={17} color={theme.brandInk} />
+        <Icon name={icon} size={17} color={theme.brandInk} />
       </View>
       <ThemedText style={[Type.body, styles.flex]}>{label}</ThemedText>
-      <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+      <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
     </Pressable>
   );
 }

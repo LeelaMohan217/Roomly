@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, type Href } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -17,6 +16,7 @@ import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isProperEmail, isValidEmail } from '@/lib/email';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * The building blocks of the sign-in and create-account screens, in the
@@ -26,7 +26,6 @@ import { isProperEmail, isValidEmail } from '@/lib/email';
  * rest of the app.
  */
 
-type IconName = keyof typeof Ionicons.glyphMap;
 
 /** The icon in a soft circle, a title, and one plain sentence under it. */
 export function AuthHeader({
@@ -43,7 +42,7 @@ export function AuthHeader({
     <View style={styles.header}>
       <View style={[styles.mark, { backgroundColor: theme.primarySoft }]}>
         <View style={[styles.markInner, { backgroundColor: theme.primary }]}>
-          <Ionicons name={icon} size={22} color={theme.onPrimary} />
+          <Icon name={icon} size={22} color={theme.onPrimary} />
         </View>
       </View>
       <ThemedText style={styles.title}>{title}</ThemedText>
@@ -130,7 +129,7 @@ export function AuthField({
                   : theme.liftEdge,
           },
         ]}>
-        <Ionicons
+        <Icon
           name={icon}
           size={18}
           color={
@@ -165,7 +164,7 @@ export function AuthField({
             accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
             hitSlop={12}
             onPress={() => setRevealed((v) => !v)}>
-            <Ionicons
+            <Icon
               name={revealed ? 'eye-off-outline' : 'eye-outline'}
               size={19}
               color={theme.textTertiary}
@@ -176,7 +175,7 @@ export function AuthField({
       {hint ? (
         <View style={styles.hintRow}>
           {hintTone !== 'neutral' ? (
-            <Ionicons
+            <Icon
               name={
                 hintTone === 'success'
                   ? 'checkmark-circle'
@@ -247,7 +246,7 @@ export function AuthButton({
         <ActivityIndicator size="small" color={fg} />
       ) : (
         <>
-          {icon ? <Ionicons name={icon} size={17} color={primary ? fg : theme.success} /> : null}
+          {icon ? <Icon name={icon} size={17} color={primary ? fg : theme.success} /> : null}
           <ThemedText style={[styles.buttonText, { color: fg }]}>{title}</ThemedText>
         </>
       )}
@@ -291,7 +290,7 @@ export function AuthResult({
     <View style={[authStyles.content, styles.result]}>
       <View style={[styles.resultRing, { backgroundColor: soft }]}>
         <View style={[styles.resultIcon, { backgroundColor: ink }]}>
-          <Ionicons name={icon} size={26} color={onInk} />
+          <Icon name={icon} size={26} color={onInk} />
         </View>
       </View>
 
@@ -304,7 +303,7 @@ export function AuthResult({
 
       {address ? (
         <View style={[styles.address, { backgroundColor: theme.liftTile }]}>
-          <Ionicons name="mail-outline" size={18} color={theme.textSecondary} />
+          <Icon name="mail-outline" size={18} color={theme.textSecondary} />
           <ThemedText style={styles.addressText} numberOfLines={2}>
             {address}
           </ThemedText>

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -22,6 +21,7 @@ import { useMembers, useMonthlyTotals } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { canMakePdf, exportStatement, openDownload, type StatementFormat } from '@/lib/statement';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -89,7 +89,11 @@ export default function StatementScreen() {
 
   const pdfReady = canMakePdf();
   const [tab, setTab] = useState<Tab>('month');
-  const [monthKey, setMonthKey] = useState(thisKey);
+  // Any number of months; a statement of several reads oldest first.
+  const [monthKeys, setMonthKeys] = useState<string[]>([thisKey]);
+  const toggleMonth = (key: string) =>
+    setMonthKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
+  const pickedMonths = months.filter((m) => monthKeys.includes(m.key));
   const [showEarlier, setShowEarlier] = useState(false);
   const [rangeKey, setRangeKey] = useState<RangeKey>('30');
   const [custom, setCustom] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
@@ -122,11 +126,30 @@ export default function StatementScreen() {
   const period = (() => {
     const today = todayIso();
     if (tab === 'month') {
-      const m = months.find((x) => x.key === monthKey) ?? months[0];
+      if (pickedMonths.length === 0) {
+        return { from: null, to: null, months: undefined, label: 'Pick at least one month' };
+      }
+      if (pickedMonths.length === 1) {
+        const m = pickedMonths[0];
+        return {
+          from: isoOf(m.year, m.month, 1),
+          to: isoOf(m.year, m.month, daysInMonth(m.year, m.month)),
+          months: undefined,
+          label: `${MONTHS[m.month - 1]} ${m.year}`,
+        };
+      }
+      const oldestFirst = [...pickedMonths].reverse();
+      const sameYear = oldestFirst.every((m) => m.year === oldestFirst[0].year);
       return {
-        from: isoOf(m.year, m.month, 1),
-        to: isoOf(m.year, m.month, daysInMonth(m.year, m.month)),
-        label: `${MONTHS[m.month - 1]} ${m.year}`,
+        from: null,
+        to: null,
+        months: oldestFirst.map(({ year, month }) => ({ year, month })),
+        label:
+          oldestFirst.length > 4
+            ? `${oldestFirst.length} months`
+            : sameYear
+              ? `${oldestFirst.map((m) => MONTHS[m.month - 1].slice(0, 3)).join(', ')} ${oldestFirst[0].year}`
+              : oldestFirst.map((m) => `${MONTHS[m.month - 1].slice(0, 3)} ${m.year}`).join(', '),
       };
     }
     if (rangeKey === 'custom') {
@@ -134,20 +157,23 @@ export default function StatementScreen() {
         ? {
             from: custom.from,
             to: custom.to ?? custom.from,
+            months: undefined,
             label: formatRange(custom.from, custom.to ?? custom.from),
           }
-        : { from: null, to: null, label: 'Pick the dates' };
+        : { from: null, to: null, months: undefined, label: 'Pick the dates' };
     }
     const r = RANGES.find((x) => x.key === rangeKey)!;
-    if (r.days === null) return { from: null, to: null, label: 'Everything' };
+    if (r.days === null) return { from: null, to: null, months: undefined, label: 'Everything' };
     const from = addDays(today, -(r.days - 1));
-    return { from, to: today, label: formatRange(from, today) };
+    return { from, to: today, months: undefined, label: formatRange(from, today) };
   })();
 
   const needsDates = tab === 'range' && rangeKey === 'custom' && !custom.from;
+  const needsMonths = tab === 'month' && pickedMonths.length === 0;
   const canDownload =
     !busy &&
     !needsDates &&
+    !needsMonths &&
     !!member &&
     (allPicked || picked.length > 0) &&
     (format === 'csv' || pdfReady);
@@ -173,6 +199,8 @@ export default function StatementScreen() {
       // who has since moved out still come in.
       filters: { from: period.from, to: period.to, categoryIds: [], paidByIds: allPicked ? [] : picked },
       search: '',
+      months: period.months,
+      periodLabel: period.months ? period.label : undefined,
       summary: allPicked ? '' : `Paid by ${picked.map((id) => (id === member.id ? member.display_name : nameOf(id))).join(', ')}`,
     });
     setBusy(false);
@@ -215,7 +243,14 @@ export default function StatementScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Appear index={0} style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Period</ThemedText>
+          <View style={styles.headRow}>
+            <ThemedText style={[styles.sectionTitle, styles.flex]}>Period</ThemedText>
+            {tab === 'month' ? (
+              <ThemedText themeColor="textTertiary" style={Type.caption}>
+                Pick one or more
+              </ThemedText>
+            ) : null}
+          </View>
           <Segmented
             options={[
               { value: 'month', label: 'Month' },
@@ -231,10 +266,11 @@ export default function StatementScreen() {
                 <Option
                   key={m.key}
                   first={i === 0}
+                  multi
                   label={`${MONTHS[m.month - 1]} ${m.year}`}
                   hint={m.key === thisKey ? `This month · ${formatPaise(m.total)}` : formatPaise(m.total)}
-                  selected={monthKey === m.key}
-                  onPress={() => setMonthKey(m.key)}
+                  selected={monthKeys.includes(m.key)}
+                  onPress={() => toggleMonth(m.key)}
                 />
               ))}
               {months.length > RECENT_MONTHS ? (
@@ -249,7 +285,7 @@ export default function StatementScreen() {
                   <ThemedText themeColor="textSecondary" style={[Type.body, styles.flex]}>
                     {showEarlier ? 'Fewer months' : 'Earlier months'}
                   </ThemedText>
-                  <Ionicons
+                  <Icon
                     name={showEarlier ? 'chevron-up' : 'chevron-down'}
                     size={15}
                     color={theme.textTertiary}
@@ -326,7 +362,7 @@ export default function StatementScreen() {
                         ? { backgroundColor: theme.primary, borderColor: theme.primary }
                         : { borderColor: theme.borderStrong },
                     ]}>
-                    {on ? <Ionicons name="checkmark" size={14} color={theme.onPrimary} /> : null}
+                    {on ? <Icon name="checkmark" size={14} color={theme.onPrimary} /> : null}
                   </View>
                 </Pressable>
               );
@@ -367,6 +403,8 @@ export default function StatementScreen() {
         <ThemedText themeColor="textTertiary" style={[Type.caption, styles.centered]} numberOfLines={1}>
           {nobody
             ? 'Pick at least one person'
+            : needsMonths
+              ? 'Pick at least one month'
             : `${period.label} · ${format === 'pdf' ? 'PDF' : 'CSV'} · ${whose}`}
         </ThemedText>
         <Pressable
@@ -385,7 +423,7 @@ export default function StatementScreen() {
             <ActivityIndicator color={theme.onPrimary} />
           ) : (
             <>
-              <Ionicons
+              <Icon
                 name="download-outline"
                 size={18}
                 color={canDownload ? theme.onPrimary : theme.textTertiary}
@@ -442,19 +480,22 @@ function Option({
   onPress,
   first,
   disabled = false,
+  multi = false,
 }: {
   label: string;
   hint?: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   selected: boolean;
   onPress: () => void;
   first: boolean;
   disabled?: boolean;
+  /** One of several that can all be on: a checkbox rather than a radio. */
+  multi?: boolean;
 }) {
   const theme = useTheme();
   return (
     <Pressable
-      accessibilityRole="radio"
+      accessibilityRole={multi ? 'checkbox' : 'radio'}
       accessibilityState={{ checked: selected, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -465,7 +506,7 @@ function Option({
       ]}>
       {icon ? (
         <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
-          <Ionicons name={icon} size={17} color={theme.brandInk} />
+          <Icon name={icon} size={17} color={theme.brandInk} />
         </View>
       ) : null}
       <View style={styles.flex}>
@@ -478,7 +519,7 @@ function Option({
       </View>
       {selected ? (
         <View style={[styles.tick, { backgroundColor: theme.primary }]}>
-          <Ionicons name="checkmark" size={14} color={theme.onPrimary} />
+          <Icon name="checkmark" size={14} color={theme.onPrimary} />
         </View>
       ) : (
         <View style={[styles.ring, { borderColor: theme.borderStrong }]} />

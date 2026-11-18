@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -24,11 +23,12 @@ import { appFontFor } from '@/constants/fonts';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
-import { iconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { formatPaise, parseAmount } from '@/lib/money';
 import { useCategories, useMembers, useRecurring } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon } from '@/components/ui/icon';
 
 const DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 
@@ -93,7 +93,7 @@ export default function RecurringEditScreen() {
   const categoryOptions: SelectOption[] = (categories.data ?? []).map((c) => ({
     value: c.id,
     label: c.name,
-    glyph: iconFor(c.icon),
+    icon: categoryIcon(c.icon),
     hint: c.respectsAwayCalendar
       ? 'Splits only between people who were here'
       : 'Everyone pays, away or not',
@@ -211,7 +211,7 @@ export default function RecurringEditScreen() {
 
             {varies ? (
               <View style={[styles.note, { backgroundColor: theme.warningSoft }]}>
-                <Ionicons name="hand-left-outline" size={14} color={theme.warning} />
+                <Icon name="hand-left-outline" size={14} color={theme.warning} />
                 <ThemedText themeColor="textSecondary" style={[Type.micro, styles.flex]}>
                   You&apos;ll be asked for the amount each month rather than the app guessing —
                   right for electricity and water.
@@ -319,7 +319,7 @@ export default function RecurringEditScreen() {
               })}
             </ScrollView>
             <View style={[styles.note, { backgroundColor: theme.backgroundSunken }]}>
-              <Ionicons name="calendar-outline" size={14} color={theme.textTertiary} />
+              <Icon name="calendar-outline" size={14} color={theme.textTertiary} />
               <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
                 {id ? 'Next posts' : 'First posts'} on{' '}
                 <ThemedText style={[Type.micro, styles.semi]}>{nextPosting}</ThemedText>. Days are
@@ -330,7 +330,7 @@ export default function RecurringEditScreen() {
 
           {id ? (
             <Pressable onPress={() => setActive(!active)} style={styles.toggleRow}>
-              <Ionicons
+              <Icon
                 name={active ? 'checkbox' : 'square-outline'}
                 size={20}
                 color={active ? theme.primary : theme.borderStrong}

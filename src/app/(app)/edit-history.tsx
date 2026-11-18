@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -23,6 +22,7 @@ import {
 import { dayLabel, dayOf } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useAllCategories, useAuditLog, useMembers } from '@/lib/queries';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * Every change to the ledger, and who made it.
@@ -39,7 +39,7 @@ import { useAllCategories, useAuditLog, useMembers } from '@/lib/queries';
 // Coloured as Activity is: green added, blue changed or restored, red deleted.
 const LOOK: Record<
   AuditKind,
-  { icon: keyof typeof Ionicons.glyphMap; verb: string; tone: 'success' | 'danger' | 'info' }
+  { icon: IconName; verb: string; tone: 'success' | 'danger' | 'info' }
 > = {
   added: { icon: 'add', verb: 'added', tone: 'success' },
   edited: { icon: 'pencil', verb: 'changed', tone: 'info' },
@@ -129,7 +129,7 @@ export default function EditHistoryScreen() {
             <Appear>
               <Card style={styles.empty}>
                 <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
-                  <Ionicons name="document-text-outline" size={22} color={theme.brandInk} />
+                  <Icon name="document-text-outline" size={22} color={theme.brandInk} />
                 </View>
                 <ThemedText style={Type.title}>Nothing changed yet</ThemedText>
                 <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -170,7 +170,7 @@ export default function EditHistoryScreen() {
                       { opacity: pressed && openable ? 0.6 : 1 },
                     ]}>
                     <View style={[styles.icon, { backgroundColor: soft }]}>
-                      <Ionicons name={look.icon} size={15} color={ink} />
+                      <Icon name={look.icon} size={15} color={ink} />
                     </View>
 
                     <View style={styles.body}>
@@ -231,7 +231,7 @@ export default function EditHistoryScreen() {
               index={Math.min(days.length, ENTRANCE_STEPS + 1)}
               still={settled || days.length > ENTRANCE_STEPS}
               style={styles.footer}>
-              <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
+              <Icon name="lock-closed-outline" size={14} color={theme.textTertiary} />
               <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
                 Written by the database. Nobody can change this list
               </ThemedText>

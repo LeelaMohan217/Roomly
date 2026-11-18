@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -45,6 +44,7 @@ import {
 } from '@/lib/pairwise';
 import { assertSettles, simplifyDebts, type Transfer } from '@/lib/settle';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -290,6 +290,22 @@ export default function SettleScreen() {
     },
   });
 
+  /**
+   * Saying a payment never arrived undoes it for the person who sent it, so
+   * it is asked first; confirming one goes straight through.
+   */
+  async function rejectPayment(id: string, from: string, amountPaise: number) {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'close-circle-outline',
+      title: 'Mark as not received?',
+      message: `${from}’s payment of ${formatPaise(amountPaise)} won’t count, and the balances go back to before it.`,
+      confirmLabel: 'Not received',
+      cancelLabel: 'Go back',
+    });
+    if (ok) review.mutate({ id, approve: false });
+  }
+
   // Per-row, not per-screen. A single mutation flag made every button on the
   // list spin at once, so you could not tell which one you had tapped.
   const reviewing = (id: string) => review.isPending && review.variables?.id === id;
@@ -458,7 +474,7 @@ export default function SettleScreen() {
               <Card key={q.id} style={styles.transfer}>
                 <View style={styles.transferHead}>
                   <View style={[styles.transferIcon, { backgroundColor: theme.warningSoft }]}>
-                    <Ionicons name="hourglass-outline" size={16} color={theme.warning} />
+                    <Icon name="hourglass-outline" size={16} color={theme.warning} />
                   </View>
 
                   <View style={styles.flex}>
@@ -479,7 +495,7 @@ export default function SettleScreen() {
                   <PillButton
                     title="Not received"
                     tone="neutral"
-                    onPress={() => review.mutate({ id: q.id, approve: false })}
+                    onPress={() => void rejectPayment(q.id, q.fromName, q.amountPaise)}
                     loading={reviewing(q.id)}
                   />
                   <PillButton
@@ -504,7 +520,7 @@ export default function SettleScreen() {
               <Card key={q.id} style={styles.transfer}>
                 <View style={styles.transferHead}>
                   <View style={[styles.transferIcon, { backgroundColor: theme.backgroundSunken }]}>
-                    <Ionicons name="hourglass-outline" size={16} color={theme.textTertiary} />
+                    <Icon name="hourglass-outline" size={16} color={theme.textTertiary} />
                   </View>
 
                   <View style={styles.flex}>
@@ -526,7 +542,7 @@ export default function SettleScreen() {
                     <PillButton
                       title="Reject"
                       tone="neutral"
-                      onPress={() => review.mutate({ id: q.id, approve: false })}
+                      onPress={() => void rejectPayment(q.id, q.fromName, q.amountPaise)}
                       loading={reviewing(q.id)}
                     />
                     <PillButton
@@ -545,7 +561,7 @@ export default function SettleScreen() {
         {pairs.drift ? (
           <Appear index={3}>
             <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-              <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
+              <Icon name="alert-circle-outline" size={14} color={theme.danger} />
               <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
                 The itemised lists do not add up to your balance ({pairs.drift}). The plan below is
                 still correct — please report this.
@@ -563,7 +579,7 @@ export default function SettleScreen() {
           <Appear index={4}>
             <Card style={styles.empty}>
               <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
-                <Ionicons name="checkmark-done" size={22} color={theme.primary} />
+                <Icon name="checkmark-done" size={22} color={theme.primary} />
               </View>
               <ThemedText style={Type.title}>All square</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -626,7 +642,7 @@ export default function SettleScreen() {
                         })
                       }
                       style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-                      <Ionicons name="help-circle-outline" size={20} color={theme.textTertiary} />
+                      <Icon name="help-circle-outline" size={20} color={theme.textTertiary} />
                     </Pressable>
                   </View>
                   {renderSection(visible)}
@@ -639,7 +655,7 @@ export default function SettleScreen() {
         {(error ?? ledgerError) ? (
           <Appear index={6}>
             <View style={[styles.note, { backgroundColor: theme.dangerSoft }]}>
-              <Ionicons name="alert-circle-outline" size={14} color={theme.danger} />
+              <Icon name="alert-circle-outline" size={14} color={theme.danger} />
               <ThemedText style={[Type.micro, styles.flex, { color: theme.danger }]}>
                 {error ?? ledgerError}
               </ThemedText>
@@ -727,7 +743,7 @@ export default function SettleScreen() {
                           styles.payIconBlank,
                           { backgroundColor: theme.backgroundSelected },
                         ]}>
-                        <Ionicons name="wallet-outline" size={22} color={theme.textSecondary} />
+                        <Icon name="wallet-outline" size={22} color={theme.textSecondary} />
                       </View>
                     )}
                     <ThemedText style={styles.payLabel} numberOfLines={1}>
@@ -827,7 +843,7 @@ export default function SettleScreen() {
                   {owesMe ? '+ ' : '− '}
                   {formatPaise(Math.abs(pair.netPaise))}
                 </ThemedText>
-                <Ionicons
+                <Icon
                   name={isOpen ? 'chevron-up' : 'chevron-down'}
                   size={14}
                   color={theme.textTertiary}
@@ -1051,7 +1067,7 @@ export default function SettleScreen() {
                         styles.roundIcon,
                         { backgroundColor: yours ? theme.primarySoft : theme.backgroundSelected },
                       ]}>
-                      <Ionicons
+                      <Icon
                         name={kind === 'owed' ? 'arrow-down' : kind === 'owe' ? 'arrow-up' : 'arrow-forward'}
                         size={16}
                         color={yours ? theme.brandInk : theme.textSecondary}
@@ -1156,7 +1172,7 @@ export default function SettleScreen() {
                         <ThemedText style={[Type.micro, { color: theme.brandInk }]}>
                           {planOpen === key ? 'Hide details' : 'Show details'}
                         </ThemedText>
-                        <Ionicons
+                        <Icon
                           name={planOpen === key ? 'chevron-up' : 'chevron-down'}
                           size={13}
                           color={theme.brandInk}
@@ -1269,7 +1285,7 @@ function SummaryTile({
       accessibilityLabel={`${label} ${formatPaise(paise)}`}>
       <View style={styles.summaryTileHead}>
         <View style={[styles.summaryTileIcon, { backgroundColor: theme.frostStrong }]}>
-          <Ionicons name={icon} size={12} color={theme.onWash} style={styles.summaryArrow} />
+          <Icon name={icon} size={12} color={theme.onWash} style={styles.summaryArrow} />
         </View>
         <ThemedText style={[Type.micro, { color: theme.onWashMuted }]}>{label}</ThemedText>
       </View>
@@ -1299,7 +1315,7 @@ function PillButton({
 }: {
   title: string;
   onPress: () => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   disabled?: boolean;
   loading?: boolean;
   tone?: 'primary' | 'neutral';
@@ -1344,7 +1360,7 @@ function PillButton({
         <ActivityIndicator size="small" color={ink} />
       ) : (
         <View style={styles.pillInner}>
-          {icon ? <Ionicons name={icon} size={15} color={ink} /> : null}
+          {icon ? <Icon name={icon} size={15} color={ink} /> : null}
           <ThemedText style={[styles.pillText, { color: ink }]} numberOfLines={1}>
             {title}
           </ThemedText>
@@ -1395,7 +1411,7 @@ function LinkRow({
   edge,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   title: string;
   subtitle?: string;
   edge: ReturnType<typeof rowEdge>;
@@ -1416,7 +1432,7 @@ function LinkRow({
         pressed && [{ backgroundColor: theme.backgroundSelected }, edge],
       ]}>
       <View style={[styles.periodIcon, { backgroundColor: theme.primarySoft }]}>
-        <Ionicons name={icon} size={16} color={theme.brandInk} />
+        <Icon name={icon} size={16} color={theme.brandInk} />
       </View>
       <View style={styles.flex}>
         <ThemedText style={Type.body}>{title}</ThemedText>
@@ -1426,7 +1442,7 @@ function LinkRow({
           </ThemedText>
         ) : null}
       </View>
-      <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+      <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
     </Pressable>
   );
 }
@@ -1435,7 +1451,7 @@ function EmptyView({
   icon,
   text,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   text: string;
 }) {
   const theme = useTheme();
@@ -1443,7 +1459,7 @@ function EmptyView({
   return (
     <Card style={styles.empty}>
       <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
-        <Ionicons name={icon} size={22} color={theme.primary} />
+        <Icon name={icon} size={22} color={theme.primary} />
       </View>
       <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
         {text}

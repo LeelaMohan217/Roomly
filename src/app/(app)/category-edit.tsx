@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -20,14 +19,15 @@ import { TextField } from '@/components/ui/text-field';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
-import { ICON_SLUGS, iconFor } from '@/lib/icons';
+import { categoryIcon, ICON_SLUGS } from '@/lib/icons';
 import { useAllCategories } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 type Kind = 'fixed' | 'bulk' | 'consumption';
 
-const KINDS: { kind: Kind; label: string; blurb: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const KINDS: { kind: Kind; label: string; blurb: string; icon: IconName }[] = [
   {
     kind: 'fixed',
     label: 'Fixed cost',
@@ -75,7 +75,7 @@ export default function CategoryEditScreen() {
   // An icon no longer offered (the cookie was removed) is drawn as the box
   // everywhere, so it is the box here too: highlighted in the grid, and what
   // a save writes -- rather than a preview of one thing and a save of another.
-  const storedIcon = existing?.icon && ICON_SLUGS.includes(existing.icon) ? existing.icon : 'misc';
+  const storedIcon = categoryIcon(existing?.icon);
   const icon = iconEdit ?? storedIcon;
   // 'asset' is a real kind in the database but not offered in this form.
   const kind: Kind =
@@ -166,7 +166,7 @@ export default function CategoryEditScreen() {
           showsVerticalScrollIndicator={false}>
           <Card style={styles.preview}>
             <View style={[styles.previewTile, { backgroundColor: theme.liftTile }]}>
-              <ThemedText style={styles.previewGlyph}>{iconFor(icon)}</ThemedText>
+              <Icon name={categoryIcon(icon)} size={28} color={theme.textSecondary} />
             </View>
             <ThemedText style={Type.title}>{name.trim() || 'New category'}</ThemedText>
             <ThemedText themeColor="textTertiary" style={Type.micro}>
@@ -202,7 +202,7 @@ export default function CategoryEditScreen() {
                         borderColor: selected ? theme.primary : 'transparent',
                       },
                     ]}>
-                    <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(slug)}</ThemedText>
+                    <Icon name={categoryIcon(slug)} size={18} color={theme.textSecondary} />
                   </Pressable>
                 );
               })}
@@ -230,7 +230,7 @@ export default function CategoryEditScreen() {
                       opacity: pressed ? 0.8 : 1,
                     },
                   ]}>
-                  <Ionicons
+                  <Icon
                     name={k.icon}
                     size={18}
                     color={selected ? theme.primary : theme.textSecondary}
@@ -241,7 +241,7 @@ export default function CategoryEditScreen() {
                       {k.blurb}
                     </ThemedText>
                   </View>
-                  <Ionicons
+                  <Icon
                     name={selected ? 'radio-button-on' : 'radio-button-off'}
                     size={18}
                     color={selected ? theme.primary : theme.borderStrong}
@@ -253,7 +253,7 @@ export default function CategoryEditScreen() {
 
           {id ? (
             <Pressable onPress={() => setArchived(!archived)} style={styles.toggleRow}>
-              <Ionicons
+              <Icon
                 name={archived ? 'checkbox' : 'square-outline'}
                 size={20}
                 color={archived ? theme.primary : theme.borderStrong}
@@ -269,7 +269,7 @@ export default function CategoryEditScreen() {
 
           {id && inUse ? (
             <View style={[styles.note, { backgroundColor: theme.warningSoft }]}>
-              <Ionicons name="information-circle-outline" size={14} color={theme.warning} />
+              <Icon name="information-circle-outline" size={14} color={theme.warning} />
               <ThemedText themeColor="textSecondary" style={[Type.micro, styles.flex]}>
                 Changing how this splits affects{' '}
                 <ThemedText style={[Type.micro, styles.semi]}>new expenses only</ThemedText>.

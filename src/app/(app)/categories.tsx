@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,9 +11,10 @@ import { Appear, Reveal } from '@/components/ui/motion';
 import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { iconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { useAllCategories, type ManagedCategory } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { Icon } from '@/components/ui/icon';
 
 const GROUPS: { kind: ManagedCategory['kind']; title: string; blurb: string }[] = [
   {
@@ -73,7 +73,7 @@ export default function CategoriesScreen() {
                 styles.addButton,
                 { backgroundColor: theme.fab, opacity: pressed ? 0.8 : 1 },
               ]}>
-              <Ionicons name="add" size={18} color={theme.onFab} />
+              <Icon name="add" size={18} color={theme.onFab} />
               <ThemedText style={[styles.addLabel, { color: theme.onFab }]}>New</ThemedText>
             </Pressable>
           )
@@ -85,7 +85,7 @@ export default function CategoriesScreen() {
             kind decides how its expenses split. */}
         {!isOwner ? (
           <Appear index={0} style={styles.aside}>
-            <Ionicons name="lock-closed-outline" size={14} color={theme.textTertiary} />
+            <Icon name="lock-closed-outline" size={14} color={theme.textTertiary} />
             <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
               Only the owner can change one in use
             </ThemedText>
@@ -109,7 +109,7 @@ export default function CategoriesScreen() {
                 hitSlop={6}
                 style={styles.headingRow}>
                 <ThemedText style={styles.sectionTitle}>{g.title}</ThemedText>
-                <Ionicons name="information-circle-outline" size={16} color={theme.textTertiary} />
+                <Icon name="information-circle-outline" size={16} color={theme.textTertiary} />
               </Pressable>
 
               <Card padded={false}>
@@ -142,13 +142,13 @@ export default function CategoriesScreen() {
                 onPress={() => setShowArchived((v) => !v)}
                 style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
                 <View style={[styles.tile, { backgroundColor: theme.primarySoft }]}>
-                  <Ionicons name="archive-outline" size={17} color={theme.brandInk} />
+                  <Icon name="archive-outline" size={17} color={theme.brandInk} />
                 </View>
                 <ThemedText style={[Type.body, styles.flex]}>Archived</ThemedText>
                 <ThemedText themeColor="textSecondary" style={Type.body}>
                   {archived.length}
                 </ThemedText>
-                <Ionicons
+                <Icon
                   name={showArchived ? 'chevron-up' : 'chevron-down'}
                   size={15}
                   color={theme.textTertiary}
@@ -211,7 +211,7 @@ function Row({
         { opacity: (pressed && onPress ? 0.6 : 1) * (dim ? 0.5 : 1) },
       ]}>
       <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-        <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(category.icon)}</ThemedText>
+        <Icon name={categoryIcon(category.icon)} size={18} color={theme.textSecondary} />
       </View>
 
       <View style={[styles.flex, styles.nameRow]}>
@@ -229,10 +229,10 @@ function Row({
 
       {/* Blue: information. Splits skip whoever is away. */}
       {category.respectsAwayCalendar ? (
-        <Ionicons name="airplane-outline" size={16} color={theme.info} />
+        <Icon name="airplane-outline" size={16} color={theme.info} />
       ) : null}
 
-      {onPress ? <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} /> : null}
+      {onPress ? <Icon name="chevron-forward" size={15} color={theme.textTertiary} /> : null}
     </Pressable>
   );
 }

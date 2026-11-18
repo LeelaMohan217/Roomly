@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon } from '@/components/ui/icon';
 
 type Claimable = { id: string; display_name: string };
 type Preview = { household_name: string; claimable: Claimable[] };
@@ -138,7 +138,7 @@ export default function JoinHouseholdScreen() {
               {/* What the code found, before anything else is asked. */}
               <View style={[styles.found, { backgroundColor: theme.lift, borderColor: theme.liftEdge }]}>
                 <View style={[styles.foundIcon, { backgroundColor: theme.primarySoft }]}>
-                  <Ionicons name="home-outline" size={20} color={theme.primary} />
+                  <Icon name="home-outline" size={20} color={theme.primary} />
                 </View>
                 <View style={styles.foundText}>
                   <ThemedText themeColor="textSecondary" style={styles.small}>

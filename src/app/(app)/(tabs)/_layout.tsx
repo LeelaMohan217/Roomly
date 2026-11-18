@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs, useRouter } from 'expo-router';
 import type { BottomTabBarButtonProps } from 'expo-router/tabs';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
@@ -25,6 +24,7 @@ import { usePushRegistration } from '@/lib/push';
 import { useHouseholdRealtime } from '@/lib/realtime';
 import { useSession } from '@/lib/session';
 import { resolveTour, useTourStore, useTourTarget, type TourTarget } from '@/lib/tour';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 const BODY_HEIGHT = TabBar.body;
 const BAR_MARGIN = TabBar.margin;
@@ -37,7 +37,6 @@ const TAB_INSET = 6;
 /** One easing for the capsule sliding over and the colours changing under it. */
 const TAB_EASE = { duration: 220, easing: Easing.out(Easing.cubic) };
 
-type IconName = keyof typeof Ionicons.glyphMap;
 
 /** What each tab draws, and its stop on the first-run tour, by route name. */
 const TABS: Record<string, { title: string; icon: IconName; iconFocused: IconName; tour: TourTarget }> = {
@@ -194,10 +193,10 @@ function TabButton({
       style={({ pressed }) => [style, styles.tab, { opacity: pressed ? 0.6 : 1 }]}>
       <View style={styles.iconBox}>
         <Animated.View style={inactiveStyle}>
-          <Ionicons name={meta.icon} size={21} color={theme.textTertiary} />
+          <Icon name={meta.icon} size={21} color={theme.textTertiary} />
         </Animated.View>
         <Animated.View style={[styles.overlay, activeStyle]}>
-          <Ionicons name={meta.iconFocused} size={21} color={theme.tabActiveInk} />
+          <Icon name={meta.iconFocused} size={21} color={theme.tabActiveInk} />
         </Animated.View>
       </View>
       <View>
@@ -370,7 +369,7 @@ export default function TabsLayout() {
             transform: [{ scale: pressed ? 0.94 : 1 }],
           },
         ]}>
-        <Ionicons name="add" size={26} color={theme.onFab} />
+        <Icon name="add" size={26} color={theme.onFab} />
       </Pressable>
 
       {/* Mounted once for the whole tab shell, floating above the bar so it

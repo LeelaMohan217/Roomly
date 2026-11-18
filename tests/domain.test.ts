@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { check, eq, noThrow, report, suite, throws } from './harness.ts';
 import { formatPaise, paiseToRupees, parseAmount, rupeesToPaise } from '../src/lib/money.ts';
 import {
@@ -32,7 +33,7 @@ import {
   isoOf,
   withinRange,
 } from '../src/lib/dates.ts';
-import { ICON_SLUGS, iconFor } from '../src/lib/icons.ts';
+import { categoryIcon, ICON_SLUGS } from '../src/lib/icons.ts';
 import { humanError } from '../src/lib/errors.ts';
 import { amountOf, auditKind, changesOf, entityLabel, subjectOf } from '../src/lib/audit.ts';
 import { backupFilename, csvAmount, csvCell, toCsv } from '../src/lib/csv.ts';
@@ -44,6 +45,8 @@ import {
   toTenDigits,
 } from '../src/lib/phone.ts';
 import { isProperEmail, isValidEmail } from '../src/lib/email.ts';
+import { compareMonths, mainDrivers } from '../src/lib/ledger-compare.ts';
+import { homeInsight, homeInsights, pickInsight } from '../src/lib/insight.ts';
 
 // ------------------------------- money -------------------------------
 suite('money');
@@ -249,14 +252,22 @@ check('formatRange returns something for a single day', formatRange('2026-09-05'
 
 // ------------------------------- icons -------------------------------
 suite('icons');
-check('every slug resolves to a glyph', ICON_SLUGS.every((s) => iconFor(s).length > 0));
-eq('unknown slug falls back to misc', iconFor('nope'), iconFor('misc'));
-eq('null falls back to misc', iconFor(null), iconFor('misc'));
-check(
-  'no two categories share a glyph',
-  new Set(ICON_SLUGS.map(iconFor)).size === ICON_SLUGS.length,
-  ICON_SLUGS.length + ' slugs but ' + new Set(ICON_SLUGS.map(iconFor)).size + ' distinct glyphs'
-);
+check('every slug is its own icon', ICON_SLUGS.every((s) => categoryIcon(s) === s));
+eq('unknown slug falls back to misc', categoryIcon('nope'), 'misc');
+eq('null falls back to misc', categoryIcon(null), 'misc');
+// Which Lucide drawing each name gets is in components/ui/icon.tsx, which
+// Node cannot load (it imports react-native). Read the table as text instead.
+{
+  const table = readFileSync(new URL('../src/components/ui/icon.tsx', import.meta.url), 'utf8');
+  const drawingOf = (slug: string) => table.match(new RegExp(`^\\s+'?${slug}'?: (\\w+),`, 'm'))?.[1];
+  const drawings = ICON_SLUGS.map(drawingOf);
+  check('every category slug has a Lucide drawing', drawings.every(Boolean));
+  check(
+    'no two categories share a drawing',
+    new Set(drawings).size === ICON_SLUGS.length,
+    ICON_SLUGS.length + ' slugs but ' + new Set(drawings).size + ' distinct drawings'
+  );
+}
 
 
 // ------------------------------ error messages ------------------------------
@@ -1126,5 +1137,100 @@ check('a work domain is proper', isProperEmail('mohan@procureanalytics.ai'));
 check('a college address is proper', isProperEmail('mohan@cs.iitb.ac.in'));
 check('love.com is not mistaken for live.com', isProperEmail('mohan@love.com'));
 check('a broken shape is not proper', !isProperEmail('mohan@'));
+
+// --------------------------- ledger compare ---------------------------
+suite('ledger compare');
+{
+  const e = (id: string, category: string, amountPaise: number) => ({
+    id,
+    category,
+    amountPaise,
+    description: id,
+    spentOn: '2026-11-01',
+  });
+  const oct = [e('o1', 'food', 100000), e('o2', 'fuel', 50000), e('o3', 'fun', 20000)];
+  const nov = [
+    e('n1', 'food', 180000),
+    e('n2', 'fuel', 30000),
+    e('n3', 'shopping', 60000),
+    e('n4', 'food', 10000),
+  ];
+  const c = compareMonths(oct, nov);
+  eq('first total', c.firstPaise, 170000);
+  eq('second total', c.secondPaise, 280000);
+  eq('difference is second minus first', c.diffPaise, 110000);
+  eq('percent of the first month', c.percent, 65);
+  eq('biggest change first', c.categories.map((x) => x.slug), ['food', 'shopping', 'fuel', 'fun']);
+  eq('food rose by 90,000 paise', c.categories[0].diffPaise, 90000);
+  eq('rises', c.up.map((x) => x.slug), ['food', 'shopping']);
+  eq('drops', c.down.map((x) => x.slug), ['fuel', 'fun']);
+  eq('a category only in the first month drops to zero', c.categories[3].secondPaise, 0);
+  eq('biggest payments of the second month', c.biggest.map((x) => x.id), ['n1', 'n3', 'n2']);
+  eq('changes add up to the total', c.categories.reduce((s, x) => s + x.diffPaise, 0), c.diffPaise);
+  eq('main drivers of a rise', mainDrivers(c).map((x) => x.slug), ['food']);
+
+  const back = compareMonths(nov, oct);
+  eq('a fall is negative', back.diffPaise, -110000);
+  eq('main drivers of a fall', mainDrivers(back).map((x) => x.slug), ['food']);
+  eq('no percent from an empty month', compareMonths([], nov).percent, null);
+  eq('two empty months', compareMonths([], []).diffPaise, 0);
+  eq('nothing drives no change', mainDrivers(compareMonths([], [])).length, 0);
+}
+
+// ----------------------------- home insight -----------------------------
+suite('home insight');
+{
+  type K = 'fixed' | 'consumption' | 'bulk' | 'asset';
+  const r = (month: number, categoryName: string, rupees: number, kind: K = 'consumption') => ({
+    year: 2026,
+    month,
+    categoryName,
+    kind,
+    totalPaise: rupees * 100,
+  });
+
+  const over = homeInsight(
+    [r(10, 'Groceries', 3900), r(11, 'Groceries', 4415), r(10, 'Rent', 20000, 'fixed'), r(11, 'Rent', 28000, 'fixed')],
+    2026,
+    11,
+    10
+  );
+  eq('a category past last month comes first', over?.tone, 'up');
+  eq('says how much more, on what', over?.lead, '₹515 more on Groceries');
+  eq('and both months in rupees', over?.rest, ' than last month. ₹4,415 this month, ₹3,900 in October.');
+  check('fixed costs never count', !homeInsight([r(10, 'Rent', 100, 'fixed'), r(11, 'Rent', 200, 'fixed')], 2026, 11, 10));
+
+  const mid = homeInsight([r(10, 'Groceries', 5000), r(11, 'Groceries', 1000)], 2026, 11, 12);
+  eq('mid-month, a fall is not claimed', mid?.tone, 'plain');
+  const late = homeInsight([r(10, 'Groceries', 5000), r(11, 'Groceries', 4000)], 2026, 11, 26);
+  eq('in the last week, a real fall is said', late?.tone, 'down');
+  eq('with its size', late?.lead, '₹1,000 less on Groceries');
+  const tiny = homeInsight([r(10, 'Milk', 300), r(11, 'Milk', 200)], 2026, 11, 26);
+  eq('a fall under ₹200 is not worth saying', tiny?.tone, 'plain');
+  eq('January looks back to December', homeInsight([{ ...r(12, 'Fun', 100), year: 2025 }, { ...r(1, 'Fun', 200), year: 2026 }], 2026, 1, 5)?.rest, ' than last month. ₹200 this month, ₹100 in December.');
+  eq('nothing to say', homeInsight([], 2026, 11, 10), null);
+
+  // Rotation and hiding.
+  const rows = [
+    r(10, 'Groceries', 3900),
+    r(11, 'Groceries', 4415),
+    r(10, 'Fun', 500),
+    r(11, 'Fun', 1500),
+    r(11, 'Milk', 300),
+  ];
+  const all = homeInsights(rows, 2026, 11, 10);
+  eq('every true insight, biggest jump first', all.map((i) => i.key), [
+    '2026-11:up:Fun',
+    '2026-11:up:Groceries',
+    '2026-11:top:Groceries',
+  ]);
+  eq('keys stay put when amounts move', homeInsights([...rows, r(11, 'Fun', 100)], 2026, 11, 10)[0].key, '2026-11:up:Fun');
+  eq('first open shows the first', pickInsight(all, new Set(), 0)?.key, '2026-11:up:Fun');
+  eq('the next open shows the next', pickInsight(all, new Set(), 1)?.key, '2026-11:up:Groceries');
+  eq('and it wraps round', pickInsight(all, new Set(), 3)?.key, '2026-11:up:Fun');
+  eq('a hidden one is skipped', pickInsight(all, new Set(['2026-11:up:Fun']), 0)?.key, '2026-11:up:Groceries');
+  eq('all hidden shows nothing', pickInsight(all, new Set(all.map((i) => i.key)), 0), null);
+  eq('a new month starts unhidden', homeInsights([r(11, 'Fun', 100), r(12, 'Fun', 900)], 2026, 12, 3)[0].key, '2026-12:up:Fun');
+}
 
 process.exit(report() > 0 ? 1 : 0);

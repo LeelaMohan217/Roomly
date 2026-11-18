@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -16,11 +15,12 @@ import { queryState } from '@/components/ui/query-state';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
-import { iconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import { useMonthStatement, usePeriods } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon } from '@/components/ui/icon';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -118,7 +118,7 @@ export default function MonthStatementScreen() {
           s?.status ? (
             <View style={[styles.pill, { backgroundColor: theme.backgroundSelected }]}>
               {s.status === 'closed' ? (
-                <Ionicons name="lock-closed" size={11} color={theme.textSecondary} />
+                <Icon name="lock-closed" size={11} color={theme.textSecondary} />
               ) : null}
               <ThemedText themeColor="textSecondary" style={styles.pillText}>
                 {s.status === 'closed' ? 'Closed' : 'Open'}
@@ -152,7 +152,7 @@ export default function MonthStatementScreen() {
         {(s?.expenseCount ?? 0) === 0 ? (
           <Appear index={1}>
           <Card style={styles.empty}>
-            <Ionicons name="calendar-outline" size={22} color={theme.textTertiary} />
+            <Icon name="calendar-outline" size={22} color={theme.textTertiary} />
             <ThemedText style={Type.headline}>Nothing this month</ThemedText>
             <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
               No expenses were recorded in {label}.
@@ -236,7 +236,7 @@ export default function MonthStatementScreen() {
                       i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                     ]}>
                     <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-                      <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(c.icon)}</ThemedText>
+                      <Icon name={categoryIcon(c.icon)} size={18} color={theme.textSecondary} />
                     </View>
                     <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
                       {c.name}
@@ -300,7 +300,7 @@ export default function MonthStatementScreen() {
                 { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, opacity: pressed ? 0.6 : 1 },
               ]}>
               <ThemedText style={[Type.body, styles.flex, { color: theme.brandInk }]}>See all payments</ThemedText>
-              <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+              <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
             </Pressable>
           </Card>
         </Appear>
@@ -335,7 +335,7 @@ export default function MonthStatementScreen() {
               <ActivityIndicator size="small" color={theme.brandInk} />
             ) : (
               <>
-                <Ionicons
+                <Icon
                   name={s.status === 'open' ? 'lock-closed-outline' : 'lock-open-outline'}
                   size={15}
                   color={s.status === 'open' ? theme.brandInk : theme.text}

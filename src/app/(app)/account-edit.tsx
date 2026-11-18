@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -16,6 +15,7 @@ import { canPickPhoto, pickAndUploadPhoto, removePhoto, type PhotoResult } from 
 import { useMemberPhotos, useMembers, useMyPhone } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * Your details, read-only: photo or person glyph, your name, what you sign
@@ -76,6 +76,14 @@ export default function AccountEditScreen() {
   }
 
   async function dropPhoto() {
+    const ok = await dialog.confirm({
+      tone: 'danger',
+      icon: 'image-outline',
+      title: 'Remove your photo?',
+      message: 'Everyone in the household sees your initials instead.',
+      confirmLabel: 'Remove',
+    });
+    if (!ok) return;
     setBusy(true);
     await finish(await removePhoto(myPhoto?.path ?? null), 'Photo removed');
   }
@@ -108,7 +116,7 @@ export default function AccountEditScreen() {
                 {busy ? (
                   <ActivityIndicator size="small" color={theme.onPrimary} />
                 ) : (
-                  <Ionicons name="camera" size={15} color={theme.onPrimary} />
+                  <Icon name="camera" size={15} color={theme.onPrimary} />
                 )}
               </View>
             ) : null}
@@ -173,7 +181,7 @@ function Detail({
   trail,
   first = false,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   value: string;
   /** A quiet second fact at the right: "4 people". */
@@ -191,7 +199,7 @@ function Detail({
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
       ]}>
       <View style={[styles.rowIcon, { backgroundColor: theme.liftTile }]}>
-        <Ionicons name={icon} size={18} color={theme.brandInk} />
+        <Icon name={icon} size={18} color={theme.brandInk} />
       </View>
       <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
         {value}

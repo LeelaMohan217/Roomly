@@ -1,10 +1,12 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExpenseForm, type ExpenseFormValues } from '@/components/expense-form';
+import { ExpenseReview } from '@/components/expense-review';
+import { SaveSuccess } from '@/components/save-success';
+import { formatPaise } from '@/lib/money';
 import { ThemedText } from '@/components/themed-text';
 import { useDialog } from '@/components/ui/dialog';
 import { KeyboardAwareScrollView } from '@/components/ui/keyboard-aware-scroll-view';
@@ -16,6 +18,7 @@ import { rejected } from '@/lib/haptics';
 import { useCategories, useMembers } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useSync } from '@/lib/sync';
+import { Icon } from '@/components/ui/icon';
 
 export default function AddExpenseScreen() {
   const theme = useTheme();
@@ -29,6 +32,13 @@ export default function AddExpenseScreen() {
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set once saved: the page shows the success screen instead of the form.
+  const [done, setDone] = useState<{ title: string; lines: string[] } | null>(null);
+  const [formKey, setFormKey] = useState(0);
+  // What the form submitted, shown as a bill to confirm before it is saved.
+  const [review, setReview] = useState<ExpenseFormValues | null>(null);
+  const reviewCategory = review ? categories.data?.find((c) => c.id === review.categoryId) : undefined;
+  const nameOf = (id: string) => members.data?.find((m) => m.id === id)?.displayName ?? '—';
 
   async function save(values: ExpenseFormValues) {
     setError(null);
@@ -64,16 +74,24 @@ export default function AddExpenseScreen() {
       return;
     }
 
-    // Sent or queued, the entry is safe either way — so the screen closes
-    // and the banner reports what happened. The buzz is the confirmation
-    // that survives the screen disappearing.
-    // The toast gives the same buzz committed() did, and says whether it is
-    // already shared or waiting for a connection.
-    dialog.toast(
-      expenseId
-        ? { message: 'Expense added' }
-        : { message: 'Saved. It sends when you’re back online.', icon: 'cloud-upload-outline' }
-    );
+    // Sent or queued, the entry is safe either way: the page turns into the
+    // success screen (with its buzz), which says which it was, what was
+    // added and your part of it.
+    const mine = values.splits.find((s) => s.memberId === member?.id)?.amountPaise ?? 0;
+    const what = values.description.trim() || category?.name || 'Expense';
+    const ways = values.splits.length;
+    setDone({
+      title: expenseId ? 'Expense added' : 'Saved offline',
+      lines: [
+        `${formatPaise(values.amountPaise)} for ${what}, ${ways === 1 ? 'not split' : `split ${ways} ways`}.`,
+        expenseId
+          ? mine > 0
+            ? `Your share is ${formatPaise(mine)}.`
+            : 'You’re not in this split.'
+          : 'It sends itself when you’re back online.',
+      ],
+    });
+    setBusy(false);
 
     // Photos follow the expense, which needs to exist first. A queued expense
     // has no server row yet, so its photos cannot go with it: say so rather
@@ -104,8 +122,24 @@ export default function AddExpenseScreen() {
         });
       }
     }
+  }
 
-    router.back();
+  if (done) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+        <SaveSuccess
+          title={done.title}
+          lines={done.lines}
+          onDone={() => router.back()}
+          onAnother={() => {
+            // A fresh, empty form: a new key remounts it.
+            setDone(null);
+            setError(null);
+            setFormKey((k) => k + 1);
+          }}
+        />
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -123,7 +157,7 @@ export default function AddExpenseScreen() {
                 styles.close,
                 { backgroundColor: theme.lift, borderColor: theme.liftEdge, opacity: pressed ? 0.7 : 1 },
               ]}>
-              <Ionicons name="close" size={20} color={theme.text} />
+              <Icon name="close" size={20} color={theme.text} />
             </Pressable>
           </View>
           <ThemedText style={styles.title}>New expense</ThemedText>
@@ -136,7 +170,7 @@ export default function AddExpenseScreen() {
           {/* One grey line. */}
           {!online ? (
             <View style={styles.offline}>
-              <Ionicons name="cloud-offline-outline" size={14} color={theme.textTertiary} />
+              <Icon name="cloud-offline-outline" size={14} color={theme.textTertiary} />
               <ThemedText themeColor="textTertiary" style={[Type.caption, styles.flex]}>
                 Offline · it sends itself when you reconnect
               </ThemedText>
@@ -144,8 +178,12 @@ export default function AddExpenseScreen() {
           ) : null}
 
           <ExpenseForm
+            key={formKey}
             submitLabel="Save"
-            onSubmit={save}
+            onSubmit={(values) => {
+              setError(null);
+              setReview(values);
+            }}
             busy={busy}
             error={error}
             showSuggestions
@@ -154,6 +192,30 @@ export default function AddExpenseScreen() {
             initial={{ paidBy: member?.id }}
           />
         </KeyboardAwareScrollView>
+
+        {review ? (
+          <ExpenseReview
+            visible
+            amountPaise={review.amountPaise}
+            description={review.description}
+            categoryName={reviewCategory?.name ?? 'Uncategorised'}
+            categorySlug={reviewCategory?.icon ?? null}
+            payerName={review.paidBy === member?.id ? `${nameOf(review.paidBy)} (you)` : nameOf(review.paidBy)}
+            date={review.date}
+            shares={review.splits.map((s) => ({
+              id: s.memberId,
+              name: nameOf(s.memberId),
+              amountPaise: s.amountPaise,
+              isMe: s.memberId === member?.id,
+            }))}
+            busy={busy}
+            onEdit={() => setReview(null)}
+            onConfirm={() => {
+              const values = review;
+              void save(values).then(() => setReview(null));
+            }}
+          />
+        ) : null}
     </SafeAreaView>
   );
 }

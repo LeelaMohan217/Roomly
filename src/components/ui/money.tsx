@@ -51,6 +51,11 @@ export function Money({
 }
 
 const SIZES = {
+  // Home's balance: the one figure on the screen that matters most.
+  display: StyleSheet.create({
+    whole: { fontSize: 52, lineHeight: 60, fontWeight: '600', letterSpacing: -2 },
+    fraction: { fontSize: 24, lineHeight: 31, fontWeight: '600', marginTop: 8, marginLeft: 1 },
+  }),
   hero: StyleSheet.create({
     whole: { fontSize: 42, lineHeight: 50, fontWeight: '600', letterSpacing: -1.6 },
     fraction: { fontSize: 21, lineHeight: 27, fontWeight: '600', marginTop: 6, marginLeft: 1 },

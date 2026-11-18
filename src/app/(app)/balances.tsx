@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatPaise } from '@/lib/money';
 import { useBalances, type Balance } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * Everyone's balance with the house: what Home's Balances cards show, for the
@@ -100,7 +100,7 @@ export default function BalancesScreen() {
                           ) : null}
                         </View>
                         {b.balancePaise === 0 ? (
-                          <Ionicons name="checkmark-circle" size={20} color={theme.textTertiary} />
+                          <Icon name="checkmark-circle" size={20} color={theme.textTertiary} />
                         ) : (
                           // The same + and − and colours as Home's cards.
                           <Money
@@ -119,7 +119,7 @@ export default function BalancesScreen() {
 
             {/* Where to go to actually move money. */}
             <View style={styles.note}>
-              <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
+              <Icon name="information-circle-outline" size={14} color={theme.textTertiary} />
               <ThemedText themeColor="textTertiary" style={[Type.micro, styles.flex]}>
                 These are balances with the whole house. Settle up shows who pays whom.
               </ThemedText>

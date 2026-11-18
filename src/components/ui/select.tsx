@@ -1,18 +1,26 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
+import { Elevation, MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 export type SelectOption = {
   value: string;
   label: string;
   /** Shown under the label — e.g. what a category does to the split. */
   hint?: string;
-  glyph?: string;
+  /** Drawn in a small tile before the label. */
+  icon?: IconName;
 };
 
 type Props = {
@@ -29,8 +37,20 @@ type Props = {
    */
   bare?: boolean;
   /** The tile's icon while nothing is picked; bare rows only. */
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
+  /**
+   * Open as a list dropping down from the field itself, rather than a sheet
+   * from the bottom of the screen. Opens upwards when there is no room below.
+   */
+  anchored?: boolean;
 };
+
+/** Where an anchored list goes, measured from the field when it opens. */
+type Anchor = { left: number; width: number; top?: number; bottom?: number; maxHeight: number };
+
+/** Below this much room under the field, the list opens upwards instead. */
+const MIN_ROOM_BELOW = 220;
+const LIST_MAX = 340;
 
 /**
  * A sheet picker rather than a chip row. With thirteen categories the chips
@@ -46,11 +66,39 @@ export function Select({
   disabled,
   bare = false,
   icon = 'apps-outline',
+  anchored = false,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const fieldRef = useRef<View>(null);
   const selected = options.find((o) => o.value === value) ?? null;
+
+  function openList() {
+    const field = fieldRef.current;
+    if (!anchored || !field) {
+      setOpen(true);
+      return;
+    }
+    field.measureInWindow((x, y, width, height) => {
+      const below = windowHeight - (y + height) - insets.bottom - Spacing.three;
+      const above = y - insets.top - Spacing.three;
+      const downwards = below >= MIN_ROOM_BELOW || below >= above;
+      setAnchor(
+        downwards
+          ? { left: x, width, top: y + height + 6, maxHeight: Math.min(LIST_MAX, below) }
+          : { left: x, width, bottom: windowHeight - y + 6, maxHeight: Math.min(LIST_MAX, above) }
+      );
+      setOpen(true);
+    });
+  }
+
+  function choose(v: string) {
+    onChange(v);
+    setOpen(false);
+  }
 
   return (
     <View style={bare ? undefined : styles.wrap}>
@@ -62,29 +110,38 @@ export function Select({
       )}
 
       <Pressable
+        ref={fieldRef}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? placeholder}`}
+        accessibilityState={{ expanded: open }}
         disabled={disabled}
-        onPress={() => setOpen(true)}
+        onPress={openList}
         style={({ pressed }) => [
           bare ? styles.bareField : styles.field,
           bare
             ? { opacity: disabled ? 0.5 : pressed ? 0.75 : 1 }
             : {
                 backgroundColor: theme.backgroundElement,
-                borderColor: theme.border,
+                // The open field takes the focus colour, as a TextField does.
+                borderColor: anchored && open ? theme.primary : theme.border,
+                borderWidth: anchored && open ? 1.4 : StyleSheet.hairlineWidth,
                 opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
               },
         ]}>
         {/* Bare rows sit in a white card, with the same green-tinted tile
             as the rows around them. */}
-        {selected?.glyph ? (
-          <View style={[styles.tile, bare && styles.bareTile, { backgroundColor: bare ? theme.primarySoft : theme.backgroundSelected }]}>
-            <ThemedText style={styles.glyph}>{selected.glyph}</ThemedText>
+        {selected?.icon ? (
+          <View
+            style={[
+              styles.tile,
+              bare && styles.bareTile,
+              { backgroundColor: bare ? theme.primarySoft : theme.liftTile },
+            ]}>
+            <Icon name={selected.icon} size={18} color={bare ? theme.brandInk : theme.textSecondary} />
           </View>
         ) : bare ? (
           <View style={[styles.tile, styles.bareTile, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name={icon} size={18} color={theme.brandInk} />
+            <Icon name={icon} size={18} color={theme.brandInk} />
           </View>
         ) : null}
 
@@ -102,11 +159,83 @@ export function Select({
           ) : null}
         </View>
 
-        <Ionicons name={bare ? 'chevron-forward' : 'chevron-down'} size={bare ? 15 : 16} color={theme.textTertiary} />
+        <Icon
+          name={bare ? 'chevron-forward' : anchored && open ? 'chevron-up' : 'chevron-down'}
+          size={bare ? 15 : 16}
+          color={theme.textTertiary}
+        />
       </Pressable>
 
+      {anchored ? (
+        <Modal
+          visible={open && !!anchor}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpen(false)}
+          statusBarTranslucent
+          navigationBarTranslucent>
+          {/* Clear, not dimmed: the list belongs to the field, not over the page. */}
+          <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          {anchor ? (
+            <View
+              style={[
+                styles.dropdown,
+                {
+                  left: anchor.left,
+                  width: anchor.width,
+                  top: anchor.top,
+                  bottom: anchor.bottom,
+                  maxHeight: anchor.maxHeight,
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.liftEdge,
+                },
+              ]}>
+              <ScrollView
+                contentContainerStyle={styles.dropdownList}
+                showsVerticalScrollIndicator
+                keyboardShouldPersistTaps="handled">
+                {options.map((o) => {
+                  const isSelected = o.value === value;
+                  return (
+                    <Pressable
+                      key={o.value}
+                      accessibilityRole="menuitem"
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => choose(o.value)}
+                      style={({ pressed }) => [
+                        styles.dropdownOption,
+                        {
+                          backgroundColor: isSelected
+                            ? theme.primarySoft
+                            : pressed
+                              ? theme.backgroundSelected
+                              : 'transparent',
+                        },
+                      ]}>
+                      {o.icon ? (
+                        <Icon
+                          name={o.icon}
+                          size={18}
+                          color={isSelected ? theme.brandInk : theme.textSecondary}
+                        />
+                      ) : null}
+                      <ThemedText style={[Type.body, styles.optionText]} numberOfLines={1}>
+                        {o.label}
+                      </ThemedText>
+                      {isSelected ? (
+                        <Icon name="checkmark" size={18} color={theme.primary} />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
+        </Modal>
+      ) : null}
+
       <Modal
-        visible={open}
+        visible={open && !anchored}
         transparent
         animationType="slide"
         onRequestClose={() => setOpen(false)}
@@ -156,9 +285,9 @@ export function Select({
                       opacity: pressed ? 0.75 : 1,
                     },
                   ]}>
-                  {o.glyph ? (
+                  {o.icon ? (
                     <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-                      <ThemedText style={styles.glyph}>{o.glyph}</ThemedText>
+                      <Icon name={o.icon} size={18} color={theme.textSecondary} />
                     </View>
                   ) : null}
 
@@ -172,7 +301,7 @@ export function Select({
                   </View>
 
                   {isSelected ? (
-                    <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+                    <Icon name="checkmark-circle" size={20} color={theme.primary} />
                   ) : null}
                 </Pressable>
               );
@@ -212,7 +341,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bareTile: { width: 38, height: 38, borderRadius: 12 },
-  glyph: { fontSize: 17 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   // A Modal draws over the whole window, outside the app's centred column,
   // so the sheet caps itself to the same width.
@@ -249,4 +377,21 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   optionText: { flex: 1, gap: 1 },
+  // The anchored list: lifted off the page, the field's width, scrolling.
+  dropdown: {
+    position: 'absolute',
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    ...Elevation.raised,
+  },
+  dropdownList: { padding: Spacing.one },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 11,
+    borderRadius: Radius.sm,
+  },
 });

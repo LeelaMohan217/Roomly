@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
@@ -20,6 +19,7 @@ import { formatPaise } from '@/lib/money';
 import { pairRouting, pairSummary, type PairLine } from '@/lib/pairwise';
 import { useMembers, usePairwiseLedger } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { Icon } from '@/components/ui/icon';
 
 const ENTRANCE_STEPS = 10;
 const SETTLE_MS = 800;
@@ -142,7 +142,7 @@ export default function PairHistoryScreen() {
               {exporting ? (
                 <ActivityIndicator size="small" color={theme.text} />
               ) : (
-                <Ionicons name="download-outline" size={18} color={theme.text} />
+                <Icon name="download-outline" size={18} color={theme.text} />
               )}
             </Pressable>
           ) : undefined
@@ -155,7 +155,7 @@ export default function PairHistoryScreen() {
         <View style={styles.content}>
           <Appear index={0}>
           <Card style={styles.empty}>
-            <Ionicons name="checkmark-done" size={22} color={theme.primary} />
+            <Icon name="checkmark-done" size={22} color={theme.primary} />
             <ThemedText style={Type.headline}>Nothing between you</ThemedText>
             <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
               {squaredOn
@@ -234,11 +234,11 @@ export default function PairHistoryScreen() {
                     styles.note,
                     { backgroundColor: theme.backgroundSunken, opacity: pressed ? 0.7 : 1 },
                   ]}>
-                  <Ionicons name="git-branch-outline" size={15} color={theme.textSecondary} />
+                  <Icon name="git-branch-outline" size={15} color={theme.textSecondary} />
                   <ThemedText themeColor="textSecondary" style={[Type.caption, styles.flex]}>
                     {formatPaise(routedTotal)} passed through for others
                   </ThemedText>
-                  <Ionicons name="chevron-forward" size={14} color={theme.textTertiary} />
+                  <Icon name="chevron-forward" size={14} color={theme.textTertiary} />
                 </Pressable>
               ) : null}
 
@@ -309,7 +309,7 @@ function Line({
       ]}>
       <View
         style={[styles.icon, { backgroundColor: payment ? theme.primarySoft : theme.backgroundSelected }]}>
-        <Ionicons
+        <Icon
           name={payment ? 'swap-horizontal' : 'receipt-outline'}
           size={15}
           color={payment ? theme.primary : theme.textSecondary}

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 
@@ -6,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysInMonth, firstWeekdayOfMonth, isoOf, todayIso } from '@/lib/dates';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = [
@@ -151,7 +151,7 @@ function NavButton({
   onPress,
   label,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   onPress: () => void;
   label: string;
 }) {
@@ -166,7 +166,7 @@ function NavButton({
         styles.navButton,
         { backgroundColor: theme.backgroundSunken, opacity: pressed ? 0.6 : 1 },
       ]}>
-      <Ionicons name={icon} size={16} color={theme.textSecondary} />
+      <Icon name={icon} size={16} color={theme.textSecondary} />
     </Pressable>
   );
 }

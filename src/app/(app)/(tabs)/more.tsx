@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
 import { useUpdates } from 'expo-updates';
@@ -27,13 +26,14 @@ import { PUSH_LABELS, usePushStatus } from '@/lib/push';
 import { useMembers, usePendingChanges } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * One row: an icon, a label, maybe a value on the right. It opens a screen
  * (href), does something (onPress), or only shows a fact (neither).
  */
 type Row = {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   label: string;
   value?: string;
   /** Colours the value by what it means: green on, amber needs attention. */
@@ -295,7 +295,7 @@ export default function MoreScreen() {
                 </ThemedText>
                 <View style={styles.profileMeta}>
                   <View style={[styles.rolePill, { backgroundColor: theme.primarySoft }]}>
-                    <Ionicons
+                    <Icon
                       name={isOwner ? 'shield-checkmark-outline' : 'person-outline'}
                       size={11}
                       color={theme.brandInk}
@@ -310,7 +310,7 @@ export default function MoreScreen() {
                 </View>
               </View>
               <View style={[styles.chevron, { backgroundColor: theme.liftTile }]}>
-                <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                <Icon name="chevron-forward" size={16} color={theme.textSecondary} />
               </View>
             </Pressable>
           </Appear>
@@ -328,11 +328,11 @@ export default function MoreScreen() {
                 styles.alert,
                 { backgroundColor: theme.warningSoft, opacity: pressed ? 0.7 : 1 },
               ]}>
-              <Ionicons name="alert-circle-outline" size={16} color={theme.warning} />
+              <Icon name="alert-circle-outline" size={16} color={theme.warning} />
               <ThemedText style={[Type.caption, styles.semi, styles.flex, { color: theme.warning }]}>
                 {pending} thing{pending === 1 ? '' : 's'} waiting on you
               </ThemedText>
-              <Ionicons name="chevron-forward" size={14} color={theme.warning} />
+              <Icon name="chevron-forward" size={14} color={theme.warning} />
             </Pressable>
           </Appear>
         ) : null}
@@ -359,10 +359,11 @@ export default function MoreScreen() {
             onPress={() => void confirmSignOut()}
             style={({ pressed }) => [
               styles.signOut,
-              { backgroundColor: theme.dangerSoft, opacity: pressed ? 0.75 : 1 },
+              // Solid red with white words: the one way out, unmistakable.
+              { backgroundColor: theme.danger, opacity: pressed ? 0.85 : 1 },
             ]}>
-            <Ionicons name="log-out-outline" size={19} color={theme.danger} />
-            <ThemedText style={[Type.body, styles.semi, { color: theme.danger }]}>Sign out</ThemedText>
+            <Icon name="log-out-outline" size={19} color="#FFFFFF" />
+            <ThemedText style={[Type.body, styles.semi, { color: '#FFFFFF' }]}>Sign out</ThemedText>
           </Pressable>
         </Appear>
       </ScrollView>
@@ -387,7 +388,7 @@ export default function MoreScreen() {
             <ThemedText style={[Type.body, styles.flex]} numberOfLines={1}>
               {m.displayName}
             </ThemedText>
-            <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+            <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
           </Pressable>
         ))}
       </Sheet>
@@ -418,7 +419,7 @@ function RowCard({ row: r }: { row: Row }) {
         // A tint, not a fade: the card clips it to its corners.
         style={({ pressed }) => [styles.row, pressed && act && { backgroundColor: theme.backgroundSelected }]}>
         <View style={[styles.rowIcon, { backgroundColor: theme.liftTile }]}>
-          <Ionicons name={r.icon} size={19} color={theme.brandInk} />
+          <Icon name={r.icon} size={19} color={theme.brandInk} />
         </View>
         {/* The label keeps its words; the value is secondary, so it is the
             one that truncates. */}
@@ -432,7 +433,7 @@ function RowCard({ row: r }: { row: Row }) {
         ) : (
           <View style={styles.flex} />
         )}
-        {act ? <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} /> : null}
+        {act ? <Icon name="chevron-forward" size={16} color={theme.textTertiary} /> : null}
       </Pressable>
     </View>
   );

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
@@ -20,6 +19,7 @@ import { formatPaise } from '@/lib/money';
 import { usePairwiseLedger, useSettlements, type Settlement } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon } from '@/components/ui/icon';
 
 const ENTRANCE_STEPS = 10;
 const SETTLE_MS = 800;
@@ -182,7 +182,7 @@ export default function SettlementsScreen() {
             <Appear>
               <Card style={styles.empty}>
                 <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
-                  <Ionicons name="swap-horizontal" size={22} color={theme.brandInk} />
+                  <Icon name="swap-horizontal" size={22} color={theme.brandInk} />
                 </View>
                 <ThemedText style={Type.headline}>No payments yet</ThemedText>
                 <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>

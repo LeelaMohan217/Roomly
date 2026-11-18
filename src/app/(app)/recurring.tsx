@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -18,11 +17,12 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { humanError } from '@/lib/errors';
 import { formatRange } from '@/lib/dates';
-import { iconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { formatPaise, parseAmount } from '@/lib/money';
 import { useRecurring, type Recurring } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import { Icon } from '@/components/ui/icon';
 
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -111,7 +111,7 @@ export default function RecurringScreen() {
                 styles.addButton,
                 { backgroundColor: theme.fab, opacity: pressed ? 0.8 : 1 },
               ]}>
-              <Ionicons name="add" size={18} color={theme.onFab} />
+              <Icon name="add" size={18} color={theme.onFab} />
               <ThemedText style={[styles.addLabel, { color: theme.onFab }]}>New</ThemedText>
             </Pressable>
           )
@@ -216,7 +216,7 @@ export default function RecurringScreen() {
             </Card>
           ) : (
             <Card style={styles.empty}>
-              <Ionicons name="repeat" size={22} color={theme.textTertiary} />
+              <Icon name="repeat" size={22} color={theme.textTertiary} />
               <ThemedText style={Type.headline}>Nothing recurring yet</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
                 Rent, wifi and the maid are the same every month. Add them once and they post
@@ -258,7 +258,7 @@ function RuleRow({
         { opacity: (pressed && onPress ? 0.6 : 1) * (rule.isActive ? 1 : 0.5) },
       ]}>
       <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-        <ThemedText allowFontScaling={false} style={styles.glyph}>{iconFor(rule.categoryIcon)}</ThemedText>
+        <Icon name={categoryIcon(rule.categoryIcon)} size={18} color={theme.textSecondary} />
       </View>
 
       <View style={styles.flex}>
@@ -283,9 +283,9 @@ function RuleRow({
 
       {/* Green tick: posted this month. */}
       {rule.postedThisMonth ? (
-        <Ionicons name="checkmark-circle" size={17} color={theme.primary} accessibilityLabel="Posted this month" />
+        <Icon name="checkmark-circle" size={17} color={theme.primary} accessibilityLabel="Posted this month" />
       ) : onPress ? (
-        <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+        <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
       ) : null}
     </Pressable>
   );
@@ -329,9 +329,7 @@ function PostRow({
       ]}>
       <View style={styles.rowHead}>
         <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-          <ThemedText allowFontScaling={false} style={styles.glyph}>
-            {iconFor(rule.categoryIcon)}
-          </ThemedText>
+          <Icon name={categoryIcon(rule.categoryIcon)} size={18} color={theme.textSecondary} />
         </View>
         <View style={styles.flex}>
           <View style={styles.nameRow}>

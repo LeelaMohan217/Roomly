@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import { csvAmount, toCsv } from '@/lib/csv';
-import { formatRange } from '@/lib/dates';
+import { daysInMonth, formatRange, isoOf } from '@/lib/dates';
 import { humanError } from '@/lib/errors';
 import type { HistoryFilters } from '@/lib/history-filters';
 import { formatPaise } from '@/lib/money';
@@ -65,6 +65,12 @@ export type StatementScope = {
   search: string;
   /** e.g. "Groceries, Milk · paid by Lee"; empty when unfiltered. */
   summary: string;
+  /**
+   * Whole months, any number of them, in place of the filters' from and to;
+   * with `periodLabel` saying them in words ("Oct, Nov 2026").
+   */
+  months?: { year: number; month: number }[];
+  periodLabel?: string;
 };
 
 /**
@@ -96,8 +102,20 @@ async function fetchRows(scope: StatementScope): Promise<StatementRow[]> {
       .is('voided_at', null)
       // Approved only, as every balance counts (0039).
       .eq('approval_status', 'approved');
-    if (filters.from) query = query.gte('expense_date', filters.from);
-    if (filters.to) query = query.lte('expense_date', filters.to);
+    if (scope.months?.length) {
+      // One range per month, any of them: or=(and(gte,lte),and(gte,lte)).
+      query = query.or(
+        scope.months
+          .map(
+            ({ year, month }) =>
+              `and(expense_date.gte.${isoOf(year, month, 1)},expense_date.lte.${isoOf(year, month, daysInMonth(year, month))})`
+          )
+          .join(',')
+      );
+    } else {
+      if (filters.from) query = query.gte('expense_date', filters.from);
+      if (filters.to) query = query.lte('expense_date', filters.to);
+    }
     if (filters.categoryIds.length > 0) query = query.in('category_id', filters.categoryIds);
     if (filters.paidByIds.length > 0) query = query.in('paid_by', filters.paidByIds);
 
@@ -234,7 +252,7 @@ function toStatementHtml(scope: StatementScope, rows: StatementRow[]): string {
 </style></head>
 <body>
   <h1>${esc(scope.householdName)}</h1>
-  <p class="meta">Statement · ${esc(periodOf(scope.filters))}</p>
+  <p class="meta">Statement · ${esc(scope.periodLabel ?? periodOf(scope.filters))}</p>
   ${scope.summary ? `<p class="meta">${esc(scope.summary)}</p>` : ''}
   ${scope.search.trim() ? `<p class="meta">Matching “${esc(scope.search.trim())}”</p>` : ''}
   <div class="rule"></div>
@@ -252,8 +270,8 @@ function toStatementHtml(scope: StatementScope, rows: StatementRow[]): string {
 </body></html>`;
 }
 
-/** Into Downloads where the phone allows it, else the share sheet. */
-async function deliver(
+/** Into Downloads where the phone allows it, else the share sheet. Also used by My ledger's statement. */
+export async function deliver(
   file: FileSystem.File,
   rows: number,
   mimeType: string,

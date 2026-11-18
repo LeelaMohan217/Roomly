@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -17,6 +16,7 @@ import { dayLabel, dayOf } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useNotifications, type AppNotification } from '@/lib/queries';
 import { supabase } from '@/lib/supabase';
+import { Icon, type IconName } from '@/components/ui/icon';
 
 /**
  * Wording lives here, not in SQL — money formatting has one home.
@@ -75,9 +75,9 @@ function describe(n: AppNotification): { title: string; amount: string; waiting?
 
 /** Same reasoning as describe()'s default: an unknown kind gets a shrug, not
  *  an undefined icon name that renders as a blank box. */
-const FALLBACK_ICON: keyof typeof Ionicons.glyphMap = 'ellipse-outline';
+const FALLBACK_ICON: IconName = 'ellipse-outline';
 
-const ICONS: Record<AppNotification['kind'], keyof typeof Ionicons.glyphMap> = {
+const ICONS: Record<AppNotification['kind'], IconName> = {
   expense_added: 'add',
   expense_changed: 'pencil',
   expense_deleted: 'trash-outline',
@@ -197,7 +197,7 @@ export default function NotificationsScreen() {
             <Appear>
               <Card style={styles.empty}>
                 <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
-                  <Ionicons name="notifications-outline" size={20} color={theme.brandInk} />
+                  <Icon name="notifications-outline" size={20} color={theme.brandInk} />
                 </View>
                 <ThemedText style={Type.headline}>Nothing yet</ThemedText>
                 <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
@@ -234,7 +234,7 @@ export default function NotificationsScreen() {
                       { opacity: pressed && tappable ? 0.6 : 1 },
                     ]}>
                     <View style={[styles.tile, { backgroundColor: soft }]}>
-                      <Ionicons name={ICONS[item.kind] ?? FALLBACK_ICON} size={16} color={ink} />
+                      <Icon name={ICONS[item.kind] ?? FALLBACK_ICON} size={16} color={ink} />
                     </View>
 
                     <View style={styles.flex}>

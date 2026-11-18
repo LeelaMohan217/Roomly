@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,14 +12,15 @@ import { Appear } from '@/components/ui/motion';
 import { Money } from '@/components/ui/money';
 import { queryState } from '@/components/ui/query-state';
 import { appFontFor } from '@/constants/fonts';
-import { Radius, Spacing, TabBarClearance, Type } from '@/constants/theme';
+import { Radius, Spacing, TabBarClearance, Type, washLocations } from '@/constants/theme';
 import { usePullRefresh } from '@/hooks/use-pull-refresh';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatRange } from '@/lib/dates';
 import { activeFilterCount, useHistoryFilters } from '@/lib/history-filters';
-import { iconFor } from '@/lib/icons';
+import { categoryColor, categoryIcon, categoryTint } from '@/lib/icons';
 import { formatPaise } from '@/lib/money';
 import { useCategories, useExpenses, useMembers, type Expense } from '@/lib/queries';
+import { Icon } from '@/components/ui/icon';
 
 /** A screenful: month headings and days past this are below the fold. */
 const ENTRANCE_STEPS = 10;
@@ -43,6 +43,9 @@ const MONTHS = [
  * household; a date range is fetched from the server in full, so filtering
  * further back still finds everything.
  */
+/** The search bar's and chips' outline: bright enough to read on the lighter green. */
+const BRIGHT_EDGE = 'rgba(255,255,255,0.75)';
+
 export default function HistoryScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -148,9 +151,7 @@ export default function HistoryScreen() {
 
   const narrowed = filterCount > 0 || !!needle;
 
-  // The month and year over the title, on the wash: "November 2026".
   const now = new Date();
-  const overline = `${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
   // "2026-11", the same shape as a section's key.
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -159,7 +160,9 @@ export default function HistoryScreen() {
   const header = (
     <View
       onLayout={(e) => {
-        const h = Math.round(e.nativeEvent.layout.height + insets.top + 96);
+        // Past the top of the first month card, so the green dissolves
+        // behind it rather than stopping at a line.
+        const h = Math.round(e.nativeEvent.layout.height + insets.top + 230);
         if (h !== washHeight) setWashHeight(h);
       }}>
       {/* Reaches up under the status bar and out to both screen edges; the
@@ -174,15 +177,13 @@ export default function HistoryScreen() {
           theme.washMint,
           theme.background,
         ]}
-        // Green held down past the chips, so they sit on green rather than
-        // on the pale mint, then fading behind the top of the month card.
-        locations={[0, 0.34, 0.62, 0.8, 0.92, 1]}
+        // The same soft dissolve as Home and Reports.
+        locations={washLocations()}
         style={[styles.wash, { top: -insets.top, height: washHeight }]}
       />
 
       <View style={styles.titleRow}>
         <View style={styles.flex}>
-          <ThemedText style={[Type.caption, { color: theme.onWashMuted }]}>{overline}</ThemedText>
           <ThemedText style={[styles.screenTitle, { color: theme.onWash }]}>History</ThemedText>
         </View>
         {/* Each month card opens that month's statement. This one downloads
@@ -196,7 +197,7 @@ export default function HistoryScreen() {
             styles.headerIcon,
             { backgroundColor: theme.frost, borderColor: theme.frostEdge, opacity: pressed ? 0.7 : 1 },
           ]}>
-          <Ionicons name="download-outline" size={19} color={theme.frostIcon} />
+          <Icon name="download-outline" size={19} color={theme.frostIcon} />
         </Pressable>
       </View>
 
@@ -205,8 +206,8 @@ export default function HistoryScreen() {
             same list, side by side. Transparent -- no fill, only its outline
             -- with white text and icons, so the wash shows straight through
             instead of a solid white block. */}
-        <View style={[styles.search, { backgroundColor: 'transparent', borderColor: theme.frostStrongEdge }]}>
-          <Ionicons name="search" size={18} color={theme.onWash} />
+        <View style={[styles.search, { backgroundColor: 'transparent', borderColor: BRIGHT_EDGE }]}>
+          <Icon name="search" size={18} color={theme.onWash} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -224,10 +225,10 @@ export default function HistoryScreen() {
               accessibilityLabel="Clear search"
               onPress={() => setQuery('')}
               hitSlop={10}>
-              <Ionicons name="close-circle" size={17} color={theme.onWashMuted} />
+              <Icon name="close-circle" size={17} color={theme.onWashMuted} />
             </Pressable>
           ) : null}
-          <View style={[styles.searchDivider, { backgroundColor: theme.frostStrongEdge }]} />
+          <View style={[styles.searchDivider, { backgroundColor: BRIGHT_EDGE }]} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} on` : 'Filter expenses'}
@@ -239,7 +240,7 @@ export default function HistoryScreen() {
               filterCount > 0 && { backgroundColor: theme.washField },
               { opacity: pressed ? 0.7 : 1 },
             ]}>
-            <Ionicons
+            <Icon
               name="options-outline"
               size={19}
               color={filterCount > 0 ? theme.tabActiveInk : theme.onWash}
@@ -336,7 +337,7 @@ export default function HistoryScreen() {
           queryState(expenses, 'your expenses') ??
           (narrowed ? (
             <Card style={styles.empty}>
-              <Ionicons name="search-outline" size={22} color={theme.textTertiary} />
+              <Icon name="search-outline" size={22} color={theme.textTertiary} />
               <ThemedText style={Type.headline}>Nothing matches</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
                 Try another word, or clear the filters.
@@ -344,7 +345,7 @@ export default function HistoryScreen() {
             </Card>
           ) : (
             <Card style={styles.empty}>
-              <Ionicons name="receipt-outline" size={22} color={theme.textTertiary} />
+              <Icon name="receipt-outline" size={22} color={theme.textTertiary} />
               <ThemedText style={Type.headline}>Nothing logged yet</ThemedText>
               <ThemedText themeColor="textSecondary" style={[Type.caption, styles.centered]}>
                 Expenses you add will appear here, grouped by month.
@@ -384,7 +385,7 @@ export default function HistoryScreen() {
                   </ThemedText>
                   <ThemedText style={styles.entriesCount}>{entries}</ThemedText>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
               </Pressable>
             </Appear>
           );
@@ -416,11 +417,9 @@ export default function HistoryScreen() {
                       styles.row,
                       pressed && { backgroundColor: theme.backgroundSelected },
                     ]}>
-                    {/* Grey, so green stays for money and actions. */}
-                    <View style={[styles.tile, { backgroundColor: theme.liftTile }]}>
-                      <ThemedText allowFontScaling={false} style={styles.tileGlyph}>
-                        {iconFor(item.categoryIcon)}
-                      </ThemedText>
+                    {/* Each category in its own colour on a soft tint, as on Home's Recent. */}
+                    <View style={[styles.tile, { backgroundColor: categoryTint(item.categoryIcon) }]}>
+                      <Icon name={categoryIcon(item.categoryIcon)} size={18} color={categoryColor(item.categoryIcon)} />
                     </View>
 
                     <View style={styles.rowText}>
@@ -473,7 +472,7 @@ function Chip({
         // outline and white words -- like the search bar above them.
         on
           ? { backgroundColor: theme.washField, borderColor: theme.washField }
-          : { backgroundColor: 'transparent', borderColor: theme.frostStrongEdge },
+          : { backgroundColor: 'transparent', borderColor: BRIGHT_EDGE },
         { opacity: pressed ? 0.7 : 1 },
       ]}>
       <ThemedText

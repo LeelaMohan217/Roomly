@@ -1,5 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -14,8 +12,9 @@ import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { daysInMonth, formatRange, isoOf, todayIso } from '@/lib/dates';
 import { NO_FILTERS, useHistoryFilters, type HistoryFilters } from '@/lib/history-filters';
-import { lineIconFor } from '@/lib/icons';
+import { categoryIcon } from '@/lib/icons';
 import { useCategories, useMembers } from '@/lib/queries';
+import { Icon } from '@/components/ui/icon';
 
 type Pane = 'date' | 'category' | 'paidBy';
 /** null: no date option picked, which means every date. */
@@ -100,7 +99,7 @@ function OptionRow({
               ? { backgroundColor: theme.primary, borderColor: theme.primary }
               : { borderColor: theme.borderStrong },
           ]}>
-          {selected ? <Ionicons name="checkmark" size={15} color={theme.onPrimary} /> : null}
+          {selected ? <Icon name="checkmark" size={15} color={theme.onPrimary} /> : null}
         </View>
       )}
     </Pressable>
@@ -294,8 +293,8 @@ export default function HistoryFiltersScreen() {
                   // "picked" -- the ticks, the current filter and its count.
                   lead={
                     <View style={[styles.lead, { backgroundColor: theme.primarySoft }]}>
-                      <MaterialCommunityIcons
-                        name={lineIconFor(c.icon) as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
+                      <Icon
+                        name={categoryIcon(c.icon)}
                         size={16}
                         color={theme.brandInk}
                       />
