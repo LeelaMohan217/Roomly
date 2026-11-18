@@ -18,6 +18,7 @@ import { humanError } from '@/lib/errors';
 import { useTheme } from '@/hooks/use-theme';
 import { isProperEmail } from '@/lib/email';
 import { looksLikePhone, normalizePhone } from '@/lib/phone';
+import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -27,6 +28,8 @@ import { supabase } from '@/lib/supabase';
  */
 export default function SignInScreen() {
   const theme = useTheme();
+  // Signed out by the server rather than by pressing Sign out.
+  const { expired } = useSession();
   // Email or phone in one field: the field decides which it is from what is
   // typed, so nobody has to choose a tab before they start.
   const [account, setAccount] = useState('');
@@ -135,6 +138,10 @@ export default function SignInScreen() {
         />
 
         <View style={authStyles.form}>
+          {expired && !error ? (
+            <Notice tone="info" message="You were signed out on this phone. Sign in again to carry on." />
+          ) : null}
+
           <AuthField
             label="Email or phone number"
             icon={isPhone ? 'call-outline' : 'mail-outline'}

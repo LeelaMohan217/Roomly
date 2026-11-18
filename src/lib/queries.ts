@@ -1453,6 +1453,13 @@ export function useMyPhone(userId: string | undefined) {
     queryKey: ['my-phone', userId],
     enabled: !!userId,
     queryFn: async (): Promise<string | null> => {
+      // Without a live sign-in this read goes out as a stranger, RLS hides
+      // the row, and "no number" comes back for an account that has one --
+      // which is how members were asked again for a number already saved.
+      // Fail instead: a failed read never asks (see PhoneNudge).
+      const { data: auth } = await supabase.auth.getSession();
+      if (auth.session?.user.id !== userId) throw new Error('Auth session missing!');
+
       const { data, error } = await supabase
         .from('phone_logins')
         .select('phone')

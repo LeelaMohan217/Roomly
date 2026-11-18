@@ -101,6 +101,15 @@ export function PhoneNudge() {
     if (!e164 || busy) return;
     setError(null);
     setBusy(true);
+    // Not signed in with the server any more: the save would be refused as
+    // "no permission", which tells the person nothing they can act on.
+    const { data: auth } = await supabase.auth.getSession();
+    if (!auth.session) {
+      setBusy(false);
+      setVisible(false);
+      dialog.toast({ message: 'Your session expired. Sign in again.' });
+      return;
+    }
     const { error: rpcError } = await supabase.rpc('set_my_phone', { p_phone: e164 });
     setBusy(false);
     if (rpcError) {

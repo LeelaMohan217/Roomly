@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Session } from '@supabase/supabase-js';
+import { isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
 import {
   createContext,
   useCallback,
@@ -14,7 +14,7 @@ import {
 
 import { clear as clearOutbox } from '@/lib/outbox';
 import { setRecoveryPending } from '@/lib/recovery';
-import { supabase } from '@/lib/supabase';
+import { onAnonymousRequest, supabase } from '@/lib/supabase';
 
 export type MemberRow = {
   id: string;
@@ -61,6 +61,11 @@ type SessionValue = {
    * when only the latter is known.
    */
   unreachable: boolean;
+  /**
+   * Signed out by the server, not by the person: the sign-in could not be
+   * renewed. Sign in says so, rather than appearing out of nowhere.
+   */
+  expired: boolean;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -104,6 +109,33 @@ async function writeCachedMembership(value: CachedMembership | null): Promise<vo
   }
 }
 
+/**
+ * Whose sign-in ended without them signing out, so the next sign-in can tell
+ * "the same person, back again" (keep their unsent expenses and cached
+ * screens) from "someone else on this phone" (drop both, as signOut does).
+ */
+const EXPIRED_KEY = 'roomly.expiredUser.v1';
+
+async function readExpiredUser(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(EXPIRED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function writeExpiredUser(userId: string | null): Promise<void> {
+  try {
+    if (userId) await AsyncStorage.setItem(EXPIRED_KEY, userId);
+    else await AsyncStorage.removeItem(EXPIRED_KEY);
+  } catch {
+    // Not remembered: the worst case is a missing "you were signed out" line.
+  }
+}
+
+/** At most one dead-session check this often, however many requests trip it. */
+const SESSION_CHECK_GAP_MS = 30_000;
+
 /** Resolves to `null` rather than hanging forever. */
 function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
   return new Promise((resolve) => {
@@ -143,6 +175,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<JoinRequestRow | null>(null);
   const [unreachable, setUnreachable] = useState(false);
   const [booting, setBooting] = useState(true);
+  const [expired, setExpired] = useState(false);
+
+  // Read by the auth listener and the dead-session check, which are set up
+  // once and must see the current session, not the one they were made with.
+  const sessionRef = useRef<Session | null>(null);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  /** Set while the person signs out on purpose, so that is not "expired". */
+  const signingOutRef = useRef(false);
+  const lastCheckRef = useRef(0);
   /**
    * Whose membership has been looked up, answer or not. Until it matches the
    * signed-in user, "no member row" means "not read yet", not "no household".
@@ -252,6 +295,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase.auth.getSession();
       if (!active) return;
       setSession(data.session);
+      // Closed the app on the "you were signed out" screen: still say so.
+      if (!data.session && (await readExpiredUser())) setExpired(true);
       // Bounded. setBooting(false) used to run only after this resolved, and
       // RootNavigator renders null while loading -- so a request that never
       // came back (captive portal, a network that accepts and drops) left the
@@ -260,8 +305,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (active) setBooting(false);
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       if (!active) return;
+      const previous = sessionRef.current;
+
+      // supabase-js signs out by itself when a sign-in can no longer be
+      // renewed. Nobody pressed anything, so the sign-in screen explains.
+      if (event === 'SIGNED_OUT' && previous && !signingOutRef.current) {
+        setExpired(true);
+        void writeExpiredUser(previous.user.id);
+      }
+
+      if (event === 'SIGNED_IN' && next) {
+        const userId = next.user.id;
+        setExpired(false);
+        // Out of the callback, like resolveMembership below.
+        setTimeout(() => {
+          void (async () => {
+            const expiredUser = await readExpiredUser();
+            if (!expiredUser) return;
+            await writeExpiredUser(null);
+            if (expiredUser !== userId) {
+              // Someone else on this phone: what signOut would have dropped.
+              await clearOutbox();
+              queryClient.clear();
+            } else {
+              // The same person: keep everything, but re-read whatever came
+              // back empty while their requests were going out unsigned.
+              await queryClient.invalidateQueries();
+            }
+          })();
+        }, 0);
+      }
+
       setSession(next);
       // Deferred out of the callback on purpose. supabase-js holds its auth
       // lock for the duration of this handler and documents that calling other
@@ -276,7 +352,65 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, [resolveMembership]);
+  }, [resolveMembership, queryClient]);
+
+  /**
+   * A request went out with no signed-in token while the app believes it is
+   * signed in: the session has died underneath it (see onAnonymousRequest).
+   *
+   * Left alone, the server sees a stranger: reads come back empty, writes say
+   * "You don't have permission", and cached screens hide that anything is
+   * wrong. So: try once to renew it. If that works, re-read what came back
+   * empty. If the server definitely refuses, end the session and send them to
+   * sign in. A network failure during the renewal proves nothing, so it does
+   * neither -- an offline member is never thrown out.
+   */
+  useEffect(
+    () =>
+      onAnonymousRequest(() => {
+        const current = sessionRef.current;
+        if (!current || signingOutRef.current) return;
+        const now = Date.now();
+        if (now - lastCheckRef.current < SESSION_CHECK_GAP_MS) return;
+        lastCheckRef.current = now;
+
+        void (async () => {
+          const { data: live } = await supabase.auth.getSession();
+          if (live.session) {
+            // Raced a renewal that has since landed.
+            await queryClient.invalidateQueries();
+            return;
+          }
+
+          const { data, error } = await supabase.auth.refreshSession();
+          if (data.session) {
+            await queryClient.invalidateQueries();
+            return;
+          }
+          if (isAuthRetryableFetchError(error)) return;
+          // Signed out by the request that tripped this, or by hand meanwhile.
+          if (sessionRef.current?.user.id !== current.user.id || signingOutRef.current) return;
+
+          setExpired(true);
+          await writeExpiredUser(current.user.id);
+          // Local only: the server already holds no live session for this
+          // phone. Unsent expenses and cached screens are kept for when the
+          // same person signs back in (see SIGNED_IN above).
+          signingOutRef.current = true;
+          try {
+            await supabase.auth.signOut({ scope: 'local' });
+          } finally {
+            signingOutRef.current = false;
+          }
+          setSession(null);
+          setMember(null);
+          setPending(null);
+          setUnreachable(false);
+          await writeCachedMembership(null);
+        })();
+      }),
+    [queryClient]
+  );
 
   /**
    * While a join request is pending, watch it over Realtime so the waiting
@@ -340,7 +474,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [pendingId]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    signingOutRef.current = true;
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      signingOutRef.current = false;
+    }
+    setExpired(false);
+    await writeExpiredUser(null);
     // A half-finished password reset belonged to that session too.
     await setRecoveryPending(false);
     setMember(null);
@@ -379,8 +520,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           : 'needsOnboarding';
 
   const value = useMemo(
-    () => ({ session, member, pending, status, resolving, unreachable, refresh, signOut }),
-    [session, member, pending, status, resolving, unreachable, refresh, signOut]
+    () => ({ session, member, pending, status, resolving, unreachable, expired, refresh, signOut }),
+    [session, member, pending, status, resolving, unreachable, expired, refresh, signOut]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
